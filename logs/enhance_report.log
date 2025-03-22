@@ -1,0 +1,33 @@
+2025-03-22 22:05:23,574 - Report_Enhancer - INFO - Enhancing report for SUI
+2025-03-22 22:05:24,028 - Report_Enhancer - INFO - Created language model for content generation
+2025-03-22 22:05:24,029 - Report_Enhancer - INFO - Loaded report configuration
+2025-03-22 22:05:24,029 - Report_Enhancer - WARNING - No existing report found for SUI
+2025-03-22 22:05:24,029 - Report_Enhancer - INFO - Gathering enhanced data for SUI
+2025-03-22 22:05:24,029 - Report_Enhancer - INFO - Starting comprehensive data gathering for SUI
+2025-03-22 22:05:24,029 - Report_Enhancer - INFO - Running coingecko data module
+2025-03-22 22:05:24,031 - Report_Enhancer - INFO - Using cached CoinGecko data for SUI (price: $2.27)
+2025-03-22 22:05:24,031 - Report_Enhancer - INFO - Running coinmarketcap data module
+2025-03-22 22:05:24,031 - Report_Enhancer - INFO - Using cached CoinMarketCap data for SUI (price: $2.2725239131688015)
+2025-03-22 22:05:24,031 - Report_Enhancer - INFO - Running defillama data module
+2025-03-22 22:05:24,031 - Report_Enhancer - INFO - Using cached DeFiLlama data for SUI (TVL: $346291119.88723916)
+2025-03-22 22:05:24,033 - Report_Enhancer - INFO - Using cached enhanced market data for SUI
+2025-03-22 22:05:24,033 - Report_Enhancer - INFO - Successfully added enhanced market data
+2025-03-22 22:05:24,034 - Report_Enhancer - INFO - Using cached enhanced market data for SUI
+2025-03-22 22:05:24,035 - Report_Enhancer - INFO - Added enhanced market data with 21 fields
+2025-03-22 22:05:24,035 - Report_Enhancer - INFO - Added enhanced tokenomics data
+2025-03-22 22:05:24,035 - Report_Enhancer - INFO - Added default references
+2025-03-22 22:05:24,035 - Report_Enhancer - INFO - Generating content from enhanced data
+2025-03-22 22:05:24,035 - Report_Enhancer - INFO - Generated basic report content: 1852 characters
+2025-03-22 22:05:24,035 - Report_Enhancer - INFO - Generating enhanced PDF report...
+2025-03-22 22:05:24,035 - Report_Enhancer - INFO - Publishing report for SUI
+2025-03-22 22:05:24,035 - Report_Enhancer - INFO - Using report configuration from state for document structure
+2025-03-22 22:05:24,035 - Report_Enhancer - WARNING - Missing research_summary, using default
+2025-03-22 22:05:24,035 - Report_Enhancer - WARNING - Missing price_analysis, using default
+2025-03-22 22:05:24,035 - Report_Enhancer - WARNING - No visualizations found, continuing without them
+2025-03-22 22:05:24,035 - Report_Enhancer - INFO - Using draft for report content
+2025-03-22 22:05:24,040 - Report_Enhancer - WARNING - Using built-in Helvetica fonts: Can't open file "assets/fonts/Roboto-Regular.ttf"
+2025-03-22 22:05:24,041 - Report_Enhancer - INFO - Building report according to style guide with report configuration
+2025-03-22 22:05:24,044 - Report_Enhancer - INFO - Successfully created PDF report at docs/SUI_report.pdf
+2025-03-22 22:05:24,044 - Report_Enhancer - INFO - Successfully generated enhanced report at docs/SUI_report.pdf
+2025-03-22 22:05:24,044 - Report_Enhancer - INFO - PDF size: 2.6 KB
+2025-03-22 22:05:24,045 - Report_Enhancer - INFO - Report enhancement completed successfully for SUI
