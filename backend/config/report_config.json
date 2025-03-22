@@ -1,0 +1,190 @@
+{
+    "report_name": "Cryptocurrency Research Report",
+    "description": "A comprehensive analysis of cryptocurrency projects for investment decision-making",
+    "version": "1.0",
+    "sections": [
+        {
+            "title": "Executive Summary",
+            "required": true,
+            "max_words": 300,
+            "description": "Concise overview of key investment points and real-time metrics",
+            "data_sources": ["coingecko", "coinmarketcap", "defillama"],
+            "visualizations": ["key_metrics_table"]
+        },
+        {
+            "title": "Introduction",
+            "required": true,
+            "max_words": 400,
+            "description": "Background information and basic details about the cryptocurrency",
+            "data_sources": ["coingecko", "coinmarketcap"],
+            "visualizations": ["basic_metrics_table"]
+        },
+        {
+            "title": "Market Analysis",
+            "required": true,
+            "max_words": 600,
+            "description": "In-depth market performance data and comparisons",
+            "data_sources": ["coingecko", "coinmarketcap", "defillama"],
+            "visualizations": ["price_history_chart", "volume_chart", "tvl_chart", "competitor_comparison_chart"]
+        },
+        {
+            "title": "Technical Analysis",
+            "required": true,
+            "max_words": 600,
+            "description": "Evaluation of technical foundations and architecture",
+            "data_sources": ["web_research"],
+            "visualizations": []
+        },
+        {
+            "title": "Tokenomics",
+            "required": true,
+            "max_words": 500,
+            "description": "Analysis of token economics, supply, and distribution",
+            "data_sources": ["coingecko", "coinmarketcap", "web_research"],
+            "visualizations": ["token_distribution_chart", "supply_table"]
+        },
+        {
+            "title": "Governance and Community",
+            "required": true,
+            "max_words": 400,
+            "description": "Assessment of decision-making processes and community engagement",
+            "data_sources": ["web_research"],
+            "visualizations": ["governance_metrics_table"]
+        },
+        {
+            "title": "Ecosystem and Partnerships",
+            "required": true,
+            "max_words": 400,
+            "description": "Evaluation of project's network and external relationships",
+            "data_sources": ["web_research", "defillama"],
+            "visualizations": ["partnerships_table"]
+        },
+        {
+            "title": "Risks and Opportunities",
+            "required": true,
+            "max_words": 500,
+            "description": "Identification of challenges and growth potential",
+            "data_sources": ["web_research"],
+            "visualizations": ["risks_table", "opportunities_table"]
+        },
+        {
+            "title": "Team and Development",
+            "required": true,
+            "max_words": 400,
+            "description": "Assessment of the team and roadmap",
+            "data_sources": ["web_research"],
+            "visualizations": ["roadmap_timeline"]
+        },
+        {
+            "title": "Conclusion",
+            "required": true,
+            "max_words": 300,
+            "description": "Summary of findings and investment outlook",
+            "data_sources": [],
+            "visualizations": ["key_takeaways_table"]
+        }
+    ],
+    "visualization_types": {
+        "price_history_chart": {
+            "type": "line_chart",
+            "data_source": "coingecko",
+            "data_field": "price_history",
+            "time_period": "60d",
+            "title": "60-Day Price Trend",
+            "description_template": "The chart shows the price movement of {project_name} over the past 60 days, illustrating {trend_description}."
+        },
+        "volume_chart": {
+            "type": "line_chart",
+            "data_source": "coingecko",
+            "data_field": "volume_history",
+            "time_period": "30d",
+            "title": "30-Day Trading Volume",
+            "description_template": "Trading volume for {project_name} over the past 30 days shows {volume_description}."
+        },
+        "tvl_chart": {
+            "type": "line_chart",
+            "data_source": "defillama",
+            "data_field": "tvl_history",
+            "time_period": "60d",
+            "title": "Total Value Locked (TVL) Trend",
+            "description_template": "The Total Value Locked (TVL) in {project_name} over the past 60 days demonstrates {tvl_description}."
+        },
+        "token_distribution_chart": {
+            "type": "pie_chart",
+            "data_source": "web_research",
+            "data_field": "token_distribution",
+            "title": "Token Distribution",
+            "description_template": "The distribution of {project_name} tokens shows {distribution_description}."
+        },
+        "key_metrics_table": {
+            "type": "table",
+            "data_source": "multi",
+            "data_fields": ["current_price", "market_cap", "24h_volume", "tvl"],
+            "title": "Key Metrics",
+            "description_template": "Current key metrics for {project_name} as of {timestamp}."
+        },
+        "basic_metrics_table": {
+            "type": "table",
+            "data_source": "multi",
+            "data_fields": ["current_price", "market_cap", "circulating_supply", "total_supply", "24h_volume"],
+            "title": "Basic Information",
+            "description_template": "Basic market information for {project_name} as of {timestamp}."
+        },
+        "competitor_comparison_chart": {
+            "type": "bar_chart",
+            "data_source": "multi",
+            "data_fields": ["market_cap", "price_change_percentage_24h"],
+            "title": "Competitive Comparison",
+            "description_template": "This chart compares {project_name} with similar projects in terms of {metrics_description}."
+        },
+        "supply_table": {
+            "type": "table",
+            "data_source": "multi",
+            "data_fields": ["circulating_supply", "total_supply", "max_supply"],
+            "title": "Token Supply Details",
+            "description_template": "Token supply information for {project_name}."
+        },
+        "governance_metrics_table": {
+            "type": "table",
+            "data_source": "web_research",
+            "data_fields": ["governance_model", "proposal_count", "voting_participation"],
+            "title": "Governance Metrics",
+            "description_template": "Governance statistics for {project_name}."
+        },
+        "partnerships_table": {
+            "type": "table",
+            "data_source": "web_research",
+            "data_fields": ["partner_name", "partnership_type", "partnership_date"],
+            "title": "Key Partnerships",
+            "description_template": "Major partnerships and integrations of {project_name}."
+        },
+        "risks_table": {
+            "type": "table",
+            "data_source": "web_research",
+            "data_fields": ["risk_type", "risk_description", "risk_level"],
+            "title": "Key Risks",
+            "description_template": "Major risks associated with {project_name}."
+        },
+        "opportunities_table": {
+            "type": "table",
+            "data_source": "web_research",
+            "data_fields": ["opportunity_type", "opportunity_description", "potential_impact"],
+            "title": "Key Opportunities",
+            "description_template": "Major opportunities for {project_name}."
+        },
+        "roadmap_timeline": {
+            "type": "timeline",
+            "data_source": "web_research",
+            "data_fields": ["milestone_date", "milestone_description", "completion_status"],
+            "title": "Development Roadmap",
+            "description_template": "Upcoming and completed milestones for {project_name}."
+        },
+        "key_takeaways_table": {
+            "type": "table",
+            "data_source": "generated",
+            "data_fields": ["aspect", "assessment", "recommendation"],
+            "title": "Key Takeaways",
+            "description_template": "Summary of key findings and recommendations for {project_name}."
+        }
+    }
+} 
