@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import { SocketProvider } from './socket-provider'
 
 const inter = Inter({
   subsets: ["latin"],
@@ -8,19 +9,21 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "XplainCrypto",
-  description: "AI-Powered Crypto Research Reports",
+  title: "XplainCrypto - Cryptocurrency Research Reports",
+  description: "Generate comprehensive, research-backed reports on any cryptocurrency",
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: {
+  children: React.ReactNode
+}) {
   return (
     <html lang="en">
       <body className={`${inter.variable} antialiased`}>
-        {children}
+        <SocketProvider>
+          {children}
+        </SocketProvider>
       </body>
     </html>
   );

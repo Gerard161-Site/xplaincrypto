@@ -1,159 +1,181 @@
 'use client';
 
-import React, { useState, useEffect } from "react";
-import io from "socket.io-client";
-import Image from "next/image";
+import React, { useState, useEffect } from 'react';
+import { useSocket } from './socket-provider';
+import Spinner from './components/Spinner';
 
 export default function Home() {
   const [projectName, setProjectName] = useState("");
-  const [progress, setProgress] = useState<string[]>([]);
-  const [reportUrl, setReportUrl] = useState("");
-
-  useEffect(() => {
-    const socket = io("http://localhost:8000");
-    socket.on("connect", () => console.log("Connected to WebSocket"));
-    socket.on("message", (msg) => {
-      setProgress((prev) => [...prev, msg]);
-    });
-    socket.on("data", (data) => {
-      setProgress((prev) => [...prev, data.status]);
-      setReportUrl(data.final_report);
-    });
-    socket.on("error", (err) => {
-      setProgress((prev) => [...prev, `Error: ${err}`]);
-    });
-
-    return () => {
-      socket.disconnect();
-    };
-  }, []);
+  const [fastMode, setFastMode] = useState(true);
+  const { connected, isGenerating, startGenerate, progress, reportUrl, resetState, metrics, logs } = useSocket();
 
   const handleGenerate = () => {
-    setProgress([]); // Clear previous logs
-    setReportUrl(""); // Reset download link
-    const socket = io("http://localhost:8000");
-    socket.emit("message", { project_name: projectName });
+    if (!projectName) {
+      alert("Please enter a project name");
+      return;
+    }
+    if (!connected) {
+      alert("Not connected to the server. Please wait for connection to establish or refresh the page.");
+      return;
+    }
+    startGenerate(projectName, fastMode);
+  };
+
+  // Format duration in a user-friendly way
+  const formatDuration = (seconds: number) => {
+    if (seconds < 60) return `${seconds}s`;
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = Math.round(seconds % 60);
+    return `${minutes}m ${remainingSeconds}s`;
   };
 
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start w-full max-w-md">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <h1 className="text-2xl font-bold mb-4">XplainCrypto</h1>
+    <main className="min-h-screen bg-gray-900 text-white p-4">
+      <div className="max-w-4xl mx-auto">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-3xl font-bold text-blue-400">XplainCrypto</h1>
+          <div className={`flex items-center ${connected ? 'text-green-500' : 'text-red-500'}`}>
+            <div className={`w-3 h-3 rounded-full mr-2 ${connected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+            {connected ? 'Connected' : 'Disconnected'}
+          </div>
+        </div>
         
-        <div className="w-full space-y-4">
-          <input
-            type="text"
-            value={projectName}
-            onChange={(e) => setProjectName(e.target.value)}
-            placeholder="Enter project name (e.g., Solana)"
-            className="w-full p-2 border rounded bg-background text-foreground"
-          />
-          
-          <button
-            onClick={handleGenerate}
-            className="w-full p-2 bg-foreground text-background rounded hover:bg-[#383838] dark:hover:bg-[#ccc] transition-colors"
-          >
-            Generate Report
-          </button>
+        <p className="text-gray-300 mb-8 text-center">
+          Generate comprehensive, research-backed reports on any cryptocurrency
+        </p>
 
-          <div className="mt-4 max-h-64 overflow-y-auto border p-2 rounded bg-background/[.05] dark:bg-white/[.06]">
-            {progress.map((msg, idx) => (
-              <p key={idx} className="text-sm text-foreground/80">{msg}</p>
-            ))}
+        <div className="bg-gray-800 p-6 rounded-lg shadow-lg mb-6">
+          <div className="mb-4">
+            <label htmlFor="project-name" className="block text-gray-300 mb-2">
+              Enter Cryptocurrency Name or Symbol:
+            </label>
+            <input
+              id="project-name"
+              type="text"
+              value={projectName}
+              onChange={(e) => setProjectName(e.target.value)}
+              placeholder="e.g., Bitcoin, Ethereum, SOL, etc."
+              className="w-full p-2 bg-gray-700 text-white rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={isGenerating}
+            />
           </div>
 
-          {reportUrl && (
-            <a
-              href={`http://localhost:8000/${reportUrl}`}
-              download
-              className="mt-4 block text-foreground underline hover:no-underline"
+          <div className="mb-6">
+            <label className="block text-gray-300 mb-2">Report Mode:</label>
+            <div className="flex space-x-4">
+              <label className="flex items-center cursor-pointer">
+                <input
+                  type="radio"
+                  name="mode"
+                  checked={fastMode}
+                  onChange={() => setFastMode(true)}
+                  className="mr-2"
+                  disabled={isGenerating}
+                />
+                <span className="text-gray-300">Fast Mode</span>
+                <span className="ml-2 text-xs text-gray-500">(~1-2 min)</span>
+              </label>
+              <label className="flex items-center cursor-pointer">
+                <input
+                  type="radio"
+                  name="mode"
+                  checked={!fastMode}
+                  onChange={() => setFastMode(false)}
+                  className="mr-2"
+                  disabled={isGenerating}
+                />
+                <span className="text-gray-300">Comprehensive Mode</span>
+                <span className="ml-2 text-xs text-gray-500">(~5-10 min)</span>
+              </label>
+            </div>
+          </div>
+
+          <button
+            onClick={handleGenerate}
+            disabled={isGenerating || !connected}
+            className={`w-full p-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 ${(isGenerating || !connected) ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
+            <svg
+              className="h-5 w-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
             >
-              Download Report
-            </a>
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            {connected ? 'Generate Report' : 'Connecting...'}
+          </button>
+
+          {isGenerating && (
+            <div className="flex items-center gap-2 text-yellow-500 mt-4">
+              <Spinner />
+              Generating report... Please wait.
+            </div>
           )}
+          {reportUrl && (
+            <div className="flex flex-col items-center gap-2 text-green-500 mt-4">
+              <div className="flex items-center">
+                <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                Report generated successfully!
+              </div>
+              <a 
+                href={`http://localhost:8000${reportUrl}`} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="px-4 py-2 bg-blue-600 rounded hover:bg-blue-700 text-white transition-colors mt-2"
+              >
+                Download PDF Report
+              </a>
+              {metrics && (
+                <div className="text-xs text-gray-400 mt-2">
+                  Generated in {formatDuration(metrics.duration)} | {metrics.mode === 'fast' ? 'Fast Mode' : 'Comprehensive Mode'}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Display log section */}
+          <div className="mt-6 border border-gray-700 p-2 rounded">
+            <h3 className="text-sm text-gray-400 mb-2">Process Log:</h3>
+            <div className="bg-black rounded p-2 text-xs text-gray-300 font-mono h-64 overflow-y-auto">
+              {logs.length > 0 ? (
+                logs.map((log: string, idx: number) => (
+                  <div 
+                    key={idx} 
+                    className={`mb-1 ${
+                      log.includes('ERROR') 
+                        ? 'text-red-400' 
+                        : log.includes('WARNING') 
+                          ? 'text-yellow-400' 
+                          : 'text-green-400'
+                    }`}
+                  >
+                    {log}
+                  </div>
+                ))
+              ) : (
+                <div className="text-gray-500">Logs will appear here during report generation...</div>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-4 progress-log">
+            <h3 className="text-sm text-gray-400 mb-2">Progress Updates:</h3>
+            {progress.map((msg: string, idx: number) => (
+              <p key={idx} className={`text-sm ${msg.includes('Error:') ? 'text-red-500' : 'text-gray-300'}`}>
+                {msg}
+              </p>
+            ))}
+          </div>
         </div>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+        <div className="text-center text-gray-500 text-sm">
+          <p>© 2023 XplainCrypto - AI-Powered Cryptocurrency Research</p>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+      </div>
+    </main>
   );
 }
