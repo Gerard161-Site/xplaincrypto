@@ -19,3 +19,38 @@ body {
   color: var(--foreground);
   font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
 }
+
+/* Ensure dark theme consistency */
+.dark {
+  background: #0a0a0a;
+  color: #ededed;
+}
+
+/* Style for progress log to look like a console */
+.progress-log {
+  font-family: monospace;
+  background: #1a1a1a;
+  border: 1px solid #4a4a4a;
+  border-radius: 8px;
+  padding: 12px;
+  max-height: 16rem;
+  overflow-y: auto;
+}
+
+/* Scrollbar styling for dark theme */
+.progress-log::-webkit-scrollbar {
+  width: 8px;
+}
+
+.progress-log::-webkit-scrollbar-track {
+  background: #2a2a2a;
+}
+
+.progress-log::-webkit-scrollbar-thumb {
+  background: #4a4a4a;
+  border-radius: 4px;
+}
+
+.progress-log::-webkit-scrollbar-thumb:hover {
+  background: #6a6a6a;
+}

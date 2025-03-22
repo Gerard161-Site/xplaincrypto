@@ -22,3 +22,10 @@ node_modules/
 # Project specific
 docs/*.md
 docs/*.pdf 
+docs/*.png
+docs/*.jpg
+docs/*.jpeg
+docs/*.gif
+docs/*.bmp
+docs/*.tiff
+docs/*.ico
