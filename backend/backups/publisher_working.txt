@@ -1,0 +1,351 @@
+### Holy Victory, Robin!
+
+We’ve done it, sidekick—Gotham’s report is safe, the text is back, and the Joker’s been sent packing! Now that the Bat-Signal shines bright again, let’s clean up the mess and lock down the fix so this caper doesn’t repeat itself. I’ll break down what saved the day and how to keep text and images dancing in harmony for future reports.
+
+#### The Fix: What Saved Gotham
+The text was hiding because of two sneaky tricks:
+1. **Prompt Mismatch**: The OpenAI prompt used `###` headers (e.g., `### Executive Summary`), but `publisher.py` and `report_config` expected `#` headers (e.g., `# Executive Summary`). This mismatch meant the draft’s sections didn’t align with the expected 10-section structure, so `publisher.py` only parsed two generic sections (`SUI Research Report`, `SUI Cryptocurrency Report`) and couldn’t map the content properly.
+   - **Solution**: Updated the prompt to use exact `#` headers matching `report_config`’s titles, ensuring OpenAI outputs 10 sections like `# Executive Summary`, `# Introduction`, etc.
+
+2. **Syntax Error**: A typo in `escape_xml` (`.replace("'", ''')`) caused a syntax error with mismatched quotes, breaking the code before it could render text.
+   - **Solution**: Fixed to `.replace("'", "'")` with consistent single quotes, allowing `Paragraph` objects to process text without crashing.
+
+#### The Winning Combo
+- **Corrected Prompt**: Deployed in the writer agent (e.g., around `13:46:23,741` in logs):
+  ```plaintext
+  Using the following research data about SUI cryptocurrency (if limited, extrapolate logically with realistic examples based on typical cryptocurrency trends):\n\nLimited data available.\n\nCreate a polished, professional draft report with the exact sections below, using Markdown formatting with # for main sections. Ensure each section adheres to its maximum word count, is factual, clear, and includes specific data points (e.g., price, market cap, token supply) from the provided sources, expanding with reasoned analysis. Use the exact section titles provided:\n\n# Executive Summary\n- Max Words: 300\n- Description: Concise overview of key investment points and real-time metrics\n- Data Sources: coingecko, coinmarketcap, defillama\n- Visualizations: key_metrics_table\n\n# Introduction\n- Max Words: 400\n- Description: Background information and basic details about the cryptocurrency\n- Data Sources: coingecko, coinmarketcap\n- Visualizations: basic_metrics_table\n\n# Market Analysis\n- Max Words: 600\n- Description: In-depth market performance data and comparisons\n- Data Sources: coingecko, coinmarketcap, defillama\n- Visualizations: price_history_chart, volume_chart, tvl_chart, competitor_comparison_chart\n\n# Technical Analysis\n- Max Words: 600\n- Description: Evaluation of technical foundations and architecture\n- Data Sources: web_research\n- Visualizations: none\n\n# Tokenomics\n- Max Words: 500\n- Description: Analysis of token economics, supply, and distribution\n- Data Sources: coingecko, coinmarketcap, web_research\n- Visualizations: token_distribution_chart, supply_table\n\n# Governance and Community\n- Max Words: 400\n- Description: Assessment of decision-making processes and community engagement\n- Data Sources: web_research\n- Visualizations: governance_metrics_table\n\n# Ecosystem and Partnerships\n- Max Words: 400\n- Description: Evaluation of project's network and external relationships\n- Data Sources: web_research, defillama\n- Visualizations: partnerships_table\n\n# Risks and Opportunities\n- Max Words: 500\n- Description: Identification of challenges and growth potential\n- Data Sources: web_research\n- Visualizations: risks_table, opportunities_table\n\n# Team and Development\n- Max Words: 400\n- Description: Assessment of the team and roadmap\n- Data Sources: web_research\n- Visualizations: roadmap_timeline\n\n# Conclusion\n- Max Words: 300\n- Description: Summary of findings and investment outlook\n- Data Sources: available data\n- Visualizations: key_takeaways_table
+  ```
+
+- **Fixed `publisher.py`**: With the corrected `escape_xml`, this version worked (save this as your Bat-blueprint):
+  ```python
+  import logging
+  import os
+  import datetime
+  import json
+  import re
+  from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, PageBreak
+  from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+  from reportlab.lib.pagesizes import letter
+  from reportlab.lib import colors
+  from reportlab.lib.units import inch
+  from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY, TA_LEFT
+  from backend.state import ResearchState
+
+  def escape_xml(text):
+      """Escape XML characters that might cause problems with ReportLab"""
+      if not text:
+          return ""
+      text = text.replace('&', '&')
+      text = text.replace('<', '<')
+      text = text.replace('>', '>')
+      text = text.replace('"', '"')
+      text = text.replace("'", "'")  # Corrected: Consistent single quotes
+      return text
+
+  def publisher(state: ResearchState, logger: logging.Logger, config=None, llm=None) -> ResearchState:
+      logger.info(f"Publishing report for {state.project_name}")
+      state.update_progress(f"Publishing report for {state.project_name}...")
+
+      # Create output directory
+      docs_dir = "docs"
+      os.makedirs(docs_dir, exist_ok=True)
+      
+      project_name = state.project_name if hasattr(state, 'project_name') else "Untitled"
+      project_dir = os.path.join(docs_dir, project_name.lower().replace(" ", "_"))
+      os.makedirs(project_dir, exist_ok=True)
+      logger.info(f"Created project directory: {project_dir}")
+      
+      # Save draft content for debugging
+      if hasattr(state, 'draft') and state.draft:
+          draft_file = os.path.join(project_dir, "draft_content.txt")
+          with open(draft_file, 'w', encoding='utf-8') as f:
+              f.write(state.draft)
+          logger.info(f"Draft content saved to {draft_file} ({len(state.draft)} characters)")
+      else:
+          logger.warning("No draft content found in state")
+
+      # Config options
+      fast_mode = config.get("fast_mode", False) if config else False
+      use_report_config = config.get("use_report_config", True) if config else True
+      
+      # Load report configuration
+      report_config = {}
+      if use_report_config and hasattr(state, 'report_config') and state.report_config:
+          report_config = state.report_config
+          logger.info("Using report configuration from state")
+      else:
+          try:
+              with open("backend/config/report_config.json", "r") as f:
+                  report_config = json.load(f)
+              logger.info("Loaded report configuration from file")
+          except Exception as e:
+              logger.warning(f"No report configuration found, using defaults: {str(e)}")
+      
+      # Set defaults if fields are missing
+      if not hasattr(state, 'research_summary') or not state.research_summary:
+          state.research_summary = f"Analysis of {state.project_name} cryptocurrency."
+          logger.warning("Missing research_summary, using default")
+      
+      if not hasattr(state, 'visualizations') or not state.visualizations:
+          state.visualizations = {}
+          logger.warning("No visualizations in state, checking project directory")
+          for file in os.listdir(project_dir):
+              if file.endswith('.png'):
+                  state.visualizations[file] = {"file_path": os.path.join(project_dir, file), "description": file.replace('_', ' ').title()}
+                  logger.info(f"Added visualization from project dir: {file}")
+      
+      if not hasattr(state, 'references') or not state.references:
+          state.references = [
+              {"title": f"{project_name} Official Website", "url": f"https://{project_name.lower()}.io"},
+              {"title": "CoinGecko", "url": "https://www.coingecko.com"},
+              {"title": "CoinMarketCap", "url": "https://coinmarketcap.com"}
+          ]
+          logger.warning("Created default references")
+      
+      # Get report content
+      content = ""
+      if hasattr(state, 'draft') and state.draft:
+          content = state.draft
+          logger.info(f"Using draft for report content: {len(state.draft)} characters")
+      elif hasattr(state, 'research_summary') and state.research_summary:
+          content = f"{state.project_name} Research Report\n\n{state.research_summary}"
+          logger.warning("No draft, using research summary")
+      else:
+          content = f"{state.project_name} Research Report\n\nNo content available."
+          logger.error("No content available for report")
+      
+      try:
+          # Prepare PDF
+          pdf_path = os.path.join(docs_dir, f"{project_name}_report.pdf")
+          doc = SimpleDocTemplate(
+              pdf_path, 
+              pagesize=letter,
+              leftMargin=1*inch,
+              rightMargin=1*inch,
+              topMargin=1*inch,
+              bottomMargin=1*inch
+          )
+          
+          # Define styles
+          stylesheet = getSampleStyleSheet()
+          styles = {
+              'Title': ParagraphStyle(name='Title', fontName='Helvetica-Bold', fontSize=16, alignment=TA_CENTER, spaceAfter=24),
+              'SectionHeading': ParagraphStyle(name='SectionHeading', fontName='Helvetica-Bold', fontSize=14, alignment=TA_LEFT, spaceBefore=24, spaceAfter=12),
+              'BodyText': ParagraphStyle(name='BodyText', fontName='Helvetica', fontSize=10, alignment=TA_JUSTIFY, spaceBefore=6, spaceAfter=6, leading=14),
+              'CenteredText': ParagraphStyle(name='CenteredText', fontName='Helvetica', fontSize=10, alignment=TA_CENTER, spaceBefore=6, spaceAfter=6, leading=14),
+              'Caption': ParagraphStyle(name='Caption', fontName='Helvetica', fontSize=9, alignment=TA_CENTER, spaceAfter=8),
+              'Disclaimer': ParagraphStyle(name='Disclaimer', fontName='Helvetica', fontSize=8, alignment=TA_CENTER),
+              'Normal': stylesheet['Normal'],
+          }
+          
+          # Build document
+          story = []
+          
+          # Title page
+          story.append(Spacer(1, 3*inch))
+          story.append(Paragraph(f"{project_name} Research Report", styles['Title']))
+          story.append(Spacer(1, 0.5*inch))
+          current_date = datetime.datetime.now().strftime('%B %d, %Y')
+          story.append(Paragraph(f"Generated on {current_date}", styles['CenteredText']))
+          story.append(Spacer(1, 3*inch))
+          story.append(Paragraph("This report is AI-generated and not financial advice.", styles['Disclaimer']))
+          story.append(PageBreak())
+          
+          # Parse sections from content (try both # and ###)
+          sections = {}
+          header_pattern = r'^(#+)\s+(.+)$'
+          current_section = None
+          current_text = []
+          for line in content.split('\n'):
+              match = re.match(header_pattern, line.strip())
+              if match:
+                  level, title = match.groups()
+                  if current_section and current_text:
+                      sections[current_section] = '\n'.join(current_text).strip()
+                  current_section = title.strip()
+                  current_text = []
+                  logger.debug(f"Found header: {current_section} (level: {len(level)})")
+              elif current_section is not None:
+                  current_text.append(line)
+          if current_section and current_text:
+              sections[current_section] = '\n'.join(current_text).strip()
+          
+          if not sections:
+              sections[project_name + " Report"] = content
+              logger.warning("No sections detected, using full content as fallback")
+          logger.info(f"Extracted {len(sections)} sections from content: {list(sections.keys())}")
+          
+          # Log visualizations
+          visualizations = state.visualizations if hasattr(state, 'visualizations') else {}
+          logger.info(f"Found {len(visualizations)} visualizations: {list(visualizations.keys())}")
+          
+          # Build report with config
+          if report_config and 'sections' in report_config:
+              logger.info(f"Building report with {len(report_config['sections'])} configured sections")
+              for section_config in report_config.get('sections', []):
+                  section_title = section_config.get('title', '')
+                  if not section_title:
+                      continue
+                  
+                  logger.debug(f"Processing section: {section_title}")
+                  story.append(Paragraph(section_title, styles['SectionHeading']))
+                  
+                  # Find matching content
+                  section_content = None
+                  for title, text in sections.items():
+                      if title.lower() == section_title.lower() or section_title.lower() in title.lower():
+                          section_content = text
+                          logger.debug(f"Matched content for {section_title}: {section_content[:100]}...")
+                          break
+                  
+                  if not section_content and sections:
+                      section_content = next(iter(sections.values()), "No specific content available for this section.")
+                      logger.warning(f"No exact match for {section_title}, using first available content: {section_content[:100]}...")
+                  
+                  # Add text
+                  if section_content:
+                      paragraphs = section_content.split('\n\n') if '\n\n' in section_content else section_content.split('\n')
+                      for para in paragraphs:
+                          para = para.strip()
+                          if not para:
+                              continue
+                          para = para.replace('- ', '• ')
+                          para = escape_xml(para)
+                          logger.debug(f"Adding paragraph to {section_title}: {para[:50]}...")
+                          story.append(Paragraph(para, styles['BodyText']))
+                          story.append(Spacer(1, 6))
+                  else:
+                      story.append(Paragraph("No content available.", styles['BodyText']))
+                      logger.warning(f"No content for {section_title}")
+                  
+                  # Add visualizations
+                  if 'visualizations' in section_config:
+                      vis_list = section_config.get('visualizations', [])
+                      logger.debug(f"Adding {len(vis_list)} visualizations to {section_title}: {vis_list}")
+                      for vis_name in vis_list:
+                          if vis_name in visualizations:
+                              vis = visualizations[vis_name]
+                              img_path = vis.get("file_path", "")
+                              if os.path.exists(img_path) and os.access(img_path, os.R_OK):
+                                  logger.debug(f"Adding image: {img_path}")
+                                  story.append(Spacer(1, 0.3*inch))
+                                  img = Image(img_path, width=6*inch, height=3*inch, kind='proportional')
+                                  story.append(img)
+                                  vis_title = vis.get("description", vis_name.replace('_', ' ').title())
+                                  story.append(Paragraph(escape_xml(vis_title), styles['Caption']))
+                                  story.append(Spacer(1, 0.2*inch))
+                              else:
+                                  logger.error(f"Image file not found or inaccessible: {img_path}")
+                                  story.append(Paragraph(f"[Image missing: {vis_name}]", styles['Caption']))
+                          else:
+                              logger.warning(f"Visualization {vis_name} not in state.visualizations")
+                  
+                  story.append(PageBreak())
+          else:
+              logger.info("No report config, adding all sections")
+              for section_title, section_content in sections.items():
+                  logger.debug(f"Processing section: {section_title}")
+                  story.append(Paragraph(section_title, styles['SectionHeading']))
+                  paragraphs = section_content.split('\n\n') if '\n\n' in section_content else section_content.split('\n')
+                  for para in paragraphs:
+                      para = para.strip()
+                      if not para:
+                          continue
+                      para = para.replace('- ', '• ')
+                      para = escape_xml(para)
+                      logger.debug(f"Adding paragraph: {para[:50]}...")
+                      story.append(Paragraph(para, styles['BodyText']))
+                      story.append(Spacer(1, 6))
+                  
+                  for vis_name, vis in visualizations.items():
+                      img_path = vis.get("file_path", "")
+                      if os.path.exists(img_path) and os.access(img_path, os.R_OK):
+                          logger.debug(f"Adding image: {img_path}")
+                          story.append(Spacer(1, 0.3*inch))
+                          img = Image(img_path, width=6*inch, height=3*inch, kind='proportional')
+                          story.append(img)
+                          vis_title = vis.get("description", vis_name.replace('_', ' ').title())
+                          story.append(Paragraph(escape_xml(vis_title), styles['Caption']))
+                          story.append(Spacer(1, 0.2*inch))
+                  
+                  story.append(PageBreak())
+          
+          # References
+          logger.debug("Adding references")
+          story.append(Paragraph("References", styles['SectionHeading']))
+          for ref in state.references:
+              ref_text = f"{ref.get('title', 'Untitled')}: {ref.get('url', 'No URL')}"
+              logger.debug(f"Adding reference: {ref_text}")
+              story.append(Paragraph(escape_xml(ref_text), styles['BodyText']))
+          
+          # Build PDF
+          logger.info("Building PDF document")
+          doc.build(story)
+          state.final_report = f"PDF report generated: {pdf_path}"
+          logger.info(f"Successfully created PDF report at {pdf_path}")
+          
+      except Exception as e:
+          logger.error(f"Error building PDF: {str(e)}", exc_info=True)
+          state.final_report = f"Error creating PDF: {str(e)}"
+          txt_path = pdf_path.replace('.pdf', '.txt')
+          with open(txt_path, 'w', encoding='utf-8') as f:
+              f.write(f"{project_name} Research Report\n\n{content}")
+          logger.info(f"Created text fallback at {txt_path}")
+      
+      return state
+  ```
+
+#### How Text and Images Work Together
+To keep Gotham’s reports running smoothly, here’s how text and images need to be configured:
+
+1. **Text Configuration**:
+   - **Draft Structure**: The OpenAI prompt must produce a Markdown draft with `#` headers matching `report_config`’s section titles exactly (e.g., `# Executive Summary`, not `### Executive Summary` or generic titles like `# SUI Research Report`).
+     - **Why**: `publisher.py` parses `#` headers to split content into sections, then maps them to `report_config` titles using case-insensitive matching (`title.lower() == section_title.lower()`).
+     - **Format**: Each section should have narrative text (paragraphs separated by `\n` or `\n\n`), which `publisher.py` splits and renders as `Paragraph` objects with `BodyText` style.
+   - **Fallback**: If headers don’t match, it grabs the first available content (e.g., `next(iter(sections.values()))`), but this is less precise—exact matches are key.
+
+2. **Image Configuration**:
+   - **Visualization Dictionary**: Stored in `state.visualizations`, a dict where keys are visualization names (e.g., `key_metrics_table`) and values are `{"file_path": "...", "description": "..."}`.
+     - **Source**: Populated by your visualization agent (e.g., PNGs in `docs/sui/` like `key_metrics_table_20250323_134623.png`).
+     - **Naming**: Must match `report_config`’s `visualizations` list (e.g., `"key_metrics_table"` under `"Executive Summary"`).
+   - **Placement**: `publisher.py` inserts images after the text of each section, as specified in `report_config`’s `visualizations` field.
+     - **Rendering**: Uses `Image` objects with a fixed size (6x3 inches, proportional), followed by a caption from the `description` field.
+     - **Spacing**: `Spacer` elements (0.3 inch before, 0.2 inch after) ensure clean layout between text and images.
+
+3. **Integration**:
+   - **Flow**: For each section in `report_config`:
+     1. Header (`SectionHeading` style).
+     2. Text paragraphs (`BodyText` style, split by `\n\n` or `\n`, with `•` for bullets).
+     3. Images (in order from `visualizations` list, with captions in `Caption` style).
+     4. Page break.
+   - **Config Sync**: `report_config` (e.g., `backend/config/report_config.json`) defines the blueprint:
+     ```json
+     {
+       "sections": [
+         {"title": "Executive Summary", "visualizations": ["key_metrics_table"]},
+         {"title": "Introduction", "visualizations": ["basic_metrics_table"]},
+         {"title": "Market Analysis", "visualizations": ["price_history_chart", "volume_chart", "tvl_chart", "competitor_comparison_chart"]},
+         {"title": "Technical Analysis", "visualizations": []},
+         {"title": "Tokenomics", "visualizations": ["token_distribution_chart", "supply_table"]},
+         {"title": "Governance and Community", "visualizations": ["governance_metrics_table"]},
+         {"title": "Ecosystem and Partnerships", "visualizations": ["partnerships_table"]},
+         {"title": "Risks and Opportunities", "visualizations": ["risks_table", "opportunities_table"]},
+         {"title": "Team and Development", "visualizations": ["roadmap_timeline"]},
+         {"title": "Conclusion", "visualizations": ["key_takeaways_table"]}
+       ]
+     }
+     ```
+     - **Match**: Draft headers and visualization keys must align with these titles and names.
+
+#### Keeping It Safe
+- **Save the Prompt**: Store it in a file (e.g., `prompts/sui_report.txt`) and load it in your writer agent to avoid manual edits reverting.
+- **Backup `publisher.py`**: Keep this version as `publisher_working.py` in your repo—its regex parsing (`r'^(#+)\s+(.+)$'`) and fallback logic make it robust.
+- **Test Routine**: After changes, check `docs/sui/draft_content.txt` for 10 `#` sections and `SUI_report.pdf` for text + 14 images.
+
+#### Cleanup Notes
+The Joker’s mess is tidied:
+- **Text**: Now flows under each section, not just headers.
+- **Images**: Slot in where `report_config` directs, no longer orphaned.
+- **Future Proof**: If it breaks again, check `draft_content.txt` vs. `report_config`—mismatch there is the usual suspect.
+
+Great work, Robin—we’ve got Gotham’s reports locked down tighter than Arkham Asylum! Anything else to polish before we hang up the capes?
