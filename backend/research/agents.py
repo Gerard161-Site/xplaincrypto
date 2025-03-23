@@ -1,8 +1,8 @@
-from typing import List, Dict, Any
+from typing import List, Dict
 import logging
 from abc import ABC, abstractmethod
 from langchain_openai import ChatOpenAI
-from backend.research.core import ResearchNode
+from backend.research.core import ResearchNode, ResearchType
 from backend.retriever.tavily_search import TavilySearch
 
 class ResearchAgent(ABC):
@@ -64,7 +64,6 @@ class ResearchAgent(ABC):
             self.logger.error(f"Summarization error: {str(e)}")
             return "Error generating summary: " + str(e)
 
-
 class TechnicalAgent(ResearchAgent):
     """Agent specialized in researching technical aspects of crypto projects."""
     
@@ -72,31 +71,20 @@ class TechnicalAgent(ResearchAgent):
         super().__init__(
             llm=llm,
             logger=logger,
-            include_domains=[
-                "github.com", "docs.uniswap.org", "ethereum.org", 
-                "medium.com", "vitalik.ca"
-            ]
+            include_domains=["github.com", "docs.uniswap.org", "ethereum.org", "medium.com", "vitalik.ca"]
         )
     
     def research(self, node: ResearchNode) -> ResearchNode:
         self.logger.info(f"TechnicalAgent researching: {node.query}")
-        
-        # Enhance query with technical terms and cryptocurrency focus
         enhanced_query = f"{node.query} cryptocurrency blockchain technical architecture"
-        
-        # Search web
         results = self._search_web(enhanced_query)
-        
-        # Process content
         if results:
             node.content = "\n\n".join([r['body'] for r in results])
             node.references = [{'title': r['body'][:50] + "...", 'url': r['href']} for r in results]
             node.summary = self._summarize_content(node.content, node.query)
         else:
             node.summary = "No technical information found."
-            
         return node
-
 
 class TokenomicsAgent(ResearchAgent):
     """Agent specialized in researching tokenomics and economics."""
@@ -105,31 +93,20 @@ class TokenomicsAgent(ResearchAgent):
         super().__init__(
             llm=llm,
             logger=logger,
-            include_domains=[
-                "coingecko.com", "coinmarketcap.com", "defillama.com", 
-                "messari.io", "tokenterminal.com"
-            ]
+            include_domains=["coingecko.com", "coinmarketcap.com", "defillama.com", "messari.io", "tokenterminal.com"]
         )
     
     def research(self, node: ResearchNode) -> ResearchNode:
         self.logger.info(f"TokenomicsAgent researching: {node.query}")
-        
-        # Enhance query with tokenomics terms and cryptocurrency focus
         enhanced_query = f"{node.query} cryptocurrency token tokenomics supply distribution economics"
-        
-        # Search web
         results = self._search_web(enhanced_query)
-        
-        # Process content
         if results:
             node.content = "\n\n".join([r['body'] for r in results])
             node.references = [{'title': r['body'][:50] + "...", 'url': r['href']} for r in results]
             node.summary = self._summarize_content(node.content, node.query)
         else:
             node.summary = "No tokenomics information found."
-            
         return node
-
 
 class MarketAgent(ResearchAgent):
     """Agent specialized in researching market position and competition."""
@@ -138,31 +115,20 @@ class MarketAgent(ResearchAgent):
         super().__init__(
             llm=llm,
             logger=logger,
-            include_domains=[
-                "coindesk.com", "cointelegraph.com", "theblock.co",
-                "decrypt.co", "cryptobriefing.com"
-            ]
+            include_domains=["coindesk.com", "cointelegraph.com", "theblock.co", "decrypt.co", "cryptobriefing.com"]
         )
     
     def research(self, node: ResearchNode) -> ResearchNode:
         self.logger.info(f"MarketAgent researching: {node.query}")
-        
-        # Enhance query with market terms and cryptocurrency focus
         enhanced_query = f"{node.query} cryptocurrency market position competitors trading volume price"
-        
-        # Search web
         results = self._search_web(enhanced_query)
-        
-        # Process content
         if results:
             node.content = "\n\n".join([r['body'] for r in results])
             node.references = [{'title': r['body'][:50] + "...", 'url': r['href']} for r in results]
             node.summary = self._summarize_content(node.content, node.query)
         else:
             node.summary = "No market information found."
-            
         return node
-
 
 class EcosystemAgent(ResearchAgent):
     """Agent specialized in researching ecosystem, partnerships and integrations."""
@@ -171,43 +137,72 @@ class EcosystemAgent(ResearchAgent):
         super().__init__(
             llm=llm,
             logger=logger,
-            include_domains=[
-                "medium.com", "blog.ethereum.org", "defillama.com",
-                "dappradar.com", "consensys.net"
-            ]
+            include_domains=["medium.com", "blog.ethereum.org", "defillama.com", "dappradar.com", "consensys.net"]
         )
     
     def research(self, node: ResearchNode) -> ResearchNode:
         self.logger.info(f"EcosystemAgent researching: {node.query}")
-        
-        # Enhance query with ecosystem terms and cryptocurrency focus
         enhanced_query = f"{node.query} cryptocurrency ecosystem partnerships integrations defi protocol"
-        
-        # Search web
         results = self._search_web(enhanced_query)
-        
-        # Process content
         if results:
             node.content = "\n\n".join([r['body'] for r in results])
             node.references = [{'title': r['body'][:50] + "...", 'url': r['href']} for r in results]
             node.summary = self._summarize_content(node.content, node.query)
         else:
             node.summary = "No ecosystem information found."
-            
         return node
 
-
-# Agent factory to get the right agent for each research type
-def get_agent_for_research_type(research_type: str, llm: ChatOpenAI, logger: logging.Logger) -> ResearchAgent:
-    """Factory method to create the appropriate agent for a research type."""
-    from backend.research.core import ResearchType
+class GovernanceAgent(ResearchAgent):
+    """Agent specialized in researching governance aspects of crypto projects."""
     
+    def __init__(self, llm: ChatOpenAI, logger: logging.Logger):
+        super().__init__(
+            llm=llm,
+            logger=logger,
+            include_domains=["docs.uniswap.org", "forum.arbitrum.foundation", "gov.curve.fi", "medium.com", "github.com"]
+        )
+    
+    def research(self, node: ResearchNode) -> ResearchNode:
+        self.logger.info(f"GovernanceAgent researching: {node.query}")
+        enhanced_query = f"{node.query} cryptocurrency governance DAO voting mechanism"
+        results = self._search_web(enhanced_query)
+        if results:
+            node.content = "\n\n".join([r['body'] for r in results])
+            node.references = [{'title': r['body'][:50] + "...", 'url': r['href']} for r in results]
+            node.summary = self._summarize_content(node.content, node.query)
+        else:
+            node.summary = "No governance information found."
+        return node
+
+class TeamAgent(ResearchAgent):
+    """Agent specialized in researching team and development aspects of crypto projects."""
+    
+    def __init__(self, llm: ChatOpenAI, logger: logging.Logger):
+        super().__init__(
+            llm=llm,
+            logger=logger,
+            include_domains=["linkedin.com", "github.com", "medium.com", "twitter.com", "sui.io"]
+        )
+    
+    def research(self, node: ResearchNode) -> ResearchNode:
+        self.logger.info(f"TeamAgent researching: {node.query}")
+        enhanced_query = f"{node.query} cryptocurrency team founders developers roadmap"
+        results = self._search_web(enhanced_query)
+        if results:
+            node.content = "\n\n".join([r['body'] for r in results])
+            node.references = [{'title': r['body'][:50] + "...", 'url': r['href']} for r in results]
+            node.summary = self._summarize_content(node.content, node.query)
+        else:
+            node.summary = "No team or development information found."
+        return node
+
+def get_agent_for_research_type(research_type: str, llm: ChatOpenAI, logger: logging.Logger) -> ResearchAgent:
     agents = {
         ResearchType.TECHNICAL: TechnicalAgent(llm, logger),
         ResearchType.TOKENOMICS: TokenomicsAgent(llm, logger),
         ResearchType.MARKET: MarketAgent(llm, logger),
         ResearchType.ECOSYSTEM: EcosystemAgent(llm, logger),
-        # Default to technical agent for other types
+        ResearchType.GOVERNANCE: GovernanceAgent(llm, logger),
+        ResearchType.TEAM: TeamAgent(llm, logger),
     }
-    
-    return agents.get(research_type, TechnicalAgent(llm, logger)) 
+    return agents.get(research_type, TechnicalAgent(llm, logger))
