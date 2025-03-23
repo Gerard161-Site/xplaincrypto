@@ -7,6 +7,7 @@ from typing import List, Dict, Any, Optional
 from backend.state import ResearchState
 from langchain_openai import ChatOpenAI
 from backend.research.orchestrator import ResearchOrchestrator
+from backend.research.data_modules import DataGatherer
 
 # Cache directory for storing research results
 CACHE_DIR = os.path.join("docs", "cache")
@@ -38,6 +39,15 @@ def enhanced_researcher(state: ResearchState, llm: ChatOpenAI, logger: logging.L
                 state.price_analysis = cached_data.get('price_analysis', '')
                 state.governance = cached_data.get('governance', '')
                 state.research_data = cached_data.get('research_data', {})
+                
+                # Load API data if available in cache
+                if 'coingecko_data' in cached_data:
+                    state.coingecko_data = cached_data.get('coingecko_data', {})
+                if 'coinmarketcap_data' in cached_data:
+                    state.coinmarketcap_data = cached_data.get('coinmarketcap_data', {})
+                if 'defillama_data' in cached_data:
+                    state.defillama_data = cached_data.get('defillama_data', {})
+                
                 state.update_progress(f"Loaded cached research for {state.project_name}")
                 return state
             else:
@@ -54,6 +64,39 @@ def enhanced_researcher(state: ResearchState, llm: ChatOpenAI, logger: logging.L
     except Exception as e:
         logger.warning(f"Could not load report configuration: {str(e)}")
         report_config = {}
+    
+    # Gather real-time data from APIs
+    logger.info(f"Gathering real-time data for {state.project_name}")
+    state.update_progress(f"Collecting market data for {state.project_name}...")
+    
+    # Use DataGatherer to collect API data
+    try:
+        data_gatherer = DataGatherer(state.project_name, logger)
+        all_data = data_gatherer.gather_all_data(use_cache=True)
+        
+        # Store API data in state for visualizations
+        if all_data:
+            logger.info(f"Gathered data with {len(all_data)} fields for {state.project_name}")
+            
+            # Extract source-specific data
+            coingecko_module = next((m for m in data_gatherer.modules if m.__class__.__name__ == 'CoinGeckoModule'), None)
+            if coingecko_module:
+                state.coingecko_data = coingecko_module.gather_data(use_cache=True)
+                logger.info(f"Stored CoinGecko data with {len(state.coingecko_data)} fields")
+            
+            coinmarketcap_module = next((m for m in data_gatherer.modules if m.__class__.__name__ == 'CoinMarketCapModule'), None)
+            if coinmarketcap_module:
+                state.coinmarketcap_data = coinmarketcap_module.gather_data(use_cache=True)
+                logger.info(f"Stored CoinMarketCap data with {len(state.coinmarketcap_data)} fields")
+            
+            defillama_module = next((m for m in data_gatherer.modules if m.__class__.__name__ == 'DeFiLlamaModule'), None)
+            if defillama_module:
+                state.defillama_data = defillama_module.gather_data(use_cache=True)
+                logger.info(f"Stored DeFiLlama data with {len(state.defillama_data)} fields")
+        else:
+            logger.warning("No API data found for visualization")
+    except Exception as e:
+        logger.error(f"Error gathering API data: {str(e)}")
     
     # Start the research workflow
     logger.info(f"Starting research workflow for {state.project_name}")
@@ -103,7 +146,10 @@ def enhanced_researcher(state: ResearchState, llm: ChatOpenAI, logger: logging.L
             'tokenomics': state.tokenomics,
             'price_analysis': state.price_analysis,
             'governance': state.governance,
-            'research_data': state.research_data
+            'research_data': state.research_data,
+            'coingecko_data': state.coingecko_data if hasattr(state, 'coingecko_data') else {},
+            'coinmarketcap_data': state.coinmarketcap_data if hasattr(state, 'coinmarketcap_data') else {},
+            'defillama_data': state.defillama_data if hasattr(state, 'defillama_data') else {}
         }
         with open(cache_file, 'w') as f:
             json.dump(cache_data, f)

@@ -253,6 +253,47 @@ async def message(sid, data):
             state.governance = f"Governance structure of {project_name}."
         
         # Visualization Step - CRITICAL FIX to ensure config-driven visualization generation
+        # Load cached data directly if available
+        try:
+            # Try to load cached data files for ONDO if they exist
+            project_lowercase = project_name.lower()
+            
+            # Load CoinGecko data
+            cg_cache_path = f"cache/{project_name}_CoinGeckoModule.json"
+            if os.path.exists(cg_cache_path):
+                with open(cg_cache_path, 'r') as f:
+                    state.coingecko_data = json.load(f)
+                    logger.info(f"Loaded {len(state.coingecko_data)} fields from cached CoinGecko data")
+            
+            # Load CoinMarketCap data
+            cmc_cache_path = f"cache/{project_name}_CoinMarketCapModule.json"
+            if os.path.exists(cmc_cache_path):
+                with open(cmc_cache_path, 'r') as f:
+                    state.coinmarketcap_data = json.load(f)
+                    logger.info(f"Loaded {len(state.coinmarketcap_data)} fields from cached CoinMarketCap data")
+            
+            # Load DeFiLlama data
+            dl_cache_path = f"cache/{project_name}_DeFiLlamaModule.json"
+            if os.path.exists(dl_cache_path):
+                with open(dl_cache_path, 'r') as f:
+                    state.defillama_data = json.load(f)
+                    logger.info(f"Loaded {len(state.defillama_data)} fields from cached DeFiLlama data")
+            
+            # Combine all data into multi source
+            state.data = {}
+            if hasattr(state, 'coingecko_data') and state.coingecko_data:
+                state.data.update(state.coingecko_data)
+            if hasattr(state, 'coinmarketcap_data') and state.coinmarketcap_data:
+                state.data.update(state.coinmarketcap_data)
+            if hasattr(state, 'defillama_data') and state.defillama_data:
+                state.data.update(state.defillama_data)
+            
+            logger.info(f"Combined data now has {len(state.data)} fields")
+        except Exception as e:
+            logger.error(f"Error loading cached data: {str(e)}")
+            # Continue with empty data - visualization agent will handle this
+        
+        # Visualization Step - CRITICAL FIX to ensure config-driven visualization generation
         try:
             logger.info(f"Generating visualizations for {project_name}")
             state.update_progress(f"Creating visualizations based on report configuration...")
