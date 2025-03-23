@@ -30,3 +30,11 @@ docs/*.bmp
 docs/*.tiff
 docs/*.ico
 docs/*/*.png
+docs/*.txt
+docs/*/*.txt
+docs/*/*.md
+docs/*/*.pdf
+docs/*/*.png
+docs/*/*.jpg
+docs/*/*.jpeg
+docs/*/*.gif
