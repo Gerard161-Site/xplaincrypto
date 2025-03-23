@@ -6,7 +6,7 @@
 XplainCrypto/
 ├── backend/                       # Backend API and server
 │   ├── agents/                    # Agent modules
-│   │   ├── enhanced_researcher.py # Main research agent
+│   │   ├── enhanced_researcher.py # Main research agent with data fallback
 │   │   ├── visualization_agent.py # Data visualization agent
 │   │   ├── writer.py              # Report writing agent
 │   │   ├── editor.py              # Report editing agent
@@ -26,6 +26,8 @@ XplainCrypto/
 │   └── main.py                    # FastAPI server and entry point
 ├── frontend/                      # Frontend web application
 ├── docs/                          # Generated reports and visualizations
+│   ├── cache/                     # Cached research results
+│   └── project_name/              # Project-specific reports and visualizations
 └── requirements.txt               # Python dependencies
 ```
 
@@ -42,11 +44,17 @@ Provides a user-friendly interface for initiating research and displaying result
 
 ### Tier 3: Agent System (Backend/Agents)
 - **Enhanced Researcher**: Entry point for the research process
+  - **Web Research Fallback**: Populates missing web research data when web search is unavailable
+  - **Cache Management**: Stores and retrieves research results to optimize performance
+  - **Data Normalization**: Ensures consistent data format across sources
 - **Visualization Agent**: Generates charts, graphs, and tables from data
+  - **Professional Styling**: Applies consistent styling to all visualizations
+  - **Markdown Processing**: Properly handles text formatting in report generation
 - **Writer**: Converts research into narrative format
 - **Reviewer**: Checks report for accuracy and completeness
 - **Editor**: Polishes and structures the report
 - **Publisher**: Creates the final report in various formats
+  - **PDF Formatting**: Professional PDF layout with consistent typography and spacing
 
 ### Tier 4: Research System (Backend/Research)
 - **ResearchManager**: Plans the research process by generating a hierarchical tree
@@ -84,13 +92,20 @@ The VisualizationAgent is responsible for generating visual representations of t
 3. **Automatic Description**: Generates natural language descriptions of visualizations
 4. **Template-Based Rendering**: Uses configurable templates for visualization layout
 5. **File Management**: Saves visualizations to the appropriate output directory
+6. **Professional Styling**: Applies consistent, professional styling to all visualizations
+   - Typography: Consistent font usage with Times Roman for readability
+   - Color schemes: Coordinated color palettes for visual consistency
+   - Spacing: Optimized spacing between chart elements for readability
+   - Formatting: Proper handling of numeric data with appropriate units
+   - Bold text: Special emphasis on key metrics via proper Markdown processing
+   - PDF formatting: Professional PDF layout with page numbering
 
 Supported visualization types:
-- **Line Charts**: Price history, volume, TVL trends
-- **Bar Charts**: Competitive comparisons, performance metrics
-- **Pie Charts**: Token distribution, allocation breakdowns
-- **Tables**: Key metrics, tokenomics details, performance data
-- **Timelines**: Development roadmaps, milestone tracking
+- **Line Charts**: Price history, volume, TVL trends with shaded areas and marker points
+- **Bar Charts**: Competitive comparisons, performance metrics with data labels
+- **Pie Charts**: Token distribution, allocation breakdowns with highlighted segments
+- **Tables**: Key metrics, tokenomics details, performance data with alternating row colors
+- **Timelines**: Development roadmaps, milestone tracking with connecting lines
 
 ## System Flow Diagram
 
@@ -181,6 +196,7 @@ The end-to-end flow of data through the system follows these steps:
 3. **Data Gathering**
    - Data sources are extracted from the report configuration
    - DataGatherer fetches real-time data from configured APIs
+   - Cache is checked for recent data to reduce API calls
    - Data is organized and stored in the state object
    - Price, token, and market data are structured for later use
 
@@ -190,21 +206,41 @@ The end-to-end flow of data through the system follows these steps:
    - References are collected and deduplicated
    - Research data is structured for visualization
 
-5. **Visualization Generation**
+5. **Data Fallback Mechanisms**
+   - Enhanced Researcher checks if web research data is available
+   - If missing, populate_web_research_data function provides fallback data for:
+     - Governance metrics (governance_model, proposal_count, voting_participation)
+     - Partnerships (partner_name, partnership_type, partnership_date)
+     - Risks (risk_type, risk_description, risk_level)
+     - Opportunities (opportunity_type, opportunity_description, potential_impact)
+     - Team metrics (team_size, notable_members, development_activity)
+     - Key takeaways (aspect, assessment, recommendation)
+   - This ensures all visualization tables can be generated even without web search
+
+6. **Visualization Generation**
    - Visualization Agent receives the research state with all data
    - Reads visualization types from the report configuration
    - Generates charts, graphs, and tables based on available data
+   - Applies professional styling to all visualizations
    - Creates descriptive text for each visualization
+   - Processes Markdown formatting for text elements
    - Stores visualization files in the appropriate location
 
-6. **Report Creation**
+7. **Report Creation**
    - Writer agent synthesizes research into narrative form
    - Reviewer checks content for accuracy and completeness
    - Editor structures the content according to the report configuration
-   - Publisher creates the final PDF report
+   - Publisher creates the final PDF report with:
+     - Enhanced typography using Times Roman font family
+     - Proper paragraph spacing for improved readability
+     - Professional title page with project details
+     - Table of contents section for easy navigation
+     - Consistent page numbering format
+     - Bold formatting for emphasis on key metrics
+     - Alternating row colors in tables for readability
    - Incorporates visualizations from the Visualization Agent
 
-7. **Output Delivery**
+8. **Output Delivery**
    - Final report is stored in the docs directory
    - Result is sent back to the frontend for display
    - Visualizations are embedded in the report
@@ -277,3 +313,33 @@ The architecture is designed for easy extension:
 2. **New Visualizations**: Define new visualization types in the configuration
 3. **New Data Sources**: Integrate additional APIs by adding new data modules
 4. **Custom Report Formats**: Support additional output formats beyond PDF 
+
+## Resilience and Fault Tolerance
+
+The system includes multiple mechanisms to ensure robustness and handle failures gracefully:
+
+1. **Data Source Redundancy**:
+   - Multiple API sources (CoinGecko, CoinMarketCap, DeFiLlama) provide redundancy
+   - If one data source fails, others can fill in missing information
+
+2. **Web Research Fallback**:
+   - When web search is unavailable or returns no results, synthetic data is provided
+   - The populate_web_research_data function ensures all visualizations can be generated
+   - This prevents critical report sections from being empty or incomplete
+
+3. **Caching System**:
+   - Research results are cached to disk with timestamps
+   - Reports can be generated even when external APIs are temporarily unavailable
+   - Cache TTL (Time To Live) ensures data freshness while balancing API usage
+
+4. **Error Handling**:
+   - Graceful degradation when components fail
+   - Detailed logging of errors for debugging
+   - Fallback to default values when data is incomplete
+
+5. **Visualization Robustness**:
+   - Charts and tables adapt to available data
+   - Consistent styling even with different data sources
+   - Automatic handling of missing or invalid data points
+
+These features ensure that the system can produce complete, high-quality reports even under suboptimal conditions or when certain data sources are unavailable. 
