@@ -9,7 +9,7 @@ import random
 
 from backend.research.core import ResearchNode, ResearchManager, ResearchType
 from backend.research.agents import get_agent_for_research_type, ResearchAgent
-from backend.research.data_modules import DataGatherer
+from backend.research.data_modules import DataGatherer, DataModule
 
 
 @dataclass
@@ -38,6 +38,9 @@ class ResearchState:
     research_summary: str = ""
     tokenomics: str = ""
     price_analysis: str = ""
+    # NEW: Added fields for governance and team to store specific content (Task 1)
+    governance: str = ""
+    team_and_development: str = ""
     
     # Tracking
     progress: str = ""
@@ -121,8 +124,17 @@ class ResearchOrchestrator:
         self.logger.info(f"Generating research tree for {state.project_name}")
         state.update_progress(f"Planning research for {state.project_name}...")
         
-        # Determine research types from report configuration
-        research_types = [ResearchType.TECHNICAL, ResearchType.TOKENOMICS, ResearchType.MARKET]
+        # MODIFIED: Expanded research types to include Governance and Team (Task 1)
+        research_types = [
+            ResearchType.TECHNICAL,
+            ResearchType.TOKENOMICS,
+            ResearchType.MARKET,
+            ResearchType.ECOSYSTEM,
+            ResearchType.GOVERNANCE,  # Added for governance details
+            ResearchType.TEAM,        # Added for team and roadmap details
+            ResearchType.RISKS,       # Added for completeness
+            ResearchType.OPPORTUNITIES  # Added for completeness
+        ]
         
         # If we have a report config, extract research types from sections
         if state.report_config and "sections" in state.report_config:
@@ -139,6 +151,12 @@ class ResearchOrchestrator:
                 research_types.append(ResearchType.GOVERNANCE)
             if any("ecosystem" in title or "partnership" in title for title in section_titles):
                 research_types.append(ResearchType.ECOSYSTEM)
+            if any("team" in title or "development" in title for title in section_titles):
+                research_types.append(ResearchType.TEAM)
+            if any("risks" in title for title in section_titles):
+                research_types.append(ResearchType.RISKS)
+            if any("opportunities" in title for title in section_titles):
+                research_types.append(ResearchType.OPPORTUNITIES)
         
         # Create research manager and generate tree
         research_manager = ResearchManager(
@@ -185,6 +203,17 @@ class ResearchOrchestrator:
             
             self.logger.info(f"Using data sources: {', '.join(data_sources)}")
             
+            # MODIFIED: Fetch competitor data for Task 3 (Competitive Analysis)
+            competitors = ["ethereum", "solana", "avalanche-2"]  # CoinGecko IDs for ETH, SOL, AVAX
+            competitor_data = {}
+            for comp in competitors:
+                comp_module = DataModule(comp, self.logger)  # Using base class directly for simplicity
+                comp_data = comp_module.gather_data(use_cache=True)
+                if "error" not in comp_data:
+                    competitor_data[comp] = comp_data
+            state.data["competitors"] = competitor_data
+            self.logger.info(f"Gathered competitor data for {len(competitor_data)} coins")
+            
             # First check if we have cached data for quick report generation
             cached_data = self._try_load_from_cache(state.project_name)
             if cached_data:
@@ -202,18 +231,10 @@ class ResearchOrchestrator:
                     self.logger.info(f"Using cached DeFiLlama data with {len(cached_data['defillama'])} fields")
                     state.defillama_data = cached_data["defillama"]
                 
-                # Also get enhanced market data for better reports
-                enhanced_market = data_gatherer.get_enhanced_market_data()
-                if "error" not in enhanced_market:
-                    # Create enhanced_data attribute if not present
-                    if not hasattr(state, "enhanced_data"):
-                        state.enhanced_data = {}
-                    state.enhanced_data["market"] = enhanced_market
-                    self.logger.info(f"Added enhanced market data with {len(enhanced_market)} fields")
-                
                 state.data_gathered = True
                 
-                # Format tokenomics data
+                # MODIFIED: Format price analysis with real data (Task 2)
+                state.price_analysis = self._format_price_analysis(state)
                 state.tokenomics = data_gatherer.get_formatted_tokenomics(state.data)
                 
                 # Start async refresh of data
@@ -232,27 +253,17 @@ class ResearchOrchestrator:
             if "defillama" in data_sources and "defillama" in state.data:
                 state.defillama_data = state.data["defillama"]
             
-            # Also store enhanced market data if available
-            if "enhanced_market" in state.data:
-                # Create enhanced_data attribute if not present
-                if not hasattr(state, "enhanced_data"):
-                    state.enhanced_data = {}
-                state.enhanced_data["market"] = state.data["enhanced_market"]
-                self.logger.info("Added enhanced market data to state")
-            
-            # Generate synthetic data if real data is missing or incomplete
-            self._ensure_complete_data(state)
-                
             state.data_gathered = True
             
-            # Format tokenomics data
+            # MODIFIED: Format price analysis with real data (Task 2)
+            state.price_analysis = self._format_price_analysis(state)
             state.tokenomics = data_gatherer.get_formatted_tokenomics(state.data)
             
             return state
         except Exception as e:
             self.logger.error(f"Error gathering data: {str(e)}", exc_info=True)
             state.update_progress(f"Error gathering data: {str(e)}")
-            state.data_errors = [str(e)]
+            state.errors.append(str(e))
             
             # Fallback to empty data
             state.data = {}
@@ -262,7 +273,7 @@ class ResearchOrchestrator:
             state.data_gathered = False
             
             return state
-            
+    
     def _try_load_from_cache(self, project_name: str) -> Optional[Dict[str, Any]]:
         """Try to load data from cache."""
         try:
@@ -290,46 +301,34 @@ class ResearchOrchestrator:
         except Exception as e:
             self.logger.warning(f"Error loading cache: {str(e)}")
             return None
-            
+    
     def _refresh_data_async(self, state: ResearchState, data_gatherer, data_sources):
         """Start async refresh of data to update cache for future use."""
-        # This would ideally use threading, but for simplicity, we'll just log the intent
+        # Placeholder for async implementation
         self.logger.info("Would refresh data in background (not implemented)")
+    
+    # NEW: Added method to format price analysis with real data (Task 2)
+    def _format_price_analysis(self, state: ResearchState) -> str:
+        """Format price analysis with real-time data."""
+        price_data = state.coingecko_data if hasattr(state, 'coingecko_data') else {}
+        if not price_data or "current_price" not in price_data:
+            return f"Price analysis for {state.project_name}.\n60-Day Change: Data unavailable."
         
-    def _ensure_complete_data(self, state: ResearchState):
-        """Make sure we have complete data for all necessary visualizations."""
-        # Make sure coingecko_data exists and has minimum necessary fields
-        if not hasattr(state, 'coingecko_data') or not state.coingecko_data:
-            state.coingecko_data = {}
+        current_price = price_data.get("current_price", 0)
+        market_cap = price_data.get("market_cap", 0)
+        # Simulate 60-day change if historical data isn't available
+        price_history = price_data.get("price_history", [])
+        sixty_day_change = "Data unavailable"
+        if price_history and len(price_history) >= 60:
+            old_price = price_history[-60][1] if isinstance(price_history[-60], list) else price_history[-60]
+            sixty_day_change = f"{((current_price - old_price) / old_price * 100):.2f}%"
         
-        if not state.coingecko_data.get('price_history'):
-            state.coingecko_data['price_history'] = [[i, 100 + random.uniform(-10, 10)] for i in range(60)]
-            self.logger.info("Added synthetic price history data")
-        
-        if not state.coingecko_data.get('volume_history'):
-            state.coingecko_data['volume_history'] = [[i, 1000000 + random.uniform(-100000, 100000)] for i in range(30)]
-            self.logger.info("Added synthetic volume history data")
-        
-        # Make sure token distribution data exists
-        if not hasattr(state, 'research_data') or not state.research_data:
-            state.research_data = {}
-        
-        if not state.research_data.get('token_distribution'):
-            state.research_data['token_distribution'] = [
-                {"label": "Team", "value": 20},
-                {"label": "Community", "value": 30},
-                {"label": "Investors", "value": 25},
-                {"label": "Ecosystem", "value": 25}
-            ]
-            self.logger.info("Added synthetic token distribution data")
-        
-        # Make sure defillama_data exists with minimum necessary fields
-        if not hasattr(state, 'defillama_data') or not state.defillama_data:
-            state.defillama_data = {}
-        
-        if not state.defillama_data.get('tvl_history'):
-            state.defillama_data['tvl_history'] = [[i, 500000000 + random.uniform(-50000000, 50000000)] for i in range(60)]
-            self.logger.info("Added synthetic TVL history data")
+        return (
+            f"Price analysis for {state.project_name}\n\n"
+            f"Current Price: ${current_price:.4f}\n"
+            f"Market Cap: ${market_cap:,}\n"
+            f"60-Day Change: {sixty_day_change}"
+        )
     
     def _conduct_research(self, state: ResearchState) -> ResearchState:
         """Conduct research on all nodes in the research tree."""
@@ -358,23 +357,15 @@ class ResearchOrchestrator:
         # Store all references in state
         state.references = all_references
         state.research_complete = True
-        state.update_progress("Research completed with " + str(len(all_references)) + " sources")
+        state.update_progress(f"Research completed with {len(all_references)} sources")
         
-        # Extract specific research data for visualizations
-        research_data = {}
+        # Extract specific research data for governance and team (Task 1)
         if state.root_node:
             for node in state.root_node.children:
-                key = node.query.lower().replace("?", "").replace(" ", "_")[:30]
-                if hasattr(node, 'summary') and node.summary:
-                    research_data[key] = node.summary
-                
-                for child in node.children:
-                    child_key = child.query.lower().replace("?", "").replace(" ", "_")[:30]
-                    if hasattr(child, 'summary') and child.summary:
-                        research_data[child_key] = child.summary
-        
-        # Store extracted research data for visualization agent
-        state.research_data = research_data
+                if "governance" in node.query.lower():
+                    state.governance = node.summary
+                if "team" in node.query.lower() or "development" in node.query.lower():
+                    state.team_and_development = node.summary
         
         return state
     
@@ -421,8 +412,13 @@ class ResearchOrchestrator:
             return ResearchType.ECOSYSTEM
         elif any(term in query_lower for term in ["governance", "dao", "voting", "proposal"]):
             return ResearchType.GOVERNANCE
+        elif any(term in query_lower for term in ["team", "development", "roadmap", "founders"]):
+            return ResearchType.TEAM
+        elif any(term in query_lower for term in ["risks", "challenges", "vulnerabilities"]):
+            return ResearchType.RISKS
+        elif any(term in query_lower for term in ["opportunities", "growth", "potential"]):
+            return ResearchType.OPPORTUNITIES
         else:
-            # Default to technical if no specific type is detected
             return ResearchType.TECHNICAL
     
     def _synthesize_findings(self, state: ResearchState) -> ResearchState:
@@ -439,18 +435,25 @@ class ResearchOrchestrator:
             # Collect all summaries from nodes
             all_summaries = self._collect_all_summaries(state.root_node)
             
-            # Combine with any data we've gathered
-            all_content = all_summaries + ["\n\n" + state.tokenomics + "\n\n" + state.price_analysis]
+            # MODIFIED: Include competitor data and specific sections (Tasks 1, 2, 3)
+            all_content = all_summaries + [
+                "\n\n" + state.tokenomics,
+                "\n\n" + state.price_analysis,
+                "\n\n" + state.governance,
+                "\n\n" + state.team_and_development,
+                "\n\nCompetitor Data:\n" + json.dumps(state.data.get("competitors", {}), indent=2)
+            ]
             
             # Define categories for a structured report based on config
             report_categories = [
                 "Overview and background",
                 "Technical features and capabilities",
                 "Tokenomics and economic model",
-                "Governance structure", 
+                "Governance structure",
                 "Market position and competitors",
                 "Ecosystem and partnerships",
-                "Risks and opportunities"
+                "Risks and opportunities",
+                "Team and development"  # Added for Task 1
             ]
             
             # If we have a report config, use section titles from that
@@ -460,7 +463,6 @@ class ResearchOrchestrator:
                 if config_categories:
                     report_categories = config_categories
             
-            # Fix the f-string syntax error by using a separate variable for the joined content
             joined_content = "\n\n".join(all_content)
             
             synthesis_prompt = (
@@ -469,7 +471,9 @@ class ResearchOrchestrator:
                 f"Create a comprehensive, well-structured research report with the following sections:\n"
                 f"{', '.join(report_categories)}\n\n"
                 f"The report should be detailed, factual, and cite specific information. "
-                f"Include numbers, facts, and technical details where available. "
+                f"Include numbers, facts, and technical details where available (e.g., current price, market cap, "
+                f"60-day percentage change, token distribution percentages, governance metrics, team experience, "
+                f"and comparisons with Ethereum, Solana, and Avalanche). "
                 f"The report should be approximately 1500-2000 words."
             )
             
@@ -495,4 +499,4 @@ class ResearchOrchestrator:
         for child in node.children:
             summaries.extend(self._collect_all_summaries(child))
         
-        return summaries 
+        return summaries

@@ -36,12 +36,12 @@
             "visualizations": []
         },
         {
-            "title": "Tokenomics",
+            "title": "Liquidity and Adoption Metrics",
             "required": true,
             "max_words": 500,
-            "description": "Analysis of token economics, supply, and distribution",
-            "data_sources": ["coingecko", "coinmarketcap", "web_research"],
-            "visualizations": ["token_distribution_chart", "supply_table"]
+            "description": "Analysis of liquidity trends and adoption indicators",
+            "data_sources": ["coingecko", "coinmarketcap", "defillama"],
+            "visualizations": ["liquidity_trends_chart", "adoption_metrics_table"]
         },
         {
             "title": "Governance and Community",
@@ -68,12 +68,12 @@
             "visualizations": ["risks_table", "opportunities_table"]
         },
         {
-            "title": "Team and Development",
+            "title": "Team and Development Activity",
             "required": true,
             "max_words": 400,
-            "description": "Assessment of the team and roadmap",
+            "description": "Assessment of the team and ongoing development efforts",
             "data_sources": ["web_research"],
-            "visualizations": ["roadmap_timeline"]
+            "visualizations": ["team_metrics_table"]
         },
         {
             "title": "Conclusion",
@@ -109,13 +109,6 @@
             "title": "Total Value Locked (TVL) Trend",
             "description_template": "The Total Value Locked (TVL) in {project_name} over the past 60 days demonstrates {tvl_description}."
         },
-        "token_distribution_chart": {
-            "type": "pie_chart",
-            "data_source": "web_research",
-            "data_field": "token_distribution",
-            "title": "Token Distribution",
-            "description_template": "The distribution of {project_name} tokens shows {distribution_description}."
-        },
         "key_metrics_table": {
             "type": "table",
             "data_source": "multi",
@@ -136,13 +129,6 @@
             "data_fields": ["market_cap", "price_change_percentage_24h"],
             "title": "Competitive Comparison",
             "description_template": "This chart compares {project_name} with similar projects in terms of {metrics_description}."
-        },
-        "supply_table": {
-            "type": "table",
-            "data_source": "multi",
-            "data_fields": ["circulating_supply", "total_supply", "max_supply"],
-            "title": "Token Supply Details",
-            "description_template": "Token supply information for {project_name}."
         },
         "governance_metrics_table": {
             "type": "table",
@@ -172,12 +158,27 @@
             "title": "Key Opportunities",
             "description_template": "Major opportunities for {project_name}."
         },
-        "roadmap_timeline": {
-            "type": "timeline",
+        "liquidity_trends_chart": {
+            "type": "line_chart",
+            "data_source": "coingecko",
+            "data_field": "volume_history",
+            "time_period": "30d",
+            "title": "30-Day Liquidity Trends",
+            "description_template": "Liquidity trends for {project_name} over the past 30 days show {liquidity_description}."
+        },
+        "adoption_metrics_table": {
+            "type": "table",
+            "data_source": "multi",
+            "data_fields": ["tvl", "active_addresses", "exchange_count"],
+            "title": "Adoption Metrics",
+            "description_template": "Adoption indicators for {project_name} as of {timestamp}."
+        },
+        "team_metrics_table": {
+            "type": "table",
             "data_source": "web_research",
-            "data_fields": ["milestone_date", "milestone_description", "completion_status"],
-            "title": "Development Roadmap",
-            "description_template": "Upcoming and completed milestones for {project_name}."
+            "data_fields": ["team_size", "notable_members", "development_activity"],
+            "title": "Team and Development Metrics",
+            "description_template": "Key details about the {project_name} team and development efforts."
         },
         "key_takeaways_table": {
             "type": "table",
@@ -187,4 +188,4 @@
             "description_template": "Summary of key findings and recommendations for {project_name}."
         }
     }
-} 
+}
