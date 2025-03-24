@@ -1,0 +1,98 @@
+{
+    "version": "1.0",
+    "description": "Global style configuration for reports and visualizations",
+    "fonts": {
+        "primary": "Helvetica",
+        "secondary": "Helvetica",
+        "bold": "Helvetica-Bold",
+        "italic": "Helvetica-Oblique",
+        "bolditalic": "Helvetica-BoldOblique"
+    },
+    "font_sizes": {
+        "title": 16,
+        "section_heading": 12,
+        "subsection_heading": 10,
+        "body_text": 10,
+        "caption": 9,
+        "disclaimer": 8,
+        "reference": 9
+    },
+    "colors": {
+        "primary": "#4472C4",
+        "background": "#FFFFFF",
+        "text": "#333333",
+        "table_header": "#4472C4",
+        "table_alternate_row": "#f9f9f9",
+        "table_border": "#dddddd",
+        "chart_colors": [
+            "#1f77b4",
+            "#ff7f0e",
+            "#2ca02c",
+            "#d62728"
+        ]
+    },
+    "spacing": {
+        "paragraph": {
+            "before": 6,
+            "after": 8
+        },
+        "section": {
+            "before": 24,
+            "after": 12
+        },
+        "subsection": {
+            "before": 12,
+            "after": 6
+        },
+        "line_height": 16
+    },
+    "visualization": {
+        "figure": {
+            "width": 6.5,
+            "height": 3.5,
+            "dpi": 300
+        },
+        "table": {
+            "row_height": 0.25,
+            "min_height": 2,
+            "max_height": 8,
+            "header_scale": 1.2
+        },
+        "text_wrap": {
+            "width": 40,
+            "threshold": 30
+        },
+        "matplotlib": {
+            "style": "ggplot",
+            "axes": {
+                "title_size": 12,
+                "label_size": 10,
+                "tick_size": 10
+            },
+            "legend": {
+                "font_size": 10,
+                "location": "best"
+            },
+            "grid": {
+                "alpha": 0.3
+            }
+        }
+    },
+    "pdf": {
+        "page": {
+            "size": "letter",
+            "margins": {
+                "left": 1,
+                "right": 1,
+                "top": 1,
+                "bottom": 1
+            }
+        },
+        "alignment": {
+            "title": "center",
+            "section": "left",
+            "body": "justify",
+            "caption": "center"
+        }
+    }
+} 

@@ -14,39 +14,39 @@
         {
             "title": "Introduction",
             "required": true,
-            "max_words": 400,
-            "description": "Background information and basic details about the cryptocurrency",
-            "data_sources": ["coingecko", "coinmarketcap"],
+            "min_words": 300,
+            "description": "Overview of the project, its purpose, and key value proposition.",
+            "data_sources": ["web_research", "coingecko"],
             "visualizations": ["basic_metrics_table"]
         },
         {
             "title": "Tokenomics and Distribution",
             "required": true,
-            "max_words": 500,
+            "min_words": 500,
             "description": "Analysis of token supply, distribution, and economic model. Include citations for data sources.",
-            "data_sources": ["coingecko", "coinmarketcap", "web_research"],
+            "data_sources": ["web_research","coingecko", "coinmarketcap", "web_research"],
             "visualizations": ["token_distribution_pie", "supply_metrics_table"]
         },
         {
             "title": "Market Analysis",
             "required": true,
-            "max_words": 800,
+            "min_words": 800,
             "description": "In-depth market performance data, comparisons, and predictive analysis. Include short-term and long-term price predictions where possible.",
-            "data_sources": ["coingecko", "coinmarketcap", "defillama"],
+            "data_sources": ["web_research","coingecko", "coinmarketcap", "defillama"],
             "visualizations": ["price_history_chart", "volume_chart", "tvl_chart", "competitor_comparison_chart"]
         },
         {
             "title": "Technical Analysis",
             "required": true,
-            "max_words": 600,
+            "min_words": 600,
             "description": "Evaluation of technical foundations, architecture, scalability, and security features. Include citations for technical analyses.",
-            "data_sources": ["web_research"],
+            "data_sources": ["web_research","coinmarketcap"],
             "visualizations": []
         },
         {
             "title": "Developer Tools and User Experience",
             "required": true,
-            "max_words": 400,
+            "min_words": 400,
             "description": "Evaluation of tools for developers and overall user experience. Include citations for sources.",
             "data_sources": ["web_research"],
             "visualizations": ["developer_tools_table", "user_experience_metrics"]
@@ -54,7 +54,7 @@
         {
             "title": "Security",
             "required": true,
-            "max_words": 400,
+            "min_words": 400,
             "description": "Assessment of security measures, audits, and protocols. Include citations for audit reports and security analyses.",
             "data_sources": ["web_research"],
             "visualizations": ["security_audits_table"]
@@ -62,15 +62,15 @@
         {
             "title": "Liquidity and Adoption Metrics",
             "required": true,
-            "max_words": 500,
+            "min_words": 500,
             "description": "Analysis of liquidity trends and adoption indicators",
-            "data_sources": ["coingecko", "coinmarketcap", "defillama"],
+            "data_sources": ["web_research","coingecko", "coinmarketcap", "defillama"],
             "visualizations": ["liquidity_trends_chart", "adoption_metrics_table"]
         },
         {
             "title": "Governance and Community",
             "required": true,
-            "max_words": 400,
+            "min_words": 400,
             "description": "Assessment of decision-making processes and community engagement",
             "data_sources": ["web_research"],
             "visualizations": ["governance_metrics_table"]
@@ -78,7 +78,7 @@
         {
             "title": "Ecosystem and Partnerships",
             "required": true,
-            "max_words": 400,
+            "min_words": 400,
             "description": "Evaluation of project's network and external relationships",
             "data_sources": ["web_research", "defillama"],
             "visualizations": ["partnerships_table"]
@@ -86,7 +86,7 @@
         {
             "title": "Risks and Opportunities",
             "required": true,
-            "max_words": 500,
+            "min_words": 500,
             "description": "Identification of challenges and growth potential",
             "data_sources": ["web_research"],
             "visualizations": ["risks_table", "opportunities_table"]
@@ -94,7 +94,7 @@
         {
             "title": "Team and Development Activity",
             "required": true,
-            "max_words": 400,
+            "min_words": 400,
             "description": "Assessment of the team and ongoing development efforts",
             "data_sources": ["web_research"],
             "visualizations": ["team_metrics_table"]
@@ -102,7 +102,7 @@
         {
             "title": "Conclusion",
             "required": true,
-            "max_words": 300,
+            "min_words": 300,
             "description": "Summary of findings and investment outlook",
             "data_sources": [],
             "visualizations": ["key_takeaways_table"]

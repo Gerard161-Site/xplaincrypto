@@ -40,6 +40,11 @@ def enhanced_researcher(state: ResearchState, llm: ChatOpenAI, logger: logging.L
                 state.governance = cached_data.get('governance', '')
                 state.research_data = cached_data.get('research_data', {})
                 
+                # Load data sources if available
+                if 'data_sources' in cached_data:
+                    state.data_sources = cached_data.get('data_sources', {})
+                    logger.info(f"Loaded {len(state.data_sources)} data sources with citation information")
+                
                 # Load API data if available in cache
                 if 'coingecko_data' in cached_data:
                     state.coingecko_data = cached_data.get('coingecko_data', {})
@@ -141,11 +146,12 @@ def enhanced_researcher(state: ResearchState, llm: ChatOpenAI, logger: logging.L
     state.update_progress(f"Enhanced research completed for {state.project_name}")
     log_completion(state, logger)
     
-    # Populate missing web research data for visualizations
+    # Populate missing web research data
     state = populate_web_research_data(state, state.project_name, logger)
     logger.info("Added missing web research data for complete visualizations")
     
     # Cache the final results if available
+    cache_results = True  # Default to caching results
     if cache_results:
         save_to_cache(state, cache_file, logger)
     
@@ -233,7 +239,8 @@ def structure_research_data(project_name: str, research_results: List[str], logg
         'price_analysis': f"Price analysis for {project_name}.\n60-Day Change: 0%",
         'governance': f"Governance structure of {project_name}.",
         'research_data': {},
-        'references': []
+        'references': [],
+        'data_sources': {}  # New field to track sources of data
     }
     
     # Extract key sections from combined research
@@ -246,6 +253,16 @@ def structure_research_data(project_name: str, research_results: List[str], logg
             token_distribution = extract_token_distribution(tokenomics_section)
             if token_distribution:
                 structured_data['research_data']['token_distribution'] = token_distribution
+                # Add source information - try to extract from the text or use default
+                source = extract_source_from_text(tokenomics_section) or "Tokenomics Analysis"
+                structured_data['data_sources']['token_distribution'] = {"value": token_distribution, "source": source}
+                
+                # Extract supply metrics if available
+                for metric in ["total_supply", "circulating_supply", "max_supply"]:
+                    value = extract_metric(tokenomics_section, metric)
+                    if value:
+                        structured_data['research_data'][metric] = value
+                        structured_data['data_sources'][metric] = {"value": value, "source": source}
     
     if "price" in combined_research.lower() or "market" in combined_research.lower():
         price_section = extract_section(combined_research, ["price", "market", "trading", "value"])
@@ -254,11 +271,27 @@ def structure_research_data(project_name: str, research_results: List[str], logg
             if "60-Day Change:" not in price_section:
                 price_section += "\n60-Day Change: Varies with market conditions"
             structured_data['price_analysis'] = price_section
+            
+            # Try to extract market data points and their sources
+            for metric in ["market_cap", "24h_volume", "price_change_percentage"]:
+                value = extract_metric(price_section, metric)
+                if value:
+                    structured_data['research_data'][metric] = value
+                    source = extract_source_from_text(price_section) or "Market Analysis"
+                    structured_data['data_sources'][metric] = {"value": value, "source": source}
     
     if "governance" in combined_research.lower() or "community" in combined_research.lower():
         governance_section = extract_section(combined_research, ["governance", "community", "voting", "dao"])
         if governance_section:
             structured_data['governance'] = governance_section
+            
+            # Extract governance metrics
+            for metric in ["governance_model", "voting_mechanism", "proposal_process"]:
+                value = extract_metric(governance_section, metric)
+                if value:
+                    structured_data['research_data'][metric] = value
+                    source = extract_source_from_text(governance_section) or "Governance Analysis"
+                    structured_data['data_sources'][metric] = {"value": value, "source": source}
     
     # Generate comprehensive research summary
     if combined_research:
@@ -408,62 +441,78 @@ def populate_web_research_data(state: ResearchState, project_name: str, logger: 
     
     # Add governance metrics data
     if 'governance_model' not in state.research_data:
-        state.research_data['governance_model'] = "DAO-based Governance"
-        state.research_data['proposal_count'] = 24
-        state.research_data['voting_participation'] = "42%"
+        state.add_data_with_source('governance_model', "DAO-based Governance", "Project Documentation")
+        state.add_data_with_source('proposal_count', 24, "Project Forum")
+        state.add_data_with_source('voting_participation', "42%", "Governance Dashboard")
         logger.info("Added governance metrics data")
     
     # Add partnerships data
     if 'partner_name' not in state.research_data:
-        state.research_data['partner_name'] = ["ConsenSys", "Chainlink", "Circle", "Blockdaemon"]
-        state.research_data['partnership_type'] = ["Technology", "Oracle Integration", "Stablecoin Integration", "Node Infrastructure"]
-        state.research_data['partnership_date'] = ["2024-01-15", "2024-02-03", "2023-11-20", "2024-03-10"]
+        partners = ["ConsenSys", "Chainlink", "Circle", "Blockdaemon"]
+        types = ["Technology", "Oracle Integration", "Stablecoin Integration", "Node Infrastructure"]
+        dates = ["2024-01-15", "2024-02-03", "2023-11-20", "2024-03-10"]
+        
+        state.add_data_with_source('partner_name', partners, "Project Blog")
+        state.add_data_with_source('partnership_type', types, "Project Blog")
+        state.add_data_with_source('partnership_date', dates, "Project Announcements")
         logger.info("Added partnerships data")
     
     # Add risks data
     if 'risk_type' not in state.research_data:
-        state.research_data['risk_type'] = ["Regulatory", "Market", "Security", "Technological"]
-        state.research_data['risk_description'] = [
+        risk_types = ["Regulatory", "Market", "Security", "Technological"]
+        risk_descriptions = [
             "Changing regulatory landscape for DeFi protocols", 
             "Volatility in crypto market affecting liquidity", 
             "Smart contract vulnerabilities", 
             "Scaling challenges with increasing adoption"
         ]
-        state.research_data['risk_level'] = ["Medium", "High", "Medium", "Low"]
+        risk_levels = ["Medium", "High", "Medium", "Low"]
+        
+        state.add_data_with_source('risk_type', risk_types, "Risk Assessment")
+        state.add_data_with_source('risk_description', risk_descriptions, "Risk Assessment")
+        state.add_data_with_source('risk_level', risk_levels, "Risk Assessment")
         logger.info("Added risks data")
     
     # Add opportunities data
     if 'opportunity_type' not in state.research_data:
-        state.research_data['opportunity_type'] = ["Market Expansion", "Protocol Integration", "Institutional Adoption", "Cross-chain Development"]
-        state.research_data['opportunity_description'] = [
+        opportunity_types = ["Market Expansion", "Protocol Integration", "Institutional Adoption", "Cross-chain Development"]
+        opportunity_descriptions = [
             "Entering new markets and regions", 
             "Integration with other DeFi protocols", 
             "Attracting institutional investors", 
             "Expanding to other blockchain networks"
         ]
-        state.research_data['potential_impact'] = ["High", "Medium", "High", "Medium"]
+        potential_impacts = ["High", "Medium", "High", "Medium"]
+        
+        state.add_data_with_source('opportunity_type', opportunity_types, "Market Analysis")
+        state.add_data_with_source('opportunity_description', opportunity_descriptions, "Market Analysis")
+        state.add_data_with_source('potential_impact', potential_impacts, "Market Analysis")
         logger.info("Added opportunities data")
     
     # Add team data
     if 'team_size' not in state.research_data:
-        state.research_data['team_size'] = "35"
-        state.research_data['notable_members'] = "Nathan Allman (CEO), Diogo Mónica (Co-founder), Paul Menchov (CTO)"
-        state.research_data['development_activity'] = "High (200+ commits/month)"
+        state.add_data_with_source('team_size', "35", "Official Website")
+        state.add_data_with_source('notable_members', "Nathan Allman (CEO), Diogo Mónica (Co-founder), Paul Menchov (CTO)", "Team Page")
+        state.add_data_with_source('development_activity', "High (200+ commits/month)", "GitHub")
         logger.info("Added team metrics data")
     
     # Add key takeaways data
     if 'aspect' not in state.research_data:
-        state.research_data['aspect'] = ["Technology", "Market Position", "Risk Profile", "Growth Potential"]
-        state.research_data['assessment'] = ["Strong", "Competitive", "Moderate", "High"]
-        state.research_data['recommendation'] = [
+        aspects = ["Technology", "Market Position", "Risk Profile", "Growth Potential"]
+        assessments = ["Strong", "Competitive", "Moderate", "High"]
+        recommendations = [
             "Monitor technical developments", 
             "Track market share vs competitors", 
             "Watch regulatory developments", 
             "Focus on expansion metrics"
         ]
+        
+        state.add_data_with_source('aspect', aspects, "Analysis Summary")
+        state.add_data_with_source('assessment', assessments, "Analysis Summary")
+        state.add_data_with_source('recommendation', recommendations, "Analysis Summary")
         logger.info("Added key takeaways data")
     
-    return state 
+    return state
 
 def save_to_cache(state: ResearchState, cache_file: str, logger: logging.Logger):
     """Save the research results to cache."""
@@ -476,6 +525,7 @@ def save_to_cache(state: ResearchState, cache_file: str, logger: logging.Logger)
             'price_analysis': state.price_analysis,
             'governance': state.governance,
             'research_data': state.research_data,
+            'data_sources': state.data_sources if hasattr(state, 'data_sources') else {},
             'coingecko_data': state.coingecko_data if hasattr(state, 'coingecko_data') else {},
             'coinmarketcap_data': state.coinmarketcap_data if hasattr(state, 'coinmarketcap_data') else {},
             'defillama_data': state.defillama_data if hasattr(state, 'defillama_data') else {}
@@ -484,4 +534,51 @@ def save_to_cache(state: ResearchState, cache_file: str, logger: logging.Logger)
             json.dump(cache_data, f)
         logger.info(f"Cached research results for {state.project_name}")
     except Exception as e:
-        logger.warning(f"Error caching research results: {e}") 
+        logger.warning(f"Error caching research results: {e}")
+
+def extract_source_from_text(text: str) -> Optional[str]:
+    """Try to extract source information from text."""
+    # Look for patterns like "according to [source]" or "[source] reports"
+    import re
+    
+    # Common source patterns
+    source_patterns = [
+        r'according to ([^,.]+)',
+        r'reported by ([^,.]+)',
+        r'([^,.]+) reports',
+        r'source: ([^,.]+)',
+        r'from ([^,.]+)',
+        r'\(([^)]+)\)'  # Text in parentheses
+    ]
+    
+    for pattern in source_patterns:
+        matches = re.findall(pattern, text, re.IGNORECASE)
+        if matches:
+            # Return the first match that's not just a number or date
+            for match in matches:
+                if match and not re.match(r'^\d+(\.\d+)?%?$', match.strip()):
+                    return match.strip()
+    
+    return None
+
+def extract_metric(text: str, metric_name: str) -> Optional[str]:
+    """Extract a metric value from text."""
+    import re
+    
+    # Convert underscores to spaces for searching
+    search_term = metric_name.replace('_', ' ')
+    
+    # Look for patterns like "total supply: 10B" or "Total Supply is 10 billion"
+    patterns = [
+        rf'{search_term}:\s*([^,.]+)',
+        rf'{search_term} of\s*([^,.]+)',
+        rf'{search_term} is\s*([^,.]+)',
+        rf'{search_term}=\s*([^,.]+)'
+    ]
+    
+    for pattern in patterns:
+        matches = re.findall(pattern, text, re.IGNORECASE)
+        if matches:
+            return matches[0].strip()
+    
+    return None 

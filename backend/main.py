@@ -62,7 +62,8 @@ logger.setLevel(logging.INFO)  # Default to INFO, override with DEBUG via env
 
 # Move Socket.IO logs to a separate logger
 socket_logger = logging.getLogger("socketio")
-socket_logger.setLevel(logging.DEBUG)  # Debug mode for Socket.IO
+socket_logger.setLevel(logging.WARNING)  # Set to WARNING to suppress INFO logs
+socket_logger.propagate = False  # Prevent propagation to root logger
 
 # Load environment variables
 load_dotenv()
@@ -110,15 +111,15 @@ class ReportRequest(BaseModel):
 # Define workflow - Fully integrated approach with visualization agent
 workflow = StateGraph(ResearchState)
 workflow.add_node("enhanced_researcher", lambda state, config=None: enhanced_researcher(state, llm, logger, config))
-workflow.add_node("visualization_agent", lambda state, config=None: visualization_agent(state, llm, logger, config))
 workflow.add_node("writer", lambda state, config=None: writer(state, llm, logger, config))
+workflow.add_node("visualization_agent", lambda state, config=None: visualization_agent(state, llm, logger, config))
 workflow.add_node("reviewer", lambda state, config=None: reviewer(state, llm, logger, config))
 workflow.add_node("editor", lambda state, config=None: editor(state, llm, logger, config))
 workflow.add_node("publisher", lambda state, config=None: publisher(state, logger, config, llm))
 workflow.set_entry_point("enhanced_researcher")
-workflow.add_edge("enhanced_researcher", "visualization_agent")
-workflow.add_edge("visualization_agent", "writer")
-workflow.add_edge("writer", "reviewer")
+workflow.add_edge("enhanced_researcher", "writer")
+workflow.add_edge("writer", "visualization_agent")
+workflow.add_edge("visualization_agent", "reviewer")
 workflow.add_edge("reviewer", "editor")
 workflow.add_edge("editor", "publisher")
 workflow.add_edge("publisher", END)
@@ -136,7 +137,7 @@ async def disconnect(sid):
 async def message(sid, data):
     try:
         project_name = data.get('project_name')
-        fast_mode = data.get('fast_mode', True)  # Default to true for better performance
+        fast_mode = data.get('fast_mode', False)  # Default to False to ensure full research is done
         if not project_name:
             logger.error("No project name provided")
             await sio.emit('error', "Project name is required", to=sid)
@@ -198,7 +199,7 @@ async def message(sid, data):
             # Use smaller models and reduce token usage in fast mode
             model_params = {
                 "temperature": 0.5,
-                "max_tokens": 500,
+                "max_tokens": 750,  # Increased from 500 to ensure enough context
                 "model": "gpt-4o-mini",  # Use the smaller model
             }
             logger.info("Using fast mode settings with optimized token usage")
@@ -206,7 +207,7 @@ async def message(sid, data):
             # Standard mode uses more comprehensive settings
             model_params = {
                 "temperature": 0.7,
-                "max_tokens": 1000,
+                "max_tokens": 1500,  # Increased from 1000 to provide more context
                 "model": llm.model_name,  # Use the default model
             }
             logger.info("Using standard mode settings")
@@ -218,7 +219,7 @@ async def message(sid, data):
             max_tokens=model_params["max_tokens"]
         )
         
-        # Enhanced Research Step with proper caching
+        # Enhanced Research Step with proper caching - ENSURE RESEARCH IS PERFORMED
         try:
             logger.info(f"Starting research for {project_name}")
             state.update_progress(f"Researching {project_name}...")
@@ -227,17 +228,43 @@ async def message(sid, data):
             # Create research configuration with report config requirements
             research_config = {
                 "fast_mode": fast_mode,
-                "api_limit": 5 if fast_mode else 15,  # Stricter API limit in fast mode
+                "api_limit": 10 if fast_mode else 20,  # Increased from 5/15 to ensure sufficient data
                 "cache_enabled": True,  # Always use caching
                 "cache_ttl": 21600,  # 6 hours TTL for cache to reduce API calls
+                "skip_research": False,  # Critical flag - NEVER skip research completely
+                "force_refresh": False,  # Use cached data if available (helps speed up)
                 "report_sections": state.report_config.get("sections", [])  # Pass sections to researcher
             }
             
+            # Log research configuration
+            logger.info(f"Research configuration: {research_config}")
+            
             # Run the enhanced researcher with custom configuration
             enhanced_research_state = enhanced_researcher(state, context_llm, logger, research_config)
+            
+            # Verify research was performed by checking for data
             if enhanced_research_state:
                 state = enhanced_research_state
                 metrics['steps_completed'] += 1
+                
+                # Validate research data was actually collected
+                has_api_data = (
+                    hasattr(state, 'coingecko_data') and state.coingecko_data or
+                    hasattr(state, 'coinmarketcap_data') and state.coinmarketcap_data or
+                    hasattr(state, 'defillama_data') and state.defillama_data
+                )
+                
+                if not has_api_data:
+                    logger.warning("No API data was collected during research. This may affect visualizations.")
+                    await sio.emit('warning', "Limited data was collected for this project. Some visualizations may use sample data.", to=sid)
+                
+                # Check for essential research properties
+                essential_props = ['research_summary', 'key_features', 'tokenomics', 'price_analysis']
+                missing_props = [p for p in essential_props if not hasattr(state, p) or not getattr(state, p)]
+                
+                if missing_props:
+                    logger.warning(f"Research is missing essential properties: {missing_props}")
+                    # Still continue but log warning
             else:
                 raise Exception("Enhanced research failed to return a valid state")
                 
@@ -252,41 +279,45 @@ async def message(sid, data):
             state.price_analysis = f"Price analysis for {project_name}.\n60-Day Change: 0%"
             state.governance = f"Governance structure of {project_name}."
         
-        # Visualization Step - CRITICAL FIX to ensure config-driven visualization generation
-        # Load cached data directly if available
+        # Try to load cached data directly if available to supplement any missing data
         try:
-            # Try to load cached data files for ONDO if they exist
+            # Try to load cached data files if they exist
             project_lowercase = project_name.lower()
+            cache_dir = "cache"
+            
+            # Ensure we have a properly populated data field
+            if not hasattr(state, 'data') or not state.data:
+                state.data = {}
             
             # Load CoinGecko data
-            cg_cache_path = f"cache/{project_name}_CoinGeckoModule.json"
+            cg_cache_path = os.path.join(cache_dir, f"{project_name}_CoinGeckoModule.json")
             if os.path.exists(cg_cache_path):
                 with open(cg_cache_path, 'r') as f:
-                    state.coingecko_data = json.load(f)
-                    logger.info(f"Loaded {len(state.coingecko_data)} fields from cached CoinGecko data")
+                    cg_data = json.load(f)
+                    if not hasattr(state, 'coingecko_data') or not state.coingecko_data:
+                        state.coingecko_data = cg_data
+                    state.data.update(cg_data)
+                    logger.info(f"Loaded {len(cg_data)} fields from cached CoinGecko data")
             
             # Load CoinMarketCap data
-            cmc_cache_path = f"cache/{project_name}_CoinMarketCapModule.json"
+            cmc_cache_path = os.path.join(cache_dir, f"{project_name}_CoinMarketCapModule.json")
             if os.path.exists(cmc_cache_path):
                 with open(cmc_cache_path, 'r') as f:
-                    state.coinmarketcap_data = json.load(f)
-                    logger.info(f"Loaded {len(state.coinmarketcap_data)} fields from cached CoinMarketCap data")
+                    cmc_data = json.load(f)
+                    if not hasattr(state, 'coinmarketcap_data') or not state.coinmarketcap_data:
+                        state.coinmarketcap_data = cmc_data
+                    state.data.update(cmc_data)
+                    logger.info(f"Loaded {len(cmc_data)} fields from cached CoinMarketCap data")
             
             # Load DeFiLlama data
-            dl_cache_path = f"cache/{project_name}_DeFiLlamaModule.json"
+            dl_cache_path = os.path.join(cache_dir, f"{project_name}_DeFiLlamaModule.json")
             if os.path.exists(dl_cache_path):
                 with open(dl_cache_path, 'r') as f:
-                    state.defillama_data = json.load(f)
-                    logger.info(f"Loaded {len(state.defillama_data)} fields from cached DeFiLlama data")
-            
-            # Combine all data into multi source
-            state.data = {}
-            if hasattr(state, 'coingecko_data') and state.coingecko_data:
-                state.data.update(state.coingecko_data)
-            if hasattr(state, 'coinmarketcap_data') and state.coinmarketcap_data:
-                state.data.update(state.coinmarketcap_data)
-            if hasattr(state, 'defillama_data') and state.defillama_data:
-                state.data.update(state.defillama_data)
+                    dl_data = json.load(f)
+                    if not hasattr(state, 'defillama_data') or not state.defillama_data:
+                        state.defillama_data = dl_data
+                    state.data.update(dl_data)
+                    logger.info(f"Loaded {len(dl_data)} fields from cached DeFiLlama data")
             
             logger.info(f"Combined data now has {len(state.data)} fields")
         except Exception as e:
@@ -298,6 +329,28 @@ async def message(sid, data):
             logger.info(f"Generating visualizations for {project_name}")
             state.update_progress(f"Creating visualizations based on report configuration...")
             await update_client_progress(state, "visualization", 0)
+            
+            # Fix: Make sure research data and API data are properly combined
+            if hasattr(state, 'research_data') and state.research_data:
+                logger.info(f"Using {len(state.research_data)} fields from research data")
+                
+                # Update state.data with research_data 
+                if not hasattr(state, 'data'):
+                    state.data = {}
+                state.data.update(state.research_data)
+                
+                # Make sure critical fields are available
+                if 'max_supply' in state.research_data:
+                    logger.info(f"Using max_supply from research: {state.research_data['max_supply']}")
+                if 'circulating_supply' in state.research_data:
+                    logger.info(f"Using circulating_supply from research: {state.research_data['circulating_supply']}")
+                if 'total_supply' in state.research_data:
+                    logger.info(f"Using total_supply from research: {state.research_data['total_supply']}")
+            else:
+                logger.warning("No research_data available for visualizations")
+                
+                # Add dummy research_data to state to avoid issues
+                state.research_data = {}
             
             # Create a configuration that references the report config
             vis_config = {
@@ -380,28 +433,7 @@ async def message(sid, data):
                 state.final_report = f"Error publishing report for {project_name}: {str(e)}"
         else:
             # Full workflow for standard mode
-            # Visualization Step
-            try:
-                logger.info(f"Generating visualizations for {project_name}")
-                state.update_progress(f"Creating visualizations for {project_name}...")
-                await update_client_progress(state, "visualization", 0)
-                
-                visualization_state = visualization_agent(state, llm, logger)
-                if visualization_state:
-                    state = visualization_state
-                    metrics['steps_completed'] += 1
-                else:
-                    raise Exception("Visualization agent failed to return a valid state")
-                    
-                logger.debug(f"Post-visualization state: {vars(state)}")
-                await update_client_progress(state, "visualization", 100)
-            except Exception as e:
-                await handle_error("visualization", e)
-                # Ensure state has visualizations property even if empty
-                if not hasattr(state, 'visualizations'):
-                    state.visualizations = {}
-            
-            # Writer Step
+            # Writer Step (skip visualization since we already did it above)
             try:
                 logger.info(f"Writing report for {project_name}")
                 state.update_progress(f"Writing report for {project_name}...")
