@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Union
 
 class ResearchState:
     def __init__(self, project_name: str):
@@ -22,6 +22,9 @@ class ResearchState:
         # Research data from web and other sources
         self.research_data: Dict[str, Any] = {}
         
+        # Source information for data points
+        self.data_sources: Dict[str, Dict[str, str]] = {}  # Format: {data_key: {"value": value, "source": source}}
+        
         # Visualizations generated
         self.visualizations: Dict[str, Dict[str, Any]] = {}
         
@@ -30,3 +33,20 @@ class ResearchState:
 
     def update_progress(self, message: str):
         self.progress = message
+        
+    def add_data_with_source(self, key: str, value: Any, source: str):
+        """Add a data point with its source information"""
+        # Store in research_data for backward compatibility
+        self.research_data[key] = value
+        
+        # Store in data_sources with source information
+        self.data_sources[key] = {"value": value, "source": source}
+        
+    def get_data_with_source(self, key: str) -> Optional[Dict[str, Union[Any, str]]]:
+        """Get a data point with its source information if available"""
+        if key in self.data_sources:
+            return self.data_sources[key]
+        elif key in self.research_data:
+            # For backward compatibility with existing data
+            return {"value": self.research_data[key], "source": "Unknown"}
+        return None

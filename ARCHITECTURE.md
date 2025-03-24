@@ -151,6 +151,13 @@ Supported visualization types:
          ▼                                                   
 ┌─────────────────┐                                          
 │                 │                                          
+│     Writer      │                                          
+│                 │                                          
+└────────┬────────┘                                          
+         │                                                   
+         ▼                                                   
+┌─────────────────┐                                          
+│                 │                                          
 │  Visualization  │                                          
 │     Agent       │                                          
 │                 │                                          
@@ -159,18 +166,11 @@ Supported visualization types:
          ▼                                                   
 ┌─────────────────┐     ┌────────────────┐     ┌────────────────┐
 │                 │     │                │     │                │
-│     Writer      │────►│    Reviewer    │────►│     Editor     │
+│    Reviewer     │────►│     Editor     │────►│   Publisher    │
 │                 │     │                │     │                │
 └─────────────────┘     └────────────────┘     └───────┬────────┘
                                                        │         
                                                        ▼         
-                                              ┌────────────────┐
-                                              │                │
-                                              │   Publisher    │
-                                              │                │
-                                              └───────┬────────┘
-                                                      │         
-                                                      ▼         
                                               ┌────────────────┐
                                               │                │
                                               │  Final Report  │
@@ -217,17 +217,22 @@ The end-to-end flow of data through the system follows these steps:
      - Key takeaways (aspect, assessment, recommendation)
    - This ensures all visualization tables can be generated even without web search
 
-6. **Visualization Generation**
-   - Visualization Agent receives the research state with all data
+6. **Report Writing**
+   - Writer agent synthesizes research into narrative form
+   - Ensures all web research data is fully processed
+   - Creates structured content based on the report configuration
+   - Adds metadata for effective visualization integration
+
+7. **Visualization Generation**
+   - Visualization Agent receives the fully prepared research state with complete data
    - Reads visualization types from the report configuration
    - Generates charts, graphs, and tables based on available data
    - Applies professional styling to all visualizations
    - Creates descriptive text for each visualization
-   - Processes Markdown formatting for text elements
+   - Tables are directly generated as images for PDF compatibility
    - Stores visualization files in the appropriate location
 
-7. **Report Creation**
-   - Writer agent synthesizes research into narrative form
+8. **Report Finalization**
    - Reviewer checks content for accuracy and completeness
    - Editor structures the content according to the report configuration
    - Publisher creates the final PDF report with:
@@ -240,7 +245,7 @@ The end-to-end flow of data through the system follows these steps:
      - Alternating row colors in tables for readability
    - Incorporates visualizations from the Visualization Agent
 
-8. **Output Delivery**
+9. **Output Delivery**
    - Final report is stored in the docs directory
    - Result is sent back to the frontend for display
    - Visualizations are embedded in the report
