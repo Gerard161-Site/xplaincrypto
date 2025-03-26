@@ -409,6 +409,9 @@ def _create_table_image(self, headers: List[str], data_rows: List[List[str]], ti
 def add_visualization_to_story(story, vis_path, title, description, logger):
     """Add a visualization to the PDF story with proper sizing and formatting."""
     try:
+        style_manager = StyleManager(logger)
+        styles = style_manager.get_reportlab_styles()
+        
         if not os.path.exists(vis_path):
             logger.warning(f"Visualization file not found: {vis_path}")
             return
@@ -436,7 +439,7 @@ def add_visualization_to_story(story, vis_path, title, description, logger):
         
         # Add the visualization title if provided
         if title:
-            story.append(Paragraph(escape_xml(title), heading2_style))
+            story.append(Paragraph(escape_xml(title), styles['Caption']))
             story.append(Spacer(1, 0.1*inch))
         
         # Add the image
@@ -445,7 +448,7 @@ def add_visualization_to_story(story, vis_path, title, description, logger):
         # Add the description if provided
         if description:
             story.append(Spacer(1, 0.1*inch))
-            story.append(Paragraph(escape_xml(description), caption_style))
+            story.append(Paragraph(escape_xml(description), styles['Caption']))
         
         # Add spacing after the visualization
         story.append(Spacer(1, 0.3*inch))
