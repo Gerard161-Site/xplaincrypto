@@ -277,6 +277,7 @@ class VisualizationAgent:
     
     def _generate_description(self, vis_type: str, config: Dict[str, Any], data: Dict[str, Any], result: Dict[str, Any]) -> str:
         """Generate a description for the visualization."""
+
         try:
             from langchain_core.prompts import ChatPromptTemplate
             from langchain_core.output_parsers import StrOutputParser
@@ -289,21 +290,20 @@ class VisualizationAgent:
             Data Summary: {data_summary}
             
             Write a brief but impactful analysis (2 lines maximum) that:
-            1. States the most significant trend/change with exact numbers
-            2. Provides one key investment implication or market insight
+            1. States the most significant trend/change with exact numbers, focusing on the primary metric.
+            2. Provides one key investment implication or market insight relevant to crypto investors and analysts.
             
             Guidelines:
-            - Be extremely concise - maximum 2 lines
-            - Lead with the most important metric or change
-            - Include exact numbers and percentages
-            - End with a clear market insight or investment implication
-            - Avoid generic phrases or unnecessary context
-            - Use professional, analytical tone
+            - Be extremely concise—maximum 2 lines.
+            - Lead with the most important metric or change, using exact numbers and percentages.
+            - End with a clear, actionable investment implication or market insight.
+            - Avoid generic phrases or unnecessary context.
+            - Use a professional, analytical tone suitable for investment-grade analysis.
             
             Example good format:
-            "Price declined 32.71% over 60 days, falling from $1.35 to $0.91 with significant volatility between $1.56 and $0.79. This downward trend and price instability suggests heightened selling pressure and potential near-term market uncertainty."
+            "Price declined 32.71% over 60 days, falling from $1.35 to $0.91 with volatility between $1.56 and $0.79. This downward trend suggests heightened selling pressure and potential near-term uncertainty."
             
-            "Token distribution shows 45% concentration in early investors and team members, with 6-month vesting starting Q3 2024, indicating potential supply pressure during unlock periods."
+            "Token distribution shows 45% concentration in early investors, with 6-month vesting starting Q3 2024. This indicates potential supply pressure during unlock periods, impacting price stability."
             """
             
             prompt = ChatPromptTemplate.from_template(template)

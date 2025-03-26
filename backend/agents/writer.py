@@ -316,13 +316,17 @@ class WriterAgent:
         
         # Create a dynamic prompt based on section configuration
         prompt = (
-            f"Write a professional, fact-focused section on '{section_title}' for {project_name} cryptocurrency research report.\n\n"
+            f"Write a professional, fact-focused section on '{section_title}' for a {project_name} cryptocurrency research report.\n\n"
             f"IMPORTANT GUIDELINES:\n"
-            f"1. Focus ONLY on FACTUAL information - use exact data and metrics whenever available.\n"
+            f"1. Focus ONLY on FACTUAL information—use exact data and metrics whenever available.\n"
             f"2. The content must be between {min_words}-{max_words} words.\n"
-            f"3. Include specific dates, numbers, and percentages from the research data.\n"
+            f"3. Include specific dates, numbers, and percentages from the research data, ensuring all numerical values are consistent with the key metrics provided.\n"
             f"4. Format as a cohesive section without any section headings (section title is already added).\n"
-            f"5. Follow these section-specific guidelines: {description}\n\n"
+            f"5. Follow these section-specific guidelines: {prompt}\n"
+            f"6. Avoid repeating information covered in other sections—focus on the unique scope of this section as defined in the guidelines.\n"
+            f"7. Use a professional, objective tone suitable for crypto investors and analysts, avoiding speculative or promotional language.\n"
+            f"8. Provide actionable insights for investors where relevant, focusing on implications for investment decisions.\n"
+            f"9. Ensure all claims are supported by data—qualify statements with timeframes (e.g., 'as of [date]') or sources where necessary.\n\n"
             f"RESEARCH SUMMARY:\n{research_summary}\n\n"
             f"KEY METRICS (USE THESE EXACT VALUES - DO NOT MODIFY OR ROUND THEM):\n"
         )
@@ -332,7 +336,6 @@ class WriterAgent:
             for key, value in key_metrics.items():
                 prompt += f"- {key.replace('_', ' ').title()}: {value}\n"
         else:
-            # No key metrics available
             prompt += f"- Note: Precise metrics are not available for this report.\n"
         
         # Add relevant structured data based on section type
@@ -340,7 +343,6 @@ class WriterAgent:
         if section_specific_data:
             prompt += f"\nSECTION-SPECIFIC DATA:\n{json.dumps(section_specific_data, indent=2)}\n"
         else:
-            # No section-specific data
             prompt += f"\nNote: Detailed section data is not available.\n"
         
         # Generate fallback data based on section title if needed
@@ -353,7 +355,7 @@ class WriterAgent:
             f"\nWrite a comprehensive, factual section addressing the topic thoroughly. "
             f"Ground all claims in the data provided. "
             f"STRICTLY ADHERE to the word count requirements: minimum {min_words} words, maximum {max_words} words. "
-            f"If specific data is missing, create reasonable general statements that are likely to be true for most cryptocurrencies. "
+            f"If specific data is missing, create reasonable general statements that are likely to be true for most cryptocurrencies, but avoid speculation. "
             f"Do not include the section title itself as it will be added automatically. "
             f"Avoid phrases like 'according to the data' or 'the research shows'. "
             f"Present facts directly and authoritatively with proper citations where appropriate."

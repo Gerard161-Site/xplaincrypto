@@ -277,68 +277,64 @@ def get_cache_filename(project_name: str) -> str:
 
 def generate_research_tree(project_name: str, llm, logger: logging.Logger) -> List[str]:
     """
-    Generate an optimized set of research questions.
-    Reduces the number of questions while ensuring comprehensive coverage.
+    Generate an optimized set of research questions based on the report configuration.
+    Ensures questions align with the specific needs of each section for comprehensive coverage.
     """
     logger.info(f"Generating research tree for: {project_name}")
     
-    # Use a single API call to generate all research questions together
-    # This is much more efficient than multiple separate calls
-    prompt = f"""
-    Generate 10 comprehensive research questions about {project_name} cryptocurrency covering:
-    1. Basic information and purpose
-    2. Tokenomics and supply metrics
-    3. Market position and competition
-    4. Technology and architecture
-    5. Governance and community
-    6. Use cases and adoption
-    7. Partnerships and ecosystem
-    8. Risk factors and challenges
-    9. Recent developments and roadmap
-    10. Price performance and trends
-    
-    Make each question specific and information-rich. Format as a numbered list.
-    """
-    
+    # Load the report configuration to determine the sections
     try:
-        response = llm.invoke(prompt).content
-        questions = []
-        for line in response.strip().split('\n'):
-            line = line.strip()
-            if line and (line[0].isdigit() or line[0] == '•' or line.startswith('-')):
-                # Remove numbering/bullets and clean up
-                cleaned_line = line.lstrip('0123456789.-• \t')
-                if cleaned_line:
-                    questions.append(cleaned_line)
-        
-        # Ensure we have at least some questions
-        if not questions:
-            logger.warning("Failed to extract questions from response, using defaults")
-            questions = [
-                f"What is {project_name} cryptocurrency and what problem does it solve?",
-                f"What are the tokenomics and supply metrics of {project_name}?",
-                f"How does {project_name} compare to its main competitors?",
-                f"What is the technology behind {project_name} and how does it work?",
-                f"What are the recent price trends for {project_name}?"
-            ]
-        
-        logger.info(f"Generated {len(questions)} research questions")
-        return questions
+        with open("backend/config/report_config.json", "r") as f:
+            config = json.load(f)
+            section_titles = [section.get("title", "") for section in config.get("sections", [])]
     except Exception as e:
-        logger.error(f"Error generating research tree: {e}")
-        # Return default questions as fallback
-        return [
-            f"What is {project_name} cryptocurrency and what problem does it solve?",
-            f"What are the tokenomics and supply metrics of {project_name}?",
-            f"How does {project_name} compare to its main competitors?",
-            f"What is the technology behind {project_name} and how does it work?",
-            f"What are the recent price trends for {project_name}?"
+        logger.error(f"Error loading report configuration: {e}")
+        section_titles = [
+            "Executive Summary", "Introduction", "Tokenomics and Distribution", "Market Analysis",
+            "Technical Analysis", "Developer Tools and User Experience", "Security",
+            "Liquidity and Adoption Metrics", "Governance and Community", "Ecosystem and Partnerships",
+            "Risks and Opportunities", "Team and Development Activity", "Conclusion"
         ]
+
+    # Define research questions tailored to each section
+    research_questions = []
+    section_prompts = {
+        "Executive Summary": f"What are the key differentiators and investment potential of {project_name}, focusing on strategic positioning and forward-looking implications?",
+        "Introduction": f"What is the core value proposition, background, and strategic goals of {project_name} in the cryptocurrency market?",
+        "Tokenomics and Distribution": f"What are the tokenomics, supply metrics, distribution strategy, and utility of {project_name}, including total supply, circulating supply, and allocation details?",
+        "Market Analysis": f"How does {project_name} perform in the market, including trading patterns, liquidity, market trends, and competitive positioning against similar projects?",
+        "Technical Analysis": f"What is the technical architecture of {project_name}, including blockchain technology, consensus mechanism, scalability solutions, and technical innovations?",
+        "Developer Tools and User Experience": f"What developer tools, documentation, and user experience features does {project_name} offer, and how do they impact adoption?",
+        "Security": f"What are the security measures, audit findings, and risk management practices of {project_name}, including any known vulnerabilities?",
+        "Liquidity and Adoption Metrics": f"What are the liquidity and adoption metrics for {project_name}, including user growth, market integration, and DeFi engagement?",
+        "Governance and Community": f"What is the governance model and community engagement strategy of {project_name}, including decision-making processes and voting mechanisms?",
+        "Ecosystem and Partnerships": f"What partnerships and ecosystem integrations does {project_name} have, and how do they enhance its functionality and market reach?",
+        "Risks and Opportunities": f"What are the key risks and opportunities for {project_name}, focusing on regulatory challenges, market risks, and growth catalysts?",
+        "Team and Development Activity": f"Who are the key team members behind {project_name}, and what is the development activity and roadmap progress?",
+        "Conclusion": f"What are the primary investment considerations and actionable insights for {project_name}, focusing on its overall investment thesis?"
+    }
+
+    # Generate one comprehensive question per section
+    for section_title in section_titles:
+        prompt = section_prompts.get(section_title, f"Generate a comprehensive research question about {project_name} related to {section_title}.")
+        try:
+            response = llm.invoke(prompt).content
+            question = response.strip()
+            if question:
+                research_questions.append(question)
+                logger.info(f"Generated research question for {section_title}: {question}")
+        except Exception as e:
+            logger.error(f"Error generating research question for {section_title}: {e}")
+            # Fallback question
+            research_questions.append(f"What are the key aspects of {project_name} related to {section_title}?")
+
+    logger.info(f"Generated {len(research_questions)} research questions")
+    return research_questions
 
 def structure_research_data(project_name: str, research_results: List[str], logger: logging.Logger) -> Dict[str, Any]:
     """
     Process and structure the research results into required sections.
-    Uses a single consolidated approach to reduce processing overhead.
+    Ensures data consistency and alignment with report sections.
     """
     # Combine all research results 
     combined_research = "\n\n".join(research_results)
@@ -429,6 +425,24 @@ def structure_research_data(project_name: str, research_results: List[str], logg
     urls = extract_urls(combined_research)
     structured_data['references'] = [{"url": url, "title": f"Reference {i+1}"} for i, url in enumerate(urls)]
     
+    # Ensure consistency in numerical data
+    numerical_fields = ["total_supply", "circulating_supply", "max_supply", "market_cap", "24h_volume"]
+    for field in numerical_fields:
+        if field in structured_data['research_data']:
+            # Normalize numerical values (e.g., convert "10B" to "10000000000")
+            value = structured_data['research_data'][field]
+            try:
+                if isinstance(value, str):
+                    value = value.replace(',', '')
+                    if 'B' in value.upper():
+                        value = float(value.upper().replace('B', '')) * 1_000_000_000
+                    elif 'M' in value.upper():
+                        value = float(value.upper().replace('M', '')) * 1_000_000
+                    structured_data['research_data'][field] = str(value)
+            except (ValueError, TypeError) as e:
+                logger.warning(f"Error normalizing numerical field {field}: {e}")
+                structured_data['research_data'][field] = None
+
     return structured_data
 
 def extract_section(text: str, keywords: List[str]) -> str:
@@ -709,4 +723,4 @@ def extract_metric(text: str, metric_name: str) -> Optional[str]:
         if matches:
             return matches[0].strip()
     
-    return None 
+    return None
