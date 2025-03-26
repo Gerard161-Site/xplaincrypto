@@ -32,13 +32,15 @@ def editor(state: ResearchState, llm: ChatOpenAI, logger: logging.Logger, config
         # Check for any issues with section formatting
         fixed_draft = fix_section_formatting(draft)
         
-        # Add instructions about preserving exact metrics
+        # Add instructions about preserving exact metrics and avoiding repetition
         metrics_note = """
 IMPORTANT INSTRUCTIONS:
-1. Maintain all exact numerical values (prices, market cap, trading volume, etc.) throughout the document
-2. DO NOT replace specific figures with placeholders like '$X' or 'Y tokens'
-3. DO NOT attempt to add or reference tables or images directly in the text
-4. Focus only on improving the quality of the existing text content
+1. Maintain all exact numerical values (prices, market cap, trading volume, etc.) throughout the document.
+2. DO NOT replace specific figures with placeholders like '$X' or 'Y tokens'.
+3. DO NOT attempt to add or reference tables or images directly in the text.
+4. Focus only on improving the quality of the existing text content.
+5. Avoid repetition of information across sections—each section should have a unique focus as defined in the report configuration.
+6. Ensure the report maintains a professional, investment-grade tone suitable for crypto investors and analysts.
 """
         
         # Perform editing in stages for better results
@@ -49,11 +51,11 @@ IMPORTANT INSTRUCTIONS:
 {metrics_note}
         
 Focus on:
-1. Ensuring all section headings are properly formatted and consistent
-2. Organizing content logically within each section
-3. Adding subheadings where appropriate for clarity
-4. Making sure the report flows naturally from one section to the next
-5. Ensuring all markdown formatting is correct
+1. Ensuring all section headings are properly formatted and consistent (e.g., ## Section Title).
+2. Organizing content logically within each section, using subheadings where appropriate for clarity.
+3. Ensuring each section focuses on its unique scope as defined in the report configuration, avoiding overlap with other sections.
+4. Making sure the report flows naturally from one section to the next with clear transitions.
+5. Ensuring all markdown formatting is correct and consistent.
 
 Only fix structural/formatting issues and section organization. DO NOT change the factual content.
         
@@ -63,21 +65,21 @@ Only fix structural/formatting issues and section organization. DO NOT change th
         logger.debug("Improving report structure and formatting")
         structured_draft = llm.invoke(structure_prompt).content
         
-        # Stage 2: Improve content quality, clarity and professional tone
+        # Stage 2: Improve content quality, clarity, and professional tone
         content_prompt = f"""Polish this {state.project_name} research report for professional quality and clarity.
         
 {metrics_note}
         
 Focus on:
-1. Ensuring professional language and tone throughout
-2. Improving clarity and readability with precise wording
-3. Eliminating redundancy and wordiness
-4. Ensuring consistent tense and point of view
-5. Enhancing readability with better transitions between ideas
-6. Maintaining appropriate formality for a financial research document
-7. Ensuring any claims are properly qualified
+1. Ensuring a professional, objective tone suitable for crypto investors and analysts, avoiding speculative or promotional language.
+2. Improving clarity and readability with precise, concise wording—eliminate jargon unless necessary and define terms where appropriate.
+3. Eliminating redundancy and wordiness within sections, ensuring each paragraph adds unique value.
+4. Ensuring consistent tense (use present tense unless discussing historical data) and point of view (third-person objective).
+5. Enhancing readability with smooth transitions between ideas and paragraphs.
+6. Maintaining appropriate formality for a financial research document, avoiding casual language.
+7. Ensuring claims are properly qualified (e.g., "as of [date]" for time-sensitive data).
 
-Maintain all existing sections, facts and information - only improve the writing quality.
+Maintain all existing sections, facts, and information—only improve the writing quality.
         
 {structured_draft}
         """
@@ -91,13 +93,13 @@ Maintain all existing sections, facts and information - only improve the writing
 {metrics_note}
         
 Focus on:
-1. Ensuring any numerical data or statistics are presented consistently throughout the document
-2. Resolving any contradictions or inconsistencies in the information presented
-3. Verifying that tokenomics figures are consistent where mentioned multiple times
-4. Ensuring claims are proportional and not overstated
-5. Removing any speculative statements that aren't clearly labeled as such
+1. Ensuring all numerical data (e.g., price, market cap, supply, trading volume, TVL) is presented consistently across all sections—cross-check values and correct any discrepancies.
+2. Resolving contradictions or inconsistencies in information (e.g., conflicting statements about token supply or market performance).
+3. Verifying that tokenomics figures (e.g., total supply, circulating supply, allocation percentages) are consistent across sections.
+4. Ensuring claims are proportional and not overstated—qualify statements with data sources or timeframes where necessary.
+5. Removing speculative statements unless clearly labeled as such (e.g., "Analysts predict..." should be supported by data or removed).
 
-Make only the necessary changes to ensure factual consistency - preserve the overall content and structure.
+Make only the necessary changes to ensure factual consistency—preserve the overall content and structure.
         
 {polished_draft}
         """
@@ -106,19 +108,19 @@ Make only the necessary changes to ensure factual consistency - preserve the ove
         fact_checked_draft = llm.invoke(fact_check_prompt).content
         
         # Stage 4: Final polish and executive quality check
-        final_prompt = f"""Perform a final review and polish of this {state.project_name} cryptocurrency research report to ensure investment-grade quality.
+        final_prompt = f"""Perform a final review and polish of this {state.project_name} cryptocurrency research report to ensure investment-grade quality for professional crypto investors and analysts.
         
 {metrics_note}
         
 Focus on:
-1. Ensuring an objective, balanced perspective throughout
-2. Verifying all investment-relevant information is clearly presented
-3. Making sure risk factors are appropriately highlighted
-4. Checking that conclusions follow logically from the presented evidence
-5. Ensuring the executive summary accurately reflects the full report content
-6. Polishing language for maximum clarity and impact
+1. Ensuring an objective, balanced perspective throughout—highlight both strengths and risks without bias.
+2. Verifying all investment-relevant information (e.g., market position, growth potential, risks) is clearly presented and actionable.
+3. Ensuring risk factors are appropriately highlighted and not downplayed, with clear implications for investors.
+4. Checking that conclusions in each section follow logically from the presented evidence, avoiding unsupported claims.
+5. Ensuring the Executive Summary accurately reflects the full report content, focusing on high-level insights (e.g., strategic positioning, investment potential) without repeating detailed metrics from other sections.
+6. Polishing language for maximum clarity, impact, and professionalism—use concise, direct sentences and avoid redundancy.
 
-The report should meet the quality standards expected by professional crypto investors and analysts.
+The report should meet the quality standards expected by professional crypto investors and analysts, providing actionable insights for investment decisions.
         
 {fact_checked_draft}
         """

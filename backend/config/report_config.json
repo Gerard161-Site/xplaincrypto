@@ -7,7 +7,7 @@
             "title": "Executive Summary",
             "required": true,
             "max_words": 300,
-            "prompt": "Provide a concise overview of the project's key differentiators and investment potential. Highlight the most critical insights without repeating detailed metrics covered in other sections. Focus on forward-looking implications and strategic positioning.",
+            "prompt": "Provide a concise overview of the project's strategic positioning and investment potential. Highlight key differentiators, market position, and forward-looking implications for investors, focusing on high-level insights without repeating detailed metrics covered in other sections.",
             "data_sources": ["coingecko", "coinmarketcap", "defillama"],
             "visualizations": ["key_metrics_table"]
         },
@@ -15,7 +15,7 @@
             "title": "Introduction",
             "required": true,
             "min_words": 250,
-            "prompt": "Introduce the project's core value proposition and strategic goals. Provide context on the project's background and market positioning without delving into detailed metrics or analysis covered in later sections.",
+            "prompt": "Introduce the project's core value proposition, background, and strategic goals. Provide context on its founding, mission, and role in the cryptocurrency market, without delving into detailed metrics or analysis covered in later sections.",
             "data_sources": ["web_research", "coingecko"],
             "visualizations": ["basic_metrics_table"]
         },
@@ -23,31 +23,31 @@
             "title": "Tokenomics and Distribution",
             "required": true,
             "min_words": 500,
-            "prompt": "Analyze the token's economic model and distribution strategy. Focus on token utility, distribution fairness, and potential market impact. Avoid repeating general market metrics covered in the Market Analysis section.",
-            "data_sources": ["web_research","coingecko", "coinmarketcap", "web_research"],
+            "prompt": "Analyze the token's economic model, supply metrics, and distribution strategy. Focus on token utility, allocation fairness, vesting schedules, and potential market impact, avoiding repetition of general market metrics covered in the Market Analysis section.",
+            "data_sources": ["web_research", "coingecko", "coinmarketcap"],
             "visualizations": ["token_distribution_pie", "supply_metrics_table"]
         },
         {
             "title": "Market Analysis",
             "required": true,
             "min_words": 800,
-            "prompt": "Conduct a detailed analysis of market dynamics and competitive positioning. Focus on trading patterns, liquidity, and market trends without repeating basic metrics from earlier sections.",
-            "data_sources": ["web_research","coingecko", "coinmarketcap", "defillama"],
+            "prompt": "Conduct a detailed analysis of the project's market performance and competitive positioning. Focus on trading patterns, liquidity trends, market cap growth, and comparisons with competitors, without repeating basic metrics like price or supply covered in earlier sections.",
+            "data_sources": ["web_research", "coingecko", "coinmarketcap", "defillama"],
             "visualizations": ["price_history_chart", "volume_chart", "tvl_chart", "competitor_comparison_chart"]
         },
         {
             "title": "Technical Analysis",
             "required": true,
             "min_words": 600,
-            "prompt": "Evaluate the project's technical architecture and innovations. Focus on scalability, security, and technical advantages without overlapping with governance or market analysis.",
-            "data_sources": ["web_research","coinmarketcap"],
+            "prompt": "Evaluate the project's technical architecture and innovations. Focus on blockchain technology, consensus mechanism, scalability solutions, and unique features, without overlapping with governance, security, or market analysis covered in other sections.",
+            "data_sources": ["web_research", "coinmarketcap"],
             "visualizations": []
         },
         {
             "title": "Developer Tools and User Experience",
             "required": true,
             "min_words": 400,
-            "prompt": "Assess the developer ecosystem and user experience. Highlight available tools, documentation quality, and user engagement without repeating technical details covered in other sections.",
+            "prompt": "Assess the project's developer ecosystem and user experience. Highlight available tools (e.g., APIs, SDKs), documentation quality, user engagement metrics, and accessibility features, without repeating technical details covered in the Technical Analysis section.",
             "data_sources": ["web_research"],
             "visualizations": ["developer_tools_table", "user_experience_metrics"]
         },
@@ -55,7 +55,7 @@
             "title": "Security",
             "required": true,
             "min_words": 400,
-            "prompt": "Provide a comprehensive security assessment focusing on audit findings and risk management. Avoid repeating technical details already covered in the Technical Analysis section.",
+            "prompt": "Provide a comprehensive security assessment of the project. Focus on audit history, identified vulnerabilities, risk management practices, and security features, without repeating technical architecture details covered in the Technical Analysis section.",
             "data_sources": ["web_research"],
             "visualizations": ["security_audits_table"]
         },
@@ -63,15 +63,15 @@
             "title": "Liquidity and Adoption Metrics",
             "required": true,
             "min_words": 500,
-            "prompt": "Analyze adoption and liquidity metrics, focusing on user growth and market integration. Avoid repeating basic market metrics covered earlier.",
-            "data_sources": ["web_research","coingecko", "coinmarketcap", "defillama"],
+            "prompt": "Analyze the project's liquidity and adoption metrics. Focus on user growth, market integration, DeFi engagement (e.g., TVL trends), and exchange listings, without repeating basic market metrics like trading volume covered in the Market Analysis section.",
+            "data_sources": ["web_research", "coingecko", "coinmarketcap", "defillama"],
             "visualizations": ["liquidity_trends_chart", "adoption_metrics_table"]
         },
         {
             "title": "Governance and Community",
             "required": true,
             "min_words": 400,
-            "prompt": "Evaluate governance structures and community engagement. Focus on decision-making processes and community growth without overlapping with tokenomics or technical analysis.",
+            "prompt": "Evaluate the project's governance structure and community engagement. Focus on decision-making processes, voting mechanisms, proposal activity, and community growth, without overlapping with tokenomics or technical analysis covered in other sections.",
             "data_sources": ["web_research"],
             "visualizations": ["governance_metrics_table"]
         },
@@ -79,7 +79,7 @@
             "title": "Ecosystem and Partnerships",
             "required": true,
             "min_words": 400,
-            "prompt": "Analyze strategic partnerships and ecosystem development. Focus on integration depth and mutual value creation without repeating adoption metrics covered in earlier sections.",
+            "prompt": "Analyze the project's strategic partnerships and ecosystem development. Focus on key integrations, collaboration impact, and ecosystem growth, without repeating adoption metrics covered in the Liquidity and Adoption Metrics section.",
             "data_sources": ["web_research", "defillama"],
             "visualizations": ["partnerships_table"]
         },
@@ -87,7 +87,7 @@
             "title": "Risks and Opportunities",
             "required": true,
             "min_words": 500,
-            "prompt": "Provide a balanced analysis of risks and opportunities, focusing on regulatory challenges and growth catalysts. Avoid repeating risks mentioned in previous sections.",
+            "prompt": "Provide a balanced analysis of the project's risks and opportunities. Focus on regulatory challenges, market risks, technical vulnerabilities, and growth catalysts, without repeating risks or opportunities mentioned in previous sections.",
             "data_sources": ["web_research"],
             "visualizations": ["risks_table", "opportunities_table"]
         },
@@ -95,7 +95,7 @@
             "title": "Team and Development Activity",
             "required": true,
             "min_words": 400,
-            "prompt": "Evaluate team capabilities and development momentum. Focus on team experience and roadmap execution without overlapping with technical analysis.",
+            "prompt": "Evaluate the project's team capabilities and development momentum. Focus on team experience, notable members, development activity (e.g., GitHub commits), and roadmap execution, without overlapping with technical analysis covered in other sections.",
             "data_sources": ["web_research"],
             "visualizations": ["team_metrics_table"]
         },
@@ -103,7 +103,7 @@
             "title": "Conclusion",
             "required": true,
             "min_words": 300,
-            "prompt": "Synthesize key investment considerations and provide actionable insights. Focus on the primary investment thesis and growth opportunities without introducing new information.",
+            "prompt": "Synthesize key investment considerations and provide actionable insights for the project. Focus on the primary investment thesis, growth opportunities, and strategic recommendations, without introducing new data or repeating detailed analysis from previous sections.",
             "data_sources": [],
             "visualizations": ["key_takeaways_table"]
         }

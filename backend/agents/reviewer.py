@@ -22,23 +22,26 @@ class ReviewerAgent:
         
         metrics_note = """
 IMPORTANT INSTRUCTIONS:
-1. Maintain all exact numerical values (prices, market cap, trading volume, etc.) throughout the document
-2. DO NOT replace specific figures with placeholders like '$X' or 'Y tokens'
-3. DO NOT attempt to add or reference tables or images directly in the text
-4. Focus only on improving the quality of the existing text content
+1. Maintain all exact numerical values (prices, market cap, trading volume, etc.) throughout the document.
+2. DO NOT replace specific figures with placeholders like '$X' or 'Y tokens'.
+3. DO NOT attempt to add or reference tables or images directly in the text.
+4. Focus only on improving the quality of the existing text content.
+5. Ensure each section focuses on its unique scope as defined in the report configuration, avoiding overlap with other sections.
+6. Maintain a professional, investment-grade tone suitable for crypto investors and analysts.
 """
         
         prompt = (
-            f"Review and polish this draft report for {state.project_name} cryptocurrency:\n\n"
+            f"Review and polish this draft report for {state.project_name} cryptocurrency to ensure it meets investment-grade quality for professional crypto investors and analysts:\n\n"
             f"{draft}\n\n"
             f"{metrics_note}\n"
             f"Focus on:\n"
-            "1. Ensuring an objective, balanced perspective throughout.\n"
-            "2. Verifying all investment-relevant information is clearly presented.\n"
-            "3. Highlighting risk factors appropriately.\n"
-            "4. Ensuring conclusions follow logically from the evidence.\n"
-            "5. Confirming the Executive Summary reflects the full report content.\n"
-            "6. Polishing language for clarity, conciseness, and professional impact.\n\n"
+            "1. Ensuring an objective, balanced perspective throughout—highlight both strengths and risks without bias.\n"
+            "2. Verifying all investment-relevant information (e.g., market position, growth potential, risks) is clearly presented and actionable for decision-making.\n"
+            "3. Highlighting risk factors appropriately, ensuring they are not downplayed and include clear implications for investors.\n"
+            "4. Ensuring conclusions in each section follow logically from the evidence, avoiding unsupported claims.\n"
+            "5. Confirming the Executive Summary reflects the full report content, focusing on high-level insights (e.g., strategic positioning, investment potential) without repeating detailed metrics from other sections.\n"
+            "6. Polishing language for clarity, conciseness, and professional impact—use precise, direct sentences and avoid redundancy.\n"
+            "7. Ensuring numerical data (e.g., price, market cap, supply, trading volume, TVL) is consistent across all sections—cross-check values and correct any discrepancies.\n\n"
             "Preserve the structure and core content, making only necessary changes to meet investment-grade quality. "
             "Return the revised report in markdown format."
         )
