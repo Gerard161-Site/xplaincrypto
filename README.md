@@ -40,15 +40,16 @@ Each report includes customizable sections defined in the report configuration:
 
 ## 🎨 Visualization System
 
-The platform includes a dedicated visualization agent that creates:
+The platform includes a modular visualization system with specialized visualizers for each chart type:
 
-- Price trend charts
-- Volume analysis charts
-- TVL (Total Value Locked) visualizations
-- Token distribution pie charts
-- Competitive comparison bar charts
-- Key metrics tables
-- Development roadmap timelines
+- **Base Visualizer**: Common interface and utility functions for all visualizers
+- **Line Chart Visualizer**: Price trends, volume analysis, TVL trends
+- **Bar Chart Visualizer**: Rankings and competitor comparisons
+- **Pie Chart Visualizer**: Token distribution and allocation breakdowns
+- **Table Visualizer**: Key metrics and structured data presentations
+- **Timeline Visualizer**: Development roadmaps and project milestones
+
+The system automatically selects the appropriate visualizer based on the chart type in the report configuration. Each visualization includes an AI-generated description explaining key insights from the data.
 
 ## 🛠️ Customization
 
@@ -115,6 +116,15 @@ xplaincrypto/
 │   │   ├── orchestrator.py # Orchestrates the research workflow
 │   │   ├── data_modules.py # Data gathering modules
 │   │   └── core.py       # Core research components
+│   ├── utils/            # Utility functions
+│   │   └── style_utils.py # Styling utilities for visualizations
+│   ├── visualizations/   # Modular visualization components
+│   │   ├── base.py       # Base visualizer class
+│   │   ├── line_chart.py # Line chart visualizer
+│   │   ├── bar_chart.py  # Bar chart visualizer
+│   │   ├── pie_chart.py  # Pie chart visualizer
+│   │   ├── table.py      # Table visualizer
+│   │   └── timeline.py   # Timeline visualizer
 │   └── main.py           # Server entry point
 ├── frontend/             # Next.js frontend
 │   ├── pages/            # React components and pages
