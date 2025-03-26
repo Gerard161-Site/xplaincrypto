@@ -5,6 +5,8 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --gradient-start: #6B48FF; /* Deep purple */
+  --gradient-end: #00DDEB; /* Cyan */
 }
 
 @media (prefers-color-scheme: dark) {
@@ -15,42 +17,105 @@
 }
 
 body {
-  background: var(--background);
+  background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
   color: var(--foreground);
   font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
+  min-height: 100vh;
+  position: relative;
+  overflow-x: hidden;
 }
 
 /* Ensure dark theme consistency */
 .dark {
-  background: #0a0a0a;
+  background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
   color: #ededed;
+}
+
+/* Decorative shapes */
+body::before,
+body::after {
+  content: '';
+  position: absolute;
+  opacity: 0.2;
+  z-index: -1;
+}
+
+body::before {
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle, #FF8A00, transparent);
+  top: 10%;
+  left: 5%;
+  border-radius: 50%;
+}
+
+body::after {
+  width: 150px;
+  height: 150px;
+  background: radial-gradient(circle, #00DDEB, transparent);
+  bottom: 15%;
+  right: 5%;
+  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
 }
 
 /* Style for progress log to look like a console */
 .progress-log {
   font-family: monospace;
-  background: #1a1a1a;
-  border: 1px solid #4a4a4a;
-  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
   padding: 12px;
   max-height: 16rem;
   overflow-y: auto;
 }
 
+/* Style for the log console */
+.log-console {
+  background: #000000; /* Solid black background */
+  border-radius: 8px;
+  padding: 12px;
+  font-family: monospace;
+  height: 16rem;
+  overflow-y: auto;
+}
+
 /* Scrollbar styling for dark theme */
-.progress-log::-webkit-scrollbar {
+.progress-log::-webkit-scrollbar,
+.log-console::-webkit-scrollbar {
   width: 8px;
 }
 
-.progress-log::-webkit-scrollbar-track {
-  background: #2a2a2a;
+.progress-log::-webkit-scrollbar-track,
+.log-console::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
 }
 
-.progress-log::-webkit-scrollbar-thumb {
-  background: #4a4a4a;
+.progress-log::-webkit-scrollbar-thumb,
+.log-console::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
   border-radius: 4px;
 }
 
-.progress-log::-webkit-scrollbar-thumb:hover {
-  background: #6a6a6a;
+.progress-log::-webkit-scrollbar-thumb:hover,
+.log-console::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+/* Updated glassmorphism effect for cards with a stronger background */
+.glass-card {
+  background: rgba(107, 72, 255, 0.85); /* Darker purple with higher opacity */
+  border: 1px solid rgba(255, 255, 255, 0.3); /* Slightly brighter border for contrast */
+  border-radius: 16px;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2); /* Slightly stronger shadow */
+}
+
+/* Gradient buttons */
+.gradient-button {
+  background: linear-gradient(90deg, #FF8A00, #FF2E63);
+  transition: transform 0.2s ease;
+}
+
+.gradient-button:hover {
+  transform: scale(1.05);
 }

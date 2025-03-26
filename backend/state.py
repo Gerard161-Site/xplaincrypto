@@ -1,4 +1,6 @@
 from typing import Dict, List, Optional, Any, Union
+from backend.research.core import ResearchNode
+import os
 
 class ResearchState:
     def __init__(self, project_name: str):
@@ -30,6 +32,23 @@ class ResearchState:
         
         # Report configuration
         self.report_config: Dict[str, Any] = {}
+        
+        # Missing attributes needed for compatibility with research orchestrator
+        self.root_node: Optional[ResearchNode] = None
+        self.errors: List[str] = []
+        self.query: str = ""
+        self.current_node_id: Optional[str] = None
+        self.tree_generated: bool = False
+        self.research_complete: bool = False
+        self.data_gathered: bool = False
+        self.synthesis_complete: bool = False
+        self.structured_data: Dict[str, Any] = {}
+        self.team_and_development: str = ""
+        self.missing_data_fields: List[str] = []
+        self.outputDir: str = os.path.join("docs", self.project_name.lower().replace(" ", "_"))
+        
+        # Create output directory if it doesn't exist
+        os.makedirs(self.outputDir, exist_ok=True)
 
     def update_progress(self, message: str):
         self.progress = message

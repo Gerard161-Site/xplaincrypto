@@ -62,15 +62,23 @@ class ResearchState:
         return state_dict
 
 
-class ResearchOrchestrator:
-    """Orchestrates the research workflow using LangGraph."""
+class ResearchManager:
+    """Manages the research process by handling research tree generation, data gathering, and research execution."""
     
     def __init__(self, llm: ChatOpenAI, logger: logging.Logger, config_path: str = None):
         self.llm = llm
         self.logger = logger
         self.config_path = config_path or "backend/config/report_config.json"
         self.report_config = self._load_report_config()
-        self.workflow = self._build_workflow()
+    
+    def research(self, project_name: str) -> ResearchState:
+        """Execute the research process for a given project."""
+        state = ResearchState(project_name=project_name)
+        state = self._generate_research_tree(state)
+        state = self._gather_data(state)
+        state = self._conduct_research(state)
+        state = self._synthesize_findings(state)
+        return state
     
     def _load_report_config(self) -> Dict[str, Any]:
         """Load the report configuration file."""
@@ -87,97 +95,120 @@ class ResearchOrchestrator:
             self.logger.error(f"Error loading report configuration: {str(e)}")
             return {}
     
-    def _build_workflow(self) -> StateGraph:
-        """Build the LangGraph workflow."""
-        workflow = StateGraph(ResearchState)
-        
-        # Add nodes
-        workflow.add_node("generate_research_tree", self._generate_research_tree)
-        workflow.add_node("gather_data", self._gather_data)
-        workflow.add_node("conduct_research", self._conduct_research)
-        workflow.add_node("synthesize_findings", self._synthesize_findings)
-        
-        # Add edges
-        workflow.set_entry_point("generate_research_tree")
-        workflow.add_edge("generate_research_tree", "gather_data")
-        workflow.add_edge("gather_data", "conduct_research")
-        workflow.add_edge("conduct_research", "synthesize_findings")
-        workflow.add_edge("synthesize_findings", END)
-        
-        return workflow.compile()
-    
-    def research(self, project_name: str) -> ResearchState:
-        """Execute the full research workflow."""
-        # Initialize state
-        query = f"What is {project_name} cryptocurrency?"
-        initial_state = ResearchState(project_name=project_name, query=query, report_config=self.report_config)
-        
-        # Run the workflow
-        self.logger.info(f"Starting research workflow for {project_name}")
-        final_state = self.workflow.invoke(initial_state)
-        self.logger.info(f"Research workflow completed for {project_name}")
-        
-        return final_state
-    
     def _generate_research_tree(self, state: ResearchState) -> ResearchState:
         """Generate the research tree based on the main query."""
         self.logger.info(f"Generating research tree for {state.project_name}")
         state.update_progress(f"Planning research for {state.project_name}...")
         
-        # MODIFIED: Expanded research types to include Governance and Team (Task 1)
+        # Create root node for the project
+        root_query = f"Comprehensive analysis of {state.project_name} cryptocurrency"
+        state.root_node = ResearchNode(query=root_query, research_type=ResearchType.TECHNICAL)
+        
+        # If we have a report config, use it to structure the research tree
+        if state.report_config and "sections" in state.report_config:
+            self._generate_config_based_tree(state)
+        else:
+            # Fallback to the original approach if no config is available
+            self._generate_generic_tree(state)
+        
+        state.tree_generated = True
+        self.logger.info(f"Research tree generated with {len(state.root_node.children)} sections")
+        state.update_progress(f"Research plan created with {len(state.root_node.children)} primary topics")
+        
+        return state
+
+    def _generate_config_based_tree(self, state: ResearchState) -> None:
+        """Generate a structured research tree based on report configuration."""
+        self.logger.info("Generating research tree based on report configuration")
+        
+        # For each section in the report config
+        for section in state.report_config.get("sections", []):
+            section_title = section.get("title", "")
+            description = section.get("description", "")
+            data_sources = section.get("data_sources", [])
+            visualizations = section.get("visualizations", [])
+            
+            # Skip sections without a title or description
+            if not section_title:
+                continue
+                
+            # Determine research type for this section
+            research_type = self._determine_research_type(section_title)
+            
+            # Create a section node
+            section_query = f"{section_title} of {state.project_name}"
+            section_node = state.root_node.add_child(
+                query=section_query,
+                research_type=research_type
+            )
+            
+            # If the section has visualizations, extract the data fields needed
+            data_fields = self._get_data_fields_for_section(section, state.report_config)
+            
+            # If we have data fields, create data nodes for each one
+            if data_fields:
+                for data_field, source_info in data_fields.items():
+                    source = source_info.get('source', 'web_research')
+                    field_query = f"{data_field} of {state.project_name}"
+                    
+                    # Add a specific data node for this field
+                    section_node.add_child(
+                        query=field_query,
+                        research_type=research_type,
+                        data_field=data_field,
+                        source=source
+                    )
+            
+            # Add an analysis node with the section description
+            if description:
+                analysis_query = f"Analysis: {description} for {state.project_name}"
+                section_node.add_child(
+                    query=analysis_query,
+                    research_type=research_type
+                )
+                
+    def _get_data_fields_for_section(self, section: Dict[str, Any], report_config: Dict[str, Any]) -> Dict[str, Dict[str, str]]:
+        """Extract data fields needed for visualizations in a section."""
+        data_fields = {}
+        vis_types = report_config.get("visualization_types", {})
+        
+        # For each visualization in the section
+        for vis_name in section.get("visualizations", []):
+            if vis_name in vis_types:
+                vis_config = vis_types[vis_name]
+                source = vis_config.get("data_source", "web_research")
+                
+                # Get data fields from the visualization
+                if "data_field" in vis_config:
+                    field = vis_config["data_field"]
+                    data_fields[field] = {"source": source}
+                
+                if "data_fields" in vis_config:
+                    for field in vis_config["data_fields"]:
+                        data_fields[field] = {"source": source}
+        
+        return data_fields
+        
+    def _generate_generic_tree(self, state: ResearchState) -> None:
+        """Generate a generic research tree based on predefined research types."""
+        self.logger.info("Generating generic research tree with predefined types")
+        
         research_types = [
             ResearchType.TECHNICAL,
             ResearchType.TOKENOMICS,
             ResearchType.MARKET,
             ResearchType.ECOSYSTEM,
-            ResearchType.GOVERNANCE,  # Added for governance details
-            ResearchType.TEAM,        # Added for team and roadmap details
-            ResearchType.RISKS,       # Added for completeness
-            ResearchType.OPPORTUNITIES  # Added for completeness
+            ResearchType.GOVERNANCE,
+            ResearchType.TEAM,
+            ResearchType.RISKS,
+            ResearchType.OPPORTUNITIES
         ]
         
-        # If we have a report config, extract research types from sections
-        if state.report_config and "sections" in state.report_config:
-            section_titles = [section.get("title", "").lower() for section in state.report_config["sections"]]
-            
-            # Map section titles to research types
-            if any("technical" in title for title in section_titles):
-                research_types.append(ResearchType.TECHNICAL)
-            if any("tokenomics" in title for title in section_titles):
-                research_types.append(ResearchType.TOKENOMICS)
-            if any("market" in title for title in section_titles):
-                research_types.append(ResearchType.MARKET)
-            if any("governance" in title for title in section_titles):
-                research_types.append(ResearchType.GOVERNANCE)
-            if any("ecosystem" in title or "partnership" in title for title in section_titles):
-                research_types.append(ResearchType.ECOSYSTEM)
-            if any("team" in title or "development" in title for title in section_titles):
-                research_types.append(ResearchType.TEAM)
-            if any("risks" in title for title in section_titles):
-                research_types.append(ResearchType.RISKS)
-            if any("opportunities" in title for title in section_titles):
-                research_types.append(ResearchType.OPPORTUNITIES)
+        # Directly create the nodes without using ResearchManager from core.py
+        for rt in research_types:
+            state.root_node.add_child(f"{rt} analysis of {state.project_name}", rt)
         
-        # Create research manager and generate tree
-        research_manager = ResearchManager(
-            query=state.query,
-            llm=self.llm,
-            logger=self.logger,
-            max_depth=2,
-            max_breadth=3,
-            research_types=list(set(research_types))  # Deduplicate
-        )
-        
-        try:
-            state.root_node = research_manager.generate_research_tree()
-            state.tree_generated = True
-            state.update_progress(f"Research plan created with {len(state.root_node.children)} primary topics")
-        except Exception as e:
-            self.logger.error(f"Error generating research tree: {str(e)}")
-            state.errors.append(f"Tree generation error: {str(e)}")
-            state.update_progress(f"Error in research planning: {str(e)}")
-        
-        return state
+        self.logger.info(f"Created {len(research_types)} research type nodes")
     
     def _gather_data(self, state: ResearchState) -> ResearchState:
         """Gather real-time data from APIs."""
@@ -203,16 +234,24 @@ class ResearchOrchestrator:
             
             self.logger.info(f"Using data sources: {', '.join(data_sources)}")
             
-            # MODIFIED: Fetch competitor data for Task 3 (Competitive Analysis)
-            competitors = ["ethereum", "solana", "avalanche-2"]  # CoinGecko IDs for ETH, SOL, AVAX
-            competitor_data = {}
-            for comp in competitors:
-                comp_module = DataModule(comp, self.logger)  # Using base class directly for simplicity
-                comp_data = comp_module.gather_data(use_cache=True)
-                if "error" not in comp_data:
-                    competitor_data[comp] = comp_data
-            state.data["competitors"] = competitor_data
-            self.logger.info(f"Gathered competitor data for {len(competitor_data)} coins")
+            # Try to fetch competitor data but handle errors gracefully
+            try:
+                # MODIFIED: Fetch competitor data for Task 3 (Competitive Analysis)
+                competitors = ["ethereum", "solana", "avalanche-2"]  # CoinGecko IDs for ETH, SOL, AVAX
+                competitor_data = {}
+                for comp in competitors:
+                    # Use a concrete implementation instead of abstract class
+                    from backend.research.data_modules import CoinGeckoModule
+                    comp_module = CoinGeckoModule(comp, self.logger)
+                    comp_data = comp_module.gather_data(use_cache=True)
+                    if "error" not in comp_data:
+                        competitor_data[comp] = comp_data
+                state.data["competitors"] = competitor_data
+                self.logger.info(f"Gathered competitor data for {len(competitor_data)} coins")
+            except Exception as e:
+                # Provide an empty placeholder if the above fails
+                self.logger.warning(f"Could not gather competitor data: {str(e)}")
+                state.data["competitors"] = {}
             
             # First check if we have cached data for quick report generation
             cached_data = self._try_load_from_cache(state.project_name)
@@ -235,7 +274,7 @@ class ResearchOrchestrator:
                 
                 # MODIFIED: Format price analysis with real data (Task 2)
                 state.price_analysis = self._format_price_analysis(state)
-                state.tokenomics = data_gatherer.get_formatted_tokenomics(state.data)
+                state.tokenomics = self._format_tokenomics(state)  # Use internal method instead
                 
                 # Start async refresh of data
                 self._refresh_data_async(state, data_gatherer, data_sources)
@@ -257,7 +296,7 @@ class ResearchOrchestrator:
             
             # MODIFIED: Format price analysis with real data (Task 2)
             state.price_analysis = self._format_price_analysis(state)
-            state.tokenomics = data_gatherer.get_formatted_tokenomics(state.data)
+            state.tokenomics = self._format_tokenomics(state)  # Use internal method instead
             
             return state
         except Exception as e:
@@ -344,28 +383,20 @@ class ResearchOrchestrator:
         all_references = []
         
         # Research the root node first
-        self._research_node(state.root_node, state.project_name, all_references)
+        self._research_node(state.root_node, state.project_name, all_references, state.data)
         
-        # Process each strategic question (depth 1)
-        for strategic_node in state.root_node.children:
-            self._research_node(strategic_node, state.project_name, all_references)
+        # Process each section node (depth 1)
+        for section_node in state.root_node.children:
+            self._research_node(section_node, state.project_name, all_references, state.data)
             
-            # Process tactical questions for each strategic question (depth 2)
-            for tactical_node in strategic_node.children:
-                self._research_node(tactical_node, state.project_name, all_references)
+            # Process data and analysis nodes for each section (depth 2)
+            for detail_node in section_node.children:
+                self._research_node(detail_node, state.project_name, all_references, state.data)
         
         # Store all references in state
         state.references = all_references
         state.research_complete = True
         state.update_progress(f"Research completed with {len(all_references)} sources")
-        
-        # Extract specific research data for governance and team (Task 1)
-        if state.root_node:
-            for node in state.root_node.children:
-                if "governance" in node.query.lower():
-                    state.governance = node.summary
-                if "team" in node.query.lower() or "development" in node.query.lower():
-                    state.team_and_development = node.summary
         
         return state
     
@@ -373,30 +404,122 @@ class ResearchOrchestrator:
         self, 
         node: ResearchNode, 
         project_name: str, 
-        all_references: List[Dict[str, str]]
+        all_references: List[Dict[str, str]],
+        api_data: Dict[str, Any]
     ) -> None:
-        """Research a specific node using the appropriate agent."""
+        """Research a specific node using appropriate method based on node type."""
         self.logger.info(f"Researching node: {node.query}")
+        node_id = node.id if hasattr(node, 'id') else "unknown"
+        self.logger.debug(f"Node ID: {node_id}, Type: {node.research_type}, Data field: {node.data_field}")
         
         try:
-            # Determine the research type based on content analysis
-            research_type = self._determine_research_type(node.query)
+            # Check if node is a data node (has data_field)
+            if node.data_field:
+                self.logger.debug(f"Node has data_field: {node.data_field}, checking API sources")
+                # Try to get data from API sources first
+                api_value = self._get_api_data_for_field(node.data_field, node.source, api_data)
+                
+                if api_value is not None:
+                    # We have API data, use it directly
+                    self.logger.info(f"Using API data for {node.data_field}: {api_value}")
+                    
+                    # Set structured data
+                    node.structured_data = {node.data_field: api_value}
+                    
+                    # Set summary with the data field and value
+                    node.summary = f"{node.data_field}: {api_value}"
+                    
+                    # Add API as reference
+                    source_name = node.source.capitalize() if node.source else "API"
+                    node.references = [{"title": f"{source_name} data", "url": f"https://{node.source}.com"}]
+                    
+                    # Return without doing web research
+                    self.logger.debug(f"Successfully used API data for node {node_id}")
+                    return
+                else:
+                    self.logger.info(f"No API data for {node.data_field}, falling back to web research")
+            
+            # No API data found or not a data node, proceed with web research
+            research_type = node.research_type or self._determine_research_type(node.query)
+            self.logger.debug(f"Research type determined for node {node_id}: {research_type}")
             
             # Get appropriate agent for this research type
+            self.logger.debug(f"Getting agent for research type: {research_type}")
             agent = get_agent_for_research_type(research_type, self.llm, self.logger)
+            self.logger.debug(f"Using agent: {agent.__class__.__name__} for node {node_id}")
             
             # Execute research on this node
-            agent.research(node)
+            before_state = {
+                'has_content': bool(getattr(node, 'content', '')), 
+                'has_summary': bool(getattr(node, 'summary', '')),
+                'has_references': bool(getattr(node, 'references', []))
+            }
+            self.logger.debug(f"Node state before research: {before_state}")
+            
+            # Execute research and verify the node was returned
+            result_node = agent.research(node)
+            if result_node is not node:
+                self.logger.warning(f"Agent returned a different node than passed in. Using the returned node.")
+                # Copy relevant properties from the returned node
+                node.content = getattr(result_node, 'content', node.content)
+                node.summary = getattr(result_node, 'summary', node.summary)
+                node.references = getattr(result_node, 'references', node.references)
+                node.structured_data = getattr(result_node, 'structured_data', node.structured_data)
+            
+            after_state = {
+                'has_content': bool(getattr(node, 'content', '')), 
+                'has_summary': bool(getattr(node, 'summary', '')),
+                'has_references': len(getattr(node, 'references', [])),
+                'summary_length': len(getattr(node, 'summary', '')),
+                'content_preview': getattr(node, 'content', '')[:50] + '...' if getattr(node, 'content', '') else ''
+            }
+            self.logger.debug(f"Node state after research: {after_state}")
+            
+            # Verify that the research was successful
+            if not node.summary:
+                self.logger.warning(f"Research completed but no summary was generated for node {node_id}")
+                node.summary = f"Research produced no results for: {node.query}"
             
             # Add references to the global list, avoiding duplicates
             existing_urls = [ref["url"] for ref in all_references]
+            refs_added = 0
             for ref in node.references:
-                if ref["url"] not in existing_urls:
+                if "url" in ref and ref["url"] not in existing_urls:
                     all_references.append(ref)
                     existing_urls.append(ref["url"])
+                    refs_added += 1
+            self.logger.debug(f"Added {refs_added} new references from node {node_id}")
+            
+            self.logger.info(f"Successfully researched node {node_id}")
+                    
         except Exception as e:
-            self.logger.error(f"Error researching node {node.query}: {str(e)}")
+            self.logger.error(f"Error researching node {node_id}: {str(e)}", exc_info=True)
             node.summary = f"Research failed: {str(e)}"
+            # Ensure structured_data exists even on error
+            if not hasattr(node, 'structured_data') or node.structured_data is None:
+                node.structured_data = {}
+            # Ensure references exists even on error
+            if not hasattr(node, 'references') or node.references is None:
+                node.references = []
+    
+    def _get_api_data_for_field(self, data_field: str, source: str, api_data: Dict[str, Any]) -> Any:
+        """Get data for a specific field from API data if available."""
+        # Check if we have the source
+        if not source or source == "web_research" or source not in api_data:
+            return None
+            
+        source_data = api_data.get(source, {})
+        
+        # Direct match for the data field
+        if data_field in source_data:
+            return source_data[data_field]
+            
+        # Handle multi-source by checking if multi exists and contains field
+        if "multi" in api_data and data_field in api_data["multi"]:
+            return api_data["multi"][data_field]
+            
+        # No match found
+        return None
     
     def _determine_research_type(self, query: str) -> str:
         """Determine the research type based on query content."""
@@ -500,3 +623,113 @@ class ResearchOrchestrator:
             summaries.extend(self._collect_all_summaries(child))
         
         return summaries
+
+    # NEW: Added method to format tokenomics with data from API
+    def _format_tokenomics(self, state: ResearchState) -> str:
+        """Format tokenomics data from the state."""
+        # Get data from coingecko if available
+        coin_data = state.coingecko_data if hasattr(state, 'coingecko_data') else {}
+        
+        # Extract tokenomics data
+        total_supply = coin_data.get("total_supply", "Data unavailable")
+        circulating_supply = coin_data.get("circulating_supply", "Data unavailable")
+        
+        # Format into readable text
+        tokenomics = (
+            f"Tokenomics for {state.project_name}\n\n"
+            f"Total Supply: {total_supply:,} tokens\n"
+            f"Circulating Supply: {circulating_supply:,} tokens\n"
+        )
+        
+        # Add token distribution if available
+        if coin_data.get("token_distribution"):
+            tokenomics += "\nToken Distribution:\n"
+            for allocation in coin_data.get("token_distribution", []):
+                category = allocation.get("category", "Unknown")
+                percentage = allocation.get("percentage", 0)
+                tokenomics += f"- {category}: {percentage}%\n"
+                
+        return tokenomics
+
+class ResearchOrchestrator:
+    """Orchestrates the research process using ResearchManager."""
+    
+    def __init__(self, llm: ChatOpenAI, logger: logging.Logger, config_path: str = None):
+        self.llm = llm
+        self.logger = logger
+        self.config_path = config_path
+        self.report_config = {}
+        self._load_report_config()
+        
+    def _load_report_config(self) -> Dict[str, Any]:
+        """Load the report configuration file."""
+        try:
+            if self.config_path and os.path.exists(self.config_path):
+                with open(self.config_path, "r") as f:
+                    self.report_config = json.load(f)
+                self.logger.info(f"Loaded report configuration from {self.config_path}")
+            else:
+                self.logger.warning(f"Report configuration file not found at {self.config_path}")
+        except Exception as e:
+            self.logger.error(f"Error loading report configuration: {str(e)}")
+        return self.report_config
+        
+    def research(self, project_name: str) -> ResearchState:
+        """Execute the research process using ResearchManager."""
+        self.logger.info(f"ResearchOrchestrator starting research for {project_name}")
+        
+        # Create a ResearchManager instance
+        manager = ResearchManager(
+            llm=self.llm,
+            logger=self.logger,
+            config_path=self.config_path
+        )
+        
+        # Pass our report_config to the manager if we have one
+        if self.report_config:
+            manager.report_config = self.report_config
+            self.logger.debug("Transferred report_config to ResearchManager")
+            
+        # Execute the research
+        state = manager.research(project_name)
+        
+        # Make sure the report_config is set on the state
+        if not hasattr(state, 'report_config') or not state.report_config:
+            state.report_config = manager.report_config
+            self.logger.info("Set report_config on state object from manager")
+        
+        # Initialize additional fields for compatibility with main ResearchState
+        if not hasattr(state, 'missing_data_fields'):
+            state.missing_data_fields = []
+            
+        if not hasattr(state, 'visualizations'):
+            state.visualizations = {}
+            
+        if not hasattr(state, 'outputDir'):
+            state.outputDir = os.path.join("docs", state.project_name.lower().replace(" ", "_"))
+            # Create output directory if it doesn't exist
+            os.makedirs(state.outputDir, exist_ok=True)
+            
+        if not hasattr(state, 'draft'):
+            state.draft = ""
+            
+        if not hasattr(state, 'final_report'):
+            state.final_report = ""
+            
+        if not hasattr(state, 'key_features'):
+            state.key_features = ""
+            
+        # Make sure the structured_data field exists and is properly initialized
+        if not hasattr(state, 'structured_data') or not state.structured_data:
+            state.structured_data = {}
+            
+        # Make sure research_data exists for backward compatibility
+        if not hasattr(state, 'research_data'):
+            state.research_data = state.structured_data.copy() if hasattr(state, 'structured_data') else {}
+            
+        # Ensure errors list is initialized
+        if not hasattr(state, 'errors'):
+            state.errors = []
+            
+        self.logger.info(f"ResearchOrchestrator completed research for {project_name}")
+        return state

@@ -115,8 +115,10 @@ workflow.add_node("writer", lambda state, config=None: writer(state, llm, logger
 workflow.add_node("visualization_agent", lambda state, config=None: visualization_agent(state, llm, logger, config))
 workflow.add_node("reviewer", lambda state, config=None: reviewer(state, llm, logger, config))
 workflow.add_node("editor", lambda state, config=None: editor(state, llm, logger, config))
-workflow.add_node("publisher", lambda state, config=None: publisher(state, logger, config, llm))
+workflow.add_node("publisher", lambda state, config=None: publisher(state, llm, logger, config))
 workflow.set_entry_point("enhanced_researcher")
+
+# Chain steps sequentially to ensure proper data flow
 workflow.add_edge("enhanced_researcher", "writer")
 workflow.add_edge("writer", "visualization_agent")
 workflow.add_edge("visualization_agent", "reviewer")
@@ -161,6 +163,7 @@ async def message(sid, data):
         
         # Create docs directory if it doesn't exist
         os.makedirs("docs", exist_ok=True)
+        os.makedirs(os.path.join("docs", project_name.lower().replace(" ", "_")), exist_ok=True)
         
         # Create progress tracking for client
         async def update_client_progress(current_state, step=None, percentage=None):
@@ -219,337 +222,206 @@ async def message(sid, data):
             max_tokens=model_params["max_tokens"]
         )
         
-        # Enhanced Research Step with proper caching - ENSURE RESEARCH IS PERFORMED
+        # Run each agent in sequence with proper error handling
         try:
-            logger.info(f"Starting research for {project_name}")
+            # STEP 1: Enhanced Researcher
+            logger.info(f"Starting enhanced research for {project_name}")
             state.update_progress(f"Researching {project_name}...")
             await update_client_progress(state, "research", 0)
             
-            # Create research configuration with report config requirements
+            # Configure research with proper parameters
             research_config = {
                 "fast_mode": fast_mode,
-                "api_limit": 10 if fast_mode else 20,  # Increased from 5/15 to ensure sufficient data
-                "cache_enabled": True,  # Always use caching
-                "cache_ttl": 21600,  # 6 hours TTL for cache to reduce API calls
-                "skip_research": False,  # Critical flag - NEVER skip research completely
-                "force_refresh": False,  # Use cached data if available (helps speed up)
-                "report_sections": state.report_config.get("sections", [])  # Pass sections to researcher
+                "api_limit": 10 if fast_mode else 20,
+                "cache_enabled": True,
+                "cache_ttl": 21600,  # 6 hours TTL
+                "report_sections": state.report_config.get("sections", [])
             }
             
-            # Log research configuration
-            logger.info(f"Research configuration: {research_config}")
-            
-            # Run the enhanced researcher with custom configuration
-            enhanced_research_state = enhanced_researcher(state, context_llm, logger, research_config)
-            
-            # Verify research was performed by checking for data
-            if enhanced_research_state:
-                state = enhanced_research_state
-                metrics['steps_completed'] += 1
-                
-                # Validate research data was actually collected
-                has_api_data = (
-                    hasattr(state, 'coingecko_data') and state.coingecko_data or
-                    hasattr(state, 'coinmarketcap_data') and state.coinmarketcap_data or
-                    hasattr(state, 'defillama_data') and state.defillama_data
-                )
-                
-                if not has_api_data:
-                    logger.warning("No API data was collected during research. This may affect visualizations.")
-                    await sio.emit('warning', "Limited data was collected for this project. Some visualizations may use sample data.", to=sid)
-                
-                # Check for essential research properties
-                essential_props = ['research_summary', 'key_features', 'tokenomics', 'price_analysis']
-                missing_props = [p for p in essential_props if not hasattr(state, p) or not getattr(state, p)]
-                
-                if missing_props:
-                    logger.warning(f"Research is missing essential properties: {missing_props}")
-                    # Still continue but log warning
-            else:
-                raise Exception("Enhanced research failed to return a valid state")
-                
-            logger.debug(f"Post-research state: {vars(state)}")
-            await update_client_progress(state, "research", 100)
-        except Exception as e:
-            await handle_error("research", e)
-            # Continue with empty research data instead of failing completely
-            state.research_summary = f"Analysis of {project_name} cryptocurrency."
-            state.key_features = f"Key features of {project_name}."
-            state.tokenomics = f"Tokenomics information for {project_name}."
-            state.price_analysis = f"Price analysis for {project_name}.\n60-Day Change: 0%"
-            state.governance = f"Governance structure of {project_name}."
-        
-        # Try to load cached data directly if available to supplement any missing data
-        try:
-            # Try to load cached data files if they exist
-            project_lowercase = project_name.lower()
-            cache_dir = "cache"
-            
-            # Ensure we have a properly populated data field
-            if not hasattr(state, 'data') or not state.data:
-                state.data = {}
-            
-            # Load CoinGecko data
-            cg_cache_path = os.path.join(cache_dir, f"{project_name}_CoinGeckoModule.json")
-            if os.path.exists(cg_cache_path):
-                with open(cg_cache_path, 'r') as f:
-                    cg_data = json.load(f)
-                    if not hasattr(state, 'coingecko_data') or not state.coingecko_data:
-                        state.coingecko_data = cg_data
-                    state.data.update(cg_data)
-                    logger.info(f"Loaded {len(cg_data)} fields from cached CoinGecko data")
-            
-            # Load CoinMarketCap data
-            cmc_cache_path = os.path.join(cache_dir, f"{project_name}_CoinMarketCapModule.json")
-            if os.path.exists(cmc_cache_path):
-                with open(cmc_cache_path, 'r') as f:
-                    cmc_data = json.load(f)
-                    if not hasattr(state, 'coinmarketcap_data') or not state.coinmarketcap_data:
-                        state.coinmarketcap_data = cmc_data
-                    state.data.update(cmc_data)
-                    logger.info(f"Loaded {len(cmc_data)} fields from cached CoinMarketCap data")
-            
-            # Load DeFiLlama data
-            dl_cache_path = os.path.join(cache_dir, f"{project_name}_DeFiLlamaModule.json")
-            if os.path.exists(dl_cache_path):
-                with open(dl_cache_path, 'r') as f:
-                    dl_data = json.load(f)
-                    if not hasattr(state, 'defillama_data') or not state.defillama_data:
-                        state.defillama_data = dl_data
-                    state.data.update(dl_data)
-                    logger.info(f"Loaded {len(dl_data)} fields from cached DeFiLlama data")
-            
-            logger.info(f"Combined data now has {len(state.data)} fields")
-        except Exception as e:
-            logger.error(f"Error loading cached data: {str(e)}")
-            # Continue with empty data - visualization agent will handle this
-        
-        # Visualization Step - CRITICAL FIX to ensure config-driven visualization generation
-        try:
-            logger.info(f"Generating visualizations for {project_name}")
-            state.update_progress(f"Creating visualizations based on report configuration...")
-            await update_client_progress(state, "visualization", 0)
-            
-            # Fix: Make sure research data and API data are properly combined
-            if hasattr(state, 'research_data') and state.research_data:
-                logger.info(f"Using {len(state.research_data)} fields from research data")
-                
-                # Update state.data with research_data 
-                if not hasattr(state, 'data'):
-                    state.data = {}
-                state.data.update(state.research_data)
-                
-                # Make sure critical fields are available
-                if 'max_supply' in state.research_data:
-                    logger.info(f"Using max_supply from research: {state.research_data['max_supply']}")
-                if 'circulating_supply' in state.research_data:
-                    logger.info(f"Using circulating_supply from research: {state.research_data['circulating_supply']}")
-                if 'total_supply' in state.research_data:
-                    logger.info(f"Using total_supply from research: {state.research_data['total_supply']}")
-            else:
-                logger.warning("No research_data available for visualizations")
-                
-                # Add dummy research_data to state to avoid issues
-                state.research_data = {}
-            
-            # Create a configuration that references the report config
-            vis_config = {
-                "fast_mode": fast_mode,
-                "limit_charts": fast_mode,  # Limit charts in fast mode
-                "skip_expensive_descriptions": fast_mode,  # Skip LLM descriptions in fast mode
-                "use_report_config": True  # Important flag to use the report_config
-            }
-            
-            visualization_state = visualization_agent(state, context_llm, logger, vis_config)
-            if visualization_state:
-                state = visualization_state
-                metrics['steps_completed'] += 1
-                logger.info(f"Successfully generated visualizations, now in state: {len(state.visualizations)} items")
-            else:
-                raise Exception("Visualization agent failed to return a valid state")
-                
-            await update_client_progress(state, "visualization", 100)
-        except Exception as e:
-            await handle_error("visualization", e)
-            # Ensure state has visualizations property even if empty
-            if not hasattr(state, 'visualizations'):
-                state.visualizations = {}
-            
-        # Skip resource-intensive steps in fast mode or accelerate them
-        if fast_mode:
-            logger.info("Fast mode enabled - Streamlining content generation")
-            
-            # Writer Step - simplified in fast mode, but with config awareness
+            # Execute enhanced researcher
             try:
-                logger.info(f"Writing lightweight report for {project_name}")
-                state.update_progress(f"Creating report content for {project_name}...")
-                await update_client_progress(state, "writing", 0)
-                
-                # Create writer config with fast mode settings
+                enhanced_state = enhanced_researcher(state, context_llm, logger, research_config)
+                if enhanced_state:
+                    state = enhanced_state
+                    metrics['steps_completed'] += 1
+                    logger.info("Enhanced research completed successfully")
+                else:
+                    logger.warning("Enhanced researcher returned None, keeping original state")
+            except Exception as e:
+                logger.error(f"Error in enhanced_researcher: {str(e)}", exc_info=True)
+                await handle_error("research", e)
+                # Continue to next step even with error - state might have partial data
+            
+            await update_client_progress(state, "research", 100)
+            
+            # STEP 2: Writer
+            logger.info(f"Starting writer for {project_name}")
+            state.update_progress(f"Writing report for {project_name}...")
+            await update_client_progress(state, "writing", 0)
+            
+            try:
+                # Configure writer
                 writer_config = {
-                    "fast_mode": True,
-                    "max_tokens_per_section": 250,  # Limit tokens per section
-                    "include_visualizations": True  # Important - reference visualizations in content
+                    "fast_mode": fast_mode,
+                    "report_config": state.report_config
                 }
                 
+                # Execute writer
                 writer_state = writer(state, context_llm, logger, writer_config)
                 if writer_state:
                     state = writer_state
                     metrics['steps_completed'] += 1
+                    logger.info("Writer completed successfully")
                 else:
-                    raise Exception("Writer failed to return a valid state")
-                    
-                await update_client_progress(state, "writing", 100)
+                    logger.warning("Writer returned None, keeping original state")
             except Exception as e:
-                await handle_error("writer", e)
-                # Continue with minimal draft content
-                state.draft = f"Report on {project_name} cryptocurrency."
+                logger.error(f"Error in writer: {str(e)}", exc_info=True)
+                await handle_error("writing", e)
+                # Continue to next step even with error
             
-            # Skip review and edit in fast mode
-            logger.info("Skipping detailed review and edit in fast mode")
+            await update_client_progress(state, "writing", 100)
             
-            # Direct to publisher
+            # STEP 3: Visualization Agent - CRITICAL STEP
+            logger.info(f"Starting visualization agent for {project_name}")
+            state.update_progress(f"Generating visualizations for {project_name}...")
+            await update_client_progress(state, "visualization", 0)
+            
             try:
-                logger.info(f"Publishing report for {project_name}")
-                state.update_progress(f"Creating PDF based on report configuration...")
-                await update_client_progress(state, "publishing", 0)
-                
-                # Publisher with fast mode config but config awareness
-                publisher_config = {
-                    "fast_mode": True,
-                    "use_report_config": True  # Critical flag to use the right configuration
+                # Configure visualization agent
+                vis_config = {
+                    "fast_mode": fast_mode,
+                    "report_config": state.report_config,
+                    "limit_charts": fast_mode,  # Limit charts in fast mode
+                    "skip_expensive_descriptions": fast_mode,  # Skip descriptions in fast mode
+                    "refresh_api_data": True  # Always refresh API data for latest information
                 }
                 
-                publisher_state = publisher(state, logger, publisher_config, context_llm)
-                if publisher_state:
-                    state = publisher_state
+                # Execute visualization agent
+                vis_state = visualization_agent(state, context_llm, logger, vis_config)
+                if vis_state:
+                    state = vis_state
                     metrics['steps_completed'] += 1
+                    logger.info(f"Visualization agent completed with {len(state.visualizations)} visualizations")
                 else:
-                    raise Exception("Publisher failed to return a valid state")
-                    
-                await update_client_progress(state, "publishing", 100)
+                    logger.warning("Visualization agent returned None, keeping original state")
             except Exception as e:
-                await handle_error("publisher", e)
-                state.final_report = f"Error publishing report for {project_name}: {str(e)}"
-        else:
-            # Full workflow for standard mode
-            # Writer Step (skip visualization since we already did it above)
-            try:
-                logger.info(f"Writing report for {project_name}")
-                state.update_progress(f"Writing report for {project_name}...")
-                await update_client_progress(state, "writing", 0)
-                
-                writer_state = writer(state, llm, logger)
-                if writer_state:
-                    state = writer_state
-                    metrics['steps_completed'] += 1
-                else:
-                    raise Exception("Writer failed to return a valid state")
-                    
-                logger.debug(f"Post-writer state: {vars(state)}")
-                await update_client_progress(state, "writing", 100)
-            except Exception as e:
-                await handle_error("writer", e)
+                logger.error(f"Error in visualization_agent: {str(e)}", exc_info=True)
+                await handle_error("visualization", e)
+                # Continue to next step even with error
             
-            # Reviewer Step
-            try:
-                logger.info(f"Reviewing report for {project_name}")
+            await update_client_progress(state, "visualization", 100)
+            
+            # STEP 4: Reviewer (optional in fast mode)
+            if not fast_mode:
+                logger.info(f"Starting reviewer for {project_name}")
                 state.update_progress(f"Reviewing report for {project_name}...")
-                await update_client_progress(state, "reviewing", 0)
+                await update_client_progress(state, "review", 0)
                 
-                reviewer_state = reviewer(state, llm, logger)
-                if reviewer_state:
-                    state = reviewer_state
-                    metrics['steps_completed'] += 1
-                else:
-                    raise Exception("Reviewer failed to return a valid state")
+                try:
+                    # Configure reviewer
+                    reviewer_config = {
+                        "report_config": state.report_config
+                    }
                     
-                logger.debug(f"Post-reviewer state: {vars(state)}")
-                await update_client_progress(state, "reviewing", 100)
-            except Exception as e:
-                await handle_error("reviewer", e)
-            
-            # Editor Step
-            try:
-                logger.info(f"Editing report for {project_name}")
-                state.update_progress(f"Editing report for {project_name}...")
-                await update_client_progress(state, "editing", 0)
+                    # Execute reviewer
+                    reviewer_state = reviewer(state, context_llm, logger, reviewer_config)
+                    if reviewer_state:
+                        state = reviewer_state
+                        metrics['steps_completed'] += 1
+                        logger.info("Reviewer completed successfully")
+                    else:
+                        logger.warning("Reviewer returned None, keeping original state")
+                except Exception as e:
+                    logger.error(f"Error in reviewer: {str(e)}", exc_info=True)
+                    await handle_error("review", e)
+                    # Continue to next step even with error
                 
-                editor_state = editor(state, llm, logger)
+                await update_client_progress(state, "review", 100)
+            
+            # STEP 5: Editor
+            logger.info(f"Starting editor for {project_name}")
+            state.update_progress(f"Editing report for {project_name}...")
+            await update_client_progress(state, "editing", 0)
+            
+            try:
+                # Configure editor
+                editor_config = {
+                    "fast_mode": fast_mode,
+                    "report_config": state.report_config
+                }
+                
+                # Execute editor
+                editor_state = editor(state, context_llm, logger, editor_config)
                 if editor_state:
                     state = editor_state
                     metrics['steps_completed'] += 1
+                    logger.info("Editor completed successfully")
                 else:
-                    raise Exception("Editor failed to return a valid state")
-                    
-                logger.debug(f"Post-editor state: {vars(state)}")
-                await update_client_progress(state, "editing", 100)
+                    logger.warning("Editor returned None, keeping original state")
             except Exception as e:
-                await handle_error("editor", e)
+                logger.error(f"Error in editor: {str(e)}", exc_info=True)
+                await handle_error("editing", e)
+                # Continue to next step even with error
             
-            # Publisher Step
+            await update_client_progress(state, "editing", 100)
+            
+            # STEP 6: Publisher
+            logger.info(f"Starting publisher for {project_name}")
+            state.update_progress(f"Publishing report for {project_name}...")
+            await update_client_progress(state, "publishing", 0)
+            
             try:
-                logger.info(f"Publishing report for {project_name}")
-                state.update_progress(f"Publishing final report for {project_name}...")
-                await update_client_progress(state, "publishing", 0)
+                # Configure publisher
+                publisher_config = {
+                    "fast_mode": fast_mode,
+                    "report_config": state.report_config
+                }
                 
-                publisher_state = publisher(state, logger, None, llm)
+                # Execute publisher
+                publisher_state = publisher(state, context_llm, logger, publisher_config)
                 if publisher_state:
                     state = publisher_state
                     metrics['steps_completed'] += 1
+                    logger.info("Publisher completed successfully")
                 else:
-                    raise Exception("Publisher failed to return a valid state")
-                    
-                logger.debug(f"Final state: {vars(state)}")
-                await update_client_progress(state, "publishing", 100)
+                    logger.warning("Publisher returned None, keeping original state")
             except Exception as e:
-                await handle_error("publisher", e)
-                state.final_report = f"Error publishing report for {project_name}: {str(e)}"
-        
-        # Send final data to client
-        try:
-            pdf_path = f"docs/{project_name}_report.pdf"
-            pdf_exists = os.path.exists(pdf_path)
-            pdf_size = os.path.getsize(pdf_path) if pdf_exists else 0
+                logger.error(f"Error in publisher: {str(e)}", exc_info=True)
+                await handle_error("publishing", e)
             
-            if pdf_exists and pdf_size > 1000:  # Ensure PDF is not empty
-                state.final_report = f"PDF generated at {pdf_path}"
-                logger.info(f"Successfully created PDF report: {pdf_path} ({pdf_size} bytes)")
-                metrics['report_path'] = pdf_path
-            else:
-                state.final_report = "Error: PDF was not created properly or is too small"
-                logger.error(f"PDF issue: {'Not found' if not pdf_exists else f'Too small ({pdf_size} bytes)'}")
+            await update_client_progress(state, "publishing", 100)
             
-            # Calculate execution time
+            # STEP 7: Final Report
+            logger.info(f"Report generation completed for {project_name}")
+            state.update_progress(f"Report for {project_name} is ready!")
+            
+            # Calculate metrics
             metrics['end_time'] = time.time()
-            metrics['duration'] = round(metrics['end_time'] - metrics['start_time'], 2)
+            metrics['total_time'] = metrics['end_time'] - metrics['start_time']
+            metrics['total_steps'] = metrics['steps_completed']
             
-            # Prepare report data including metrics
-            result_data = {
-                'status': state.progress,
-                'final_report': state.final_report,
-                'pdf_path': f"/{pdf_path}" if pdf_exists else None,
-                'metrics': {
-                    'duration': metrics['duration'],
-                    'steps_completed': metrics['steps_completed'],
-                    'errors': metrics['errors'],
-                    'mode': 'fast' if fast_mode else 'standard'
-                }
-            }
+            # Get report path
+            if hasattr(state, 'final_report') and state.final_report:
+                metrics['report_path'] = state.final_report
             
-            await sio.emit('data', result_data, to=sid)
-            logger.info(f"Report generation completed in {metrics['duration']}s with {metrics['errors']} errors")
-        except Exception as final_error:
-            logger.error(f"Error sending final data: {str(final_error)}", exc_info=True)
-            await sio.emit('error', f"Error completing report: {str(final_error)}", to=sid)
-        finally:
-            # Remove the socket handler when done
+            # Send completion message
+            await sio.emit('complete', {
+                'message': f"Report for {project_name} completed in {metrics['total_time']:.2f} seconds",
+                'report_path': metrics['report_path'],
+                'metrics': metrics
+            }, to=sid)
+            
+            # Clean up
             logger.removeHandler(socket_handler)
-        
-        logger.info(f"Report generation process completed for {project_name}")
+            
+        except Exception as e:
+            logger.error(f"Unexpected error in workflow: {str(e)}", exc_info=True)
+            await handle_error("workflow", e)
+            await sio.emit('error', f"Error: {str(e)}", to=sid)
+            
     except Exception as e:
-        logger.error(f"Unhandled exception in message handler: {str(e)}", exc_info=True)
-        await sio.emit('error', f"Critical error processing request: {str(e)}", to=sid)
+        logger.error(f"Error processing message: {str(e)}", exc_info=True)
+        await sio.emit('error', f"Error: {str(e)}", to=sid)
 
 # Mount Socket.IO app
 app = socket_app

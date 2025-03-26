@@ -22,6 +22,16 @@ XplainCrypto/
 │   │   └── README.md              # Research module documentation
 │   ├── retriever/                 # Web retrieval components
 │   │   └── tavily_search.py       # Tavily API integration
+│   ├── utils/                     # Utility functions
+│   │   └── style_utils.py         # Styling utilities for visualizations
+│   ├── visualizations/            # Modular visualization components
+│   │   ├── __init__.py            # Module exports
+│   │   ├── base.py                # Base visualizer class
+│   │   ├── line_chart.py          # Line chart visualizer
+│   │   ├── bar_chart.py           # Bar chart visualizer
+│   │   ├── pie_chart.py           # Pie chart visualizer
+│   │   ├── table.py               # Table visualizer
+│   │   └── timeline.py            # Timeline visualizer
 │   ├── state.py                   # State management
 │   └── main.py                    # FastAPI server and entry point
 ├── frontend/                      # Frontend web application
@@ -57,10 +67,9 @@ Provides a user-friendly interface for initiating research and displaying result
   - **PDF Formatting**: Professional PDF layout with consistent typography and spacing
 
 ### Tier 4: Research System (Backend/Research)
-- **ResearchManager**: Plans the research process by generating a hierarchical tree
+- **Research Manager**: Manages research tree generation and data gathering
 - **Specialized Agents**: Domain-specific agents for different research aspects
 - **DataGatherer**: Collects real-time cryptocurrency data
-- **Orchestrator**: Coordinates the research workflow
 
 ### Tier 5: Data Sources
 - **Web Search**: Using TavilySearch for web content
@@ -87,12 +96,22 @@ This configuration system enables:
 
 The VisualizationAgent is responsible for generating visual representations of the research data:
 
-1. **Chart Generation**: Creates line charts, bar charts, pie charts, and tables
-2. **Data Processing**: Transforms raw data into visualizable formats
-3. **Automatic Description**: Generates natural language descriptions of visualizations
-4. **Template-Based Rendering**: Uses configurable templates for visualization layout
-5. **File Management**: Saves visualizations to the appropriate output directory
-6. **Professional Styling**: Applies consistent, professional styling to all visualizations
+1. **Modular Architecture**: Coordinates specialized visualizer classes for each chart type:
+   - **BaseVisualizer**: Defines the common interface and utility functions
+   - **LineChartVisualizer**: Creates time-series visualizations
+   - **BarChartVisualizer**: Handles categorical data comparisons
+   - **PieChartVisualizer**: Shows proportional distributions
+   - **TableVisualizer**: Presents structured tabular data
+   - **TimelineVisualizer**: Displays chronological events and milestones
+
+2. **Data Flow**: The visualization agent:
+   - Maps visualization type to the appropriate visualizer class
+   - Extracts and prepares data from multiple sources (API, web research)
+   - Passes data to the specialized visualizer
+   - Generates AI descriptions for each visualization
+   - Stores the visualization files and metadata
+
+3. **Professional Styling**: Applies consistent styling via a centralized StyleManager
    - Typography: Consistent font usage with Times Roman for readability
    - Color schemes: Coordinated color palettes for visual consistency
    - Spacing: Optimized spacing between chart elements for readability
@@ -112,22 +131,23 @@ Supported visualization types:
 ```
 ┌─────────────────┐                                          
 │                 │                                          
-│  User Interface │                                          
+│      User       │                                          
+│    Interface    │                                          
 │                 │                                          
 └────────┬────────┘                                          
          │                                                   
          ▼                                                   
 ┌─────────────────┐     ┌────────────────┐                  
 │                 │     │                │                  
-│   FastAPI       │◄────┤ report_config  │                  
-│    Server       │     │    .json       │                  
+│     FastAPI     │◄────┤ report_config  │                  
+│     Server      │     │     .json      │                  
 │                 │     │                │                  
 └────────┬────────┘     └────────────────┘                  
          │                                                   
          ▼                                                   
 ┌─────────────────┐                                          
 │                 │                                          
-│   LangGraph     │                                          
+│    LangGraph    │                                          
 │    Workflow     │                                          
 │                 │                                          
 └────────┬────────┘                                          
@@ -140,13 +160,19 @@ Supported visualization types:
 │                 │                                          
 └────────┬────────┘                                          
          │                                                   
-         ▼                                                   
-┌─────────────────┐     ┌────────────────┐     ┌────────────────┐
+         │                                                
+         ▼              ┌────────────────┐     ┌────────────────┐
+┌─────────────────┐     │                │     │                │
+│                 │◄────┤ Data Gatherer  │◄────┤  External APIs │
 │                 │     │                │     │                │
-│  Research       │◄────┤ Data Gatherer  │◄────┤  External APIs │
-│  Orchestrator   │     │                │     │                │
-│                 │     └────────────────┘     └────────────────┘
-└────────┬────────┘                                          
+│    Research     │     └────────────────┘     └────────────────┘
+│    Manager      │                                                                                           
+│                 │     ┌────────────────┐     ┌────────────────┐
+│                 │     │                │     │                │
+│                 │◄────┤    Tavily      │◄────┤   Web Search   │
+└────────┬────────┘     │                │     │                │
+         │              └────────────────┘     └────────────────┘
+         │                                 
          │                                                   
          ▼                                                   
 ┌─────────────────┐                                          
@@ -156,14 +182,34 @@ Supported visualization types:
 └────────┬────────┘                                          
          │                                                   
          ▼                                                   
-┌─────────────────┐                                          
-│                 │                                          
-│  Visualization  │                                          
-│     Agent       │                                          
-│                 │                                          
+┌─────────────────┐       ┌───────────────────┐             
+│                 │       │                   │             
+│  Visualization  │◄──────┤   StyleManager    │             
+│     Agent       │       │                   │             
+│                 │       └───────────────────┘             
 └────────┬────────┘                                          
          │                                                   
-         ▼                                                   
+         ├─────────────┬────────────────┬────────────────┐ 
+         │             │                │                │ 
+         ▼             ▼                ▼                ▼ 
+┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐
+│             │ │             │ │             │ │             │
+│ LineChart   │ │ BarChart    │ │ PieChart    │ │ Table       │
+│ Visualizer  │ │ Visualizer  │ │ Visualizer  │ │ Visualizer  │
+│             │ │             │ │             │ │             │
+└──────┬──────┘ └──────┬──────┘ └──────┬──────┘ └──────┬──────┘
+        │              │              │              │        
+        └──────┬───────┴──────┬───────┴──────┬───────┘        
+               │              │              │                
+               ▼              ▼              ▼                
+       ┌───────────────────────────────────────┐              
+       │                                       │              
+       │          Output Directory             │              
+       │     (docs/project_name/*.png)         │              
+       │                                       │              
+       └───────────────┬───────────────────────┘              
+                       │                                      
+                       ▼                                      
 ┌─────────────────┐     ┌────────────────┐     ┌────────────────┐
 │                 │     │                │     │                │
 │    Reviewer     │────►│     Editor     │────►│   Publisher    │
@@ -171,11 +217,11 @@ Supported visualization types:
 └─────────────────┘     └────────────────┘     └───────┬────────┘
                                                        │         
                                                        ▼         
-                                              ┌────────────────┐
-                                              │                │
-                                              │  Final Report  │
-                                              │                │
-                                              └────────────────┘
+                                               ┌────────────────┐
+                                               │                │
+                                               │  Final Report  │
+                                               │                │
+                                               └────────────────┘
 ```
 
 ## Data Flow
@@ -183,14 +229,16 @@ Supported visualization types:
 The end-to-end flow of data through the system follows these steps:
 
 1. **Input Processing**
-   - User submits a project name through the frontend
+   - User submits a project name through the frontend User Interface
    - FastAPI server receives the request and initializes the workflow
-   - The initial state is created with the project name
+   - Server loads the report_config.json for configuration parameters
+   - The LangGraph Workflow is created and the initial state is initialized
+   - The initial state is created with the project name and passed to the Enhanced Researcher
 
 2. **Research Planning**
    - Enhanced Researcher agent loads the report_config.json
-   - Invokes the Research Orchestrator with the configuration
-   - Research Orchestrator generates a hierarchical research tree based on configured sections
+   - Invokes the Research Manager with the configuration
+   - Research Manager generates a hierarchical research tree based on configured sections
    - Research types are determined from section titles in the configuration
 
 3. **Data Gathering**
@@ -201,13 +249,19 @@ The end-to-end flow of data through the system follows these steps:
    - Price, token, and market data are structured for later use
 
 4. **Research Execution**
+   - Research Manager coordinates the research process
    - Specialized agents conduct research for each node in the tree
-   - Web searches gather additional information beyond API data
+   - Research Manager makes Tavily Search API calls for web research with the following process:
+     - Query generation based on research context
+     - Parallel search execution for efficiency
+     - Result filtering and relevance scoring
+     - Content extraction and summarization
+     - Source tracking and citation management
    - References are collected and deduplicated
    - Research data is structured for visualization
 
 5. **Data Fallback Mechanisms**
-   - Enhanced Researcher checks if web research data is available
+   - Research Manager checks if web research data is available
    - If missing, populate_web_research_data function provides fallback data for:
      - Governance metrics (governance_model, proposal_count, voting_participation)
      - Partnerships (partner_name, partnership_type, partnership_date)
@@ -218,19 +272,31 @@ The end-to-end flow of data through the system follows these steps:
    - This ensures all visualization tables can be generated even without web search
 
 6. **Report Writing**
-   - Writer agent synthesizes research into narrative form
-   - Ensures all web research data is fully processed
+   - Writer agent receives complete research data from Research Manager
+   - Synthesizes research into narrative form
    - Creates structured content based on the report configuration
    - Adds metadata for effective visualization integration
 
 7. **Visualization Generation**
    - Visualization Agent receives the fully prepared research state with complete data
    - Reads visualization types from the report configuration
-   - Generates charts, graphs, and tables based on available data
-   - Applies professional styling to all visualizations
-   - Creates descriptive text for each visualization
-   - Tables are directly generated as images for PDF compatibility
-   - Stores visualization files in the appropriate location
+   - For each visualization type:
+     - Determines the appropriate visualizer class (LineChart, BarChart, PieChart, etc.)
+     - Extracts and prepares data from relevant sources (API data, web research)
+     - Delegates visualization creation to the specialized visualizer
+     - Applies consistent styling via the StyleManager
+   - Each specialized visualizer:
+     - Processes data specific to its chart type
+     - Creates the visualization using matplotlib:
+       - Sets up figure with appropriate dimensions
+       - Plots the data with proper formatting
+       - Adds labels, titles, and styling elements
+       - Saves the figure as a PNG file to the project's output directory (docs/project_name/visualization_type.png)
+       - Verifies the file was successfully saved and has appropriate content
+     - Returns metadata about the visualization to the agent, including the file path
+   - Visualization Agent uses the LLM to generate descriptive text for each visualization
+   - Stores visualization file paths and metadata in the state for use by the Publisher agent
+   - If image creation fails, detailed error information is logged and reported back to the agent
 
 8. **Report Finalization**
    - Reviewer checks content for accuracy and completeness
@@ -282,15 +348,15 @@ State properties include:
 ### Configuration Flow
 The report_config.json file is loaded and used by multiple components:
 
-1. **ResearchOrchestrator**: Uses the config to determine research types and data sources
+1. **ResearchManager**: Uses the config to determine research types and data sources
 2. **VisualizationAgent**: Uses the config to determine which visualizations to generate
 3. **Publisher**: Uses the config to structure the final report
 
 ### Data Sharing
 Data is efficiently shared between components:
 
-1. **DataGatherer → ResearchOrchestrator → Enhanced Researcher**: API data flows through
-2. **ResearchOrchestrator → VisualizationAgent**: Research data is passed for visualization
+1. **DataGatherer → ResearchManager → Enhanced Researcher**: API data flows through
+2. **ResearchManager → VisualizationAgent**: Research data is passed for visualization
 3. **VisualizationAgent → Publisher**: Visualizations are incorporated into the final report
 
 ### Configuration-Based Customization

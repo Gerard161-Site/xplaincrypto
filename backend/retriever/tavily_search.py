@@ -52,6 +52,7 @@ class TavilySearch():
             try:
                 api_key = os.environ.get("TAVILY_API_KEY")
                 if not api_key:
+                    self.logger.error("TAVILY_API_KEY environment variable not set")
                     raise KeyError("TAVILY_API_KEY environment variable not set")
                 self.logger.debug("Using Tavily API key from environment variables")
             except KeyError as e:
@@ -94,6 +95,7 @@ class TavilySearch():
         }
 
         try:
+            self.logger.debug(f"Sending request to Tavily API with {len(data)} parameters")
             response = requests.post(
                 self.base_url, 
                 data=json.dumps(data), 
@@ -105,11 +107,23 @@ class TavilySearch():
                 result = response.json()
                 self.logger.debug(f"Tavily search successful, received {len(result.get('results', []))} results")
                 return result
+            elif response.status_code == 401:
+                self.logger.error(f"Tavily API authentication error: {response.status_code} - {response.text}")
+                raise Exception(f"Authentication failed: Please check your Tavily API key")
+            elif response.status_code == 429:
+                self.logger.error(f"Tavily API rate limit exceeded: {response.status_code} - {response.text}")
+                raise Exception(f"Rate limit exceeded: Tavily API request quota exhausted")
             else:
                 self.logger.error(f"Tavily API returned error: {response.status_code} - {response.text}")
-                response.raise_for_status()
-        except requests.exceptions.RequestException as e:
-            self.logger.error(f"Request error in Tavily search: {str(e)}")
+                raise Exception(f"Tavily API error: HTTP {response.status_code} - {response.text}")
+        except requests.exceptions.Timeout:
+            self.logger.error(f"Timeout error when connecting to Tavily API")
+            raise Exception("Tavily API request timed out")
+        except requests.exceptions.ConnectionError:
+            self.logger.error(f"Connection error when connecting to Tavily API")
+            raise Exception("Connection error: Unable to connect to Tavily API")
+        except Exception as e:
+            self.logger.error(f"Request error in Tavily search: {str(e)}", exc_info=True)
             raise
 
     def search(self, max_results=7) -> List[Dict[str, str]]:
@@ -125,6 +139,12 @@ class TavilySearch():
         try:
             # Search the query
             self.logger.info(f"Performing Tavily search: {self.query[:50]}...")
+            
+            # If we don't have any query, return empty
+            if not self.query or len(self.query.strip()) < 3:
+                self.logger.warning("Search query too short or empty, skipping search")
+                return []
+                
             results = self._search(
                 self.query, 
                 search_depth="basic", 
@@ -145,7 +165,8 @@ class TavilySearch():
             search_response = [{"href": obj["url"],
                                 "body": obj["content"]} for obj in sources]
         except Exception as e:
-            self.logger.error(f"Error in Tavily search: {str(e)}")
+            self.logger.error(f"Error in Tavily search: {str(e)}", exc_info=True)
+            # Create fallback response with error info
             search_response = []
             
         return search_response

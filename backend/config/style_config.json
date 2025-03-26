@@ -1,13 +1,13 @@
 {
     "version": "1.0",
     "description": "Global style configuration for reports and visualizations",
-    "fonts": {
-        "primary": "Helvetica",
-        "secondary": "Helvetica",
-        "bold": "Helvetica-Bold",
-        "italic": "Helvetica-Oblique",
-        "bolditalic": "Helvetica-BoldOblique"
-    },
+   "fonts": {
+    "primary": "Helvetica",
+    "secondary": "Helvetica",
+    "bold": "Helvetica-Bold",
+    "italic": "Helvetica-Oblique",
+    "bolditalic": "Helvetica-BoldOblique"
+},
     "font_sizes": {
         "title": 16,
         "section_heading": 12,
