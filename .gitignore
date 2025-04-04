@@ -38,5 +38,6 @@ docs/*/*.png
 docs/*/*.jpg
 docs/*/*.jpeg
 docs/*/*.gif
+docs/cache/*.json
 
-cache/*
+cache/*.json
