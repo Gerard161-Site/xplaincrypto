@@ -118,6 +118,20 @@ class StyleManager:
                 spaceBefore=2,
                 spaceAfter=2,
                 leading=12
+            ),
+            'BulletList': ParagraphStyle(
+                name='BulletList',
+                fontName=fonts.get("secondary", "Times-Roman"),
+                fontSize=sizes.get("body_text", 10),
+                alignment=TA_LEFT,
+                leftIndent=18,
+                firstLineIndent=0,
+                spaceBefore=4,
+                spaceAfter=6,
+                leading=14,
+                bulletIndent=10,
+                allowWidows=0,
+                allowOrphans=0
             )
         }
     

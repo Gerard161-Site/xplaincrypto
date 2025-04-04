@@ -1,563 +1,617 @@
+# backend/agents/writer.py
 import logging
 import json
-import re
+import os
 from typing import Dict, Any, Optional
 from langchain_openai import ChatOpenAI
 from backend.state import ResearchState
 from datetime import datetime
+from backend.utils.inference import infer_missing_data
+from backend.retriever.huggingface_search import HuggingFaceSearch
+from transformers import pipeline
+import asyncio
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+from backend.utils.number_formatter import NumberFormatter
+from backend.utils.inference import openai_retry_decorator
 
 class WriterAgent:
-    def __init__(self, llm: ChatOpenAI, logger: logging.Logger):
+    def __init__(self, llm: ChatOpenAI, logger: logging.Logger, hf_api_token: Optional[str] = None):
         self.llm = llm
         self.logger = logger
-    
-    def fix_placeholder_values(self, text: str) -> str:
-        """Detect and fix common placeholder patterns in the text."""
-        # Fix price placeholders like $X, $Y.YY
-        price_placeholders = re.findall(r'\$[A-Z](?:\.[A-Z0-9]{1,2})?', text)
-        if price_placeholders:
-            self.logger.warning(f"Found {len(price_placeholders)} price placeholders: {price_placeholders}")
-            for placeholder in price_placeholders:
-                text = text.replace(placeholder, "$0.00")
-                
-        # Fix token amount placeholders like X tokens, Y coins
-        token_placeholders = re.findall(r'\b[A-Z]\s+(tokens|coins|token supply)', text, re.IGNORECASE)
-        if token_placeholders:
-            self.logger.warning(f"Found {len(token_placeholders)} token placeholders")
-            for match in token_placeholders:
-                pattern = re.compile(f'\\b[A-Z]\\s+{match[0]}', re.IGNORECASE)
-                text = pattern.sub(f"0 {match[0]}", text)
-                
-        # Fix other common placeholders
-        text = re.sub(r'\$[XYZ]', '$0.00', text)
-        text = re.sub(r'\b[XYZ] (million|billion)', '0 \\1', text, flags=re.IGNORECASE)
-        
-        return text
-    
-    def write_draft(self, state: ResearchState) -> str:
-        self.logger.info(f"Writing draft for {state.project_name}")
-        
-        report_config = state.report_config if hasattr(state, 'report_config') else {"sections": []}
-        
-        # Log the report_config sections for debugging
-        if "sections" in report_config:
-            self.logger.info(f"Found {len(report_config['sections'])} sections in report_config:")
-            for i, section in enumerate(report_config['sections']):
-                title = section.get("title", "Untitled")
-                min_words = section.get("min_words", "Not specified")
-                max_words = section.get("max_words", "Not specified")
-                self.logger.info(f"Section {i+1}: {title} (min: {min_words}, max: {max_words})")
-        else:
-            self.logger.warning("No sections found in report_config")
-        
-        # Log the state's attributes for debugging
-        state_attrs = [attr for attr in dir(state) if not attr.startswith('_') and not callable(getattr(state, attr))]
-        self.logger.info(f"State has attributes: {', '.join(state_attrs)}")
-        
-        # Consolidate all data sources with proper error handling
-        data_sources = {
-            "coingecko": {},
-            "coinmarketcap": {},
-            "defillama": {},
-            "web_research": {},
-            "structured_data": {}
-        }
-        
-        # Handle API data
-        if hasattr(state, 'data') and state.data:
-            self.logger.info(f"Found state.data with {len(state.data)} sources")
-            for source in ["coingecko", "coinmarketcap", "defillama"]:
-                if source in state.data:
-                    data_sources[source] = state.data[source]
-                    self.logger.info(f"Added {len(data_sources[source])} fields from state.data[{source}]")
-        
-        # Handle direct attributes for backward compatibility
-        for source in ["coingecko_data", "coinmarketcap_data", "defillama_data"]:
-            attr_name = source
-            dict_key = source.replace("_data", "")
-            if hasattr(state, attr_name) and getattr(state, attr_name):
-                source_data = getattr(state, attr_name)
-                data_sources[dict_key] = source_data
-                self.logger.info(f"Added {len(source_data)} fields from state.{attr_name}")
-        
-        # Handle structured data from research
-        if hasattr(state, 'structured_data') and state.structured_data:
-            data_sources["structured_data"] = state.structured_data
-            self.logger.info(f"Added {len(state.structured_data)} fields from state.structured_data")
-        
-        # Handle research data (legacy field)
-        if hasattr(state, 'research_data') and state.research_data:
-            data_sources["web_research"] = state.research_data
-            self.logger.info(f"Added {len(state.research_data)} fields from state.research_data")
-        
-        # Log what we found in each source
-        for source, data in data_sources.items():
-            if data:
-                self.logger.info(f"Source {source} has {len(data)} fields: {list(data.keys())[:10]}" + 
-                               (f"... and {len(data.keys())-10} more" if len(data.keys()) > 10 else ""))
+        self.hf_api_token = hf_api_token or os.getenv("HUGGINGFACE_API_KEY")
+        self.use_local = not self.hf_api_token
+        try:
+            if self.use_local:
+                self.summary_model = pipeline("summarization", model="google/pegasus-xsum")
+                self.logger.info("Using local google/pegasus-xsum for summaries")
             else:
-                self.logger.warning(f"No data found for source: {source}")
+                self.hf_search = HuggingFaceSearch(api_token=self.hf_api_token)
+                self.logger.info("Using Hugging Face API with google/pegasus-xsum")
+        except Exception as e:
+            self.logger.error(f"Failed to initialize summary model: {str(e)}", exc_info=True)
+            self.use_local = False
+            self.hf_search = None if not self.hf_api_token else HuggingFaceSearch(api_token=self.hf_api_token)
+    
+    async def write_draft(self, state: ResearchState) -> str:
+        self.logger.info(f"Writing draft for {state.project_name}")
+        report_config = state.report_config or {}
+        if "sections" not in report_config:
+            self.logger.error("No sections in report_config")
+            raise ValueError("Report config missing 'sections' key")
         
-        # Create a consolidated data source that prioritizes structured_data then API data
+        data_sources = {
+            "coingecko": state.coingecko_data,
+            "coinmarketcap": state.coinmarketcap_data,
+            "defillama": state.defillama_data,
+            "web_research": state.research_data,
+            "structured_data": state.structured_data
+        }
         data_sources["multi"] = {}
-        # First add structured_data (highest priority)
-        if data_sources["structured_data"]:
-            data_sources["multi"].update(data_sources["structured_data"])
-        # Then add web_research data
-        if data_sources["web_research"]:
-            for key, value in data_sources["web_research"].items():
-                if key not in data_sources["multi"]:
-                    data_sources["multi"][key] = value
-        # Then add API data
-        for source in ["coingecko", "coinmarketcap", "defillama"]:
+        for source in ["structured_data", "web_research", "coingecko", "coinmarketcap", "defillama"]:
             if data_sources[source]:
-                for key, value in data_sources[source].items():
-                    if key not in data_sources["multi"]:
-                        data_sources["multi"][key] = value
+                data_sources["multi"].update({k: v for k, v in data_sources[source].items() if k not in data_sources["multi"]})
         
-        self.logger.info(f"Combined multi source has {len(data_sources['multi'])} fields")
-        
-        # Extract and format key metrics
         key_metrics = self._format_key_metrics(data_sources["multi"])
         
-        # Log key metrics
-        if key_metrics:
-            self.logger.info("Key metrics available:")
-            for key, value in key_metrics.items():
-                self.logger.info(f"- {key}: {value}")
-        else:
-            self.logger.warning("No key metrics available")
+        draft = state.draft or f"# {state.project_name} Research Report\n\n*Generated on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*\n\nThis report is generated with AI assistance and should not be considered financial advice.\n\n"
         
-        # Get research summaries mapped by section
-        section_research = {}
+        # Process sections in parallel (keeping original approach)
+        tasks = []
         
-        # Try to get section_summaries from state if available
-        if hasattr(state, 'section_summaries') and state.section_summaries:
-            section_research = state.section_summaries
-            self.logger.info(f"Using section_summaries with {len(section_research)} sections")
-        else:
-            # Fall back to extracting from root_node
-            section_research = self._map_research_to_sections(state.root_node, report_config)
-            self.logger.info(f"Extracted section research for {len(section_research)} sections")
-        
-        # Build the content for each section
-        sections_content = {}
+        # Identify potential problem sections based on configuration and available data
+        problem_sections = []
         for section in report_config.get("sections", []):
             section_title = section["title"]
-            self.logger.info(f"Generating content for section: {section_title}")
             
-            section_content = self._generate_section_content(
-                section, 
-                section_research.get(section_title, ""), 
-                key_metrics, 
-                data_sources,
-                state.project_name
+            # Check if section requires data that we're missing
+            required_fields = self._get_required_fields(section, report_config)
+            missing_fields = [f for f in required_fields if f not in data_sources["multi"] or data_sources["multi"][f] is None]
+            
+            # Identify problem sections by:
+            # 1. High minimum word requirements (400+)
+            # 2. Many missing data fields
+            # 3. Required sections with little research data
+            is_problem = (
+                (section.get("min_words", 0) >= 400 and len(missing_fields) > 2) or
+                (section.get("required", False) and len(missing_fields) > len(required_fields) / 2) or
+                (section.get("min_words", 0) >= 500)
             )
-            sections_content[section_title] = section_content
+            
+            if is_problem:
+                problem_sections.append(section_title)
+                self.logger.info(f"Identified potential problem section '{section_title}' with {len(missing_fields)} missing fields")
+        
+        for section in report_config.get("sections", []):
+            section_title = section["title"]
+            if "min_words" not in section or "max_words" not in section:
+                self.logger.error(f"Section '{section_title}' missing min_words or max_words")
+                raise ValueError(f"Section '{section_title}' must specify min_words and max_words")
+            
+            required_fields = self._get_required_fields(section, report_config)
+            missing_fields = [f for f in required_fields if f not in data_sources["multi"] or data_sources["multi"][f] is None]
+            if missing_fields and (self.hf_search or self.use_local):
+                inferred_data = infer_missing_data(self.hf_search, data_sources["multi"], missing_fields, state.project_name, self.logger, 
+                                                  model="distilbert-base-uncased-distilled-squad")
+                data_sources["multi"].update(inferred_data)
+                self.logger.info(f"Inferred {len(missing_fields)} fields for {section_title}: {missing_fields}")
+            
+            existing_content = ""
+            if f"# {section_title}" in draft:
+                start_idx = draft.index(f"# {section_title}") + len(f"# {section_title}\n\n")
+                end_idx = draft.find("\n\n#", start_idx) if "\n\n#" in draft[start_idx:] else len(draft)
+                existing_content = draft[start_idx:end_idx].strip()
+            
+            # Flag as problem section if it's in our dynamically identified list
+            is_problem_section = section_title in problem_sections
+            
+            task = self._generate_section_content(section, existing_content, key_metrics, data_sources, state.project_name, is_problem_section)
+            tasks.append((section_title, task))
+        
+        sections_content_list = await asyncio.gather(*(t[1] for t in tasks), return_exceptions=True)
+        sections_content = {t[0]: c for t, c in zip(tasks, sections_content_list)}
+        
+        # For sections with exceptions or insufficient content, retry individually
+        for section_title, content in sections_content.items():
+            # Check if we got an exception or insufficient content
+            if isinstance(content, Exception) or len(str(content).split()) < 100:
+                self.logger.warning(f"Section '{section_title}' needs retry: {str(content) if isinstance(content, Exception) else 'insufficient content'}")
+                section_config = next((s for s in report_config.get("sections", []) if s["title"] == section_title), None)
+                if section_config:
+                    try:
+                        # Enhanced retry with more specific instructions
+                        retry_content = await self._generate_problem_section(section_config, data_sources, key_metrics, state.project_name)
+                        if not isinstance(retry_content, Exception) and len(retry_content.split()) > 100:
+                            sections_content[section_title] = retry_content
+                            self.logger.info(f"Successfully regenerated content for '{section_title}' with {len(retry_content.split())} words")
+                    except Exception as e:
+                        self.logger.error(f"Error in retry for '{section_title}': {str(e)}")
         
         # Build the final draft
-        draft = ""
+        updated_draft = []
+        for line in draft.split("\n"):
+            if line.startswith("# ") and line[2:] in sections_content:
+                section_title = line[2:]
+                content = sections_content.get(section_title, "")
+                if isinstance(content, Exception):
+                    self.logger.error(f"Failed to generate content for {section_title}: {str(content)}")
+                    content = await self._infer_section_content(section_title, section.get("prompt", ""), data_sources, state.project_name)
+                updated_draft.append(f"# {section_title}\n\n{content}\n\n")
+            else:
+                updated_draft.append(line)
+        
         for section in report_config.get("sections", []):
             section_title = section["title"]
-            if section_title in sections_content:
-                draft += f"# {section_title}\n\n"
-                draft += sections_content[section_title]
-                draft += "\n\n"
+            if f"# {section_title}" not in draft and section_title in sections_content:
+                content = sections_content[section_title]
+                if isinstance(content, Exception):
+                    content = await self._infer_section_content(section_title, section.get("prompt", ""), data_sources, state.project_name)
+                updated_draft.append(f"# {section_title}\n\n{content}\n\n")
         
-        # Check for and fix any placeholder values
-        draft = self.fix_placeholder_values(draft)
+        final_draft = "\n".join(updated_draft)
+        self.logger.info(f"Draft generated: {len(final_draft.split())} words")
         
-        # Add title page
-        title_page = (
-            f"# {state.project_name} Research Report\n\n"
-            f"*Generated on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*\n\n"
-            "This report is generated with AI assistance and should not be considered financial advice. "
-            "Always conduct your own research before making investment decisions.\n\n"
+        # Verify each section meets minimum word requirements
+        section_content = {}
+        current_section = None
+        for line in final_draft.split('\n'):
+            if line.startswith('# '):
+                current_section = line[2:].strip()
+                section_content[current_section] = []
+            elif current_section:
+                section_content[current_section].append(line)
+        
+        # Check word counts against report_config requirements
+        for section in report_config.get("sections", []):
+            section_title = section["title"]
+            min_words = section.get("min_words", 0)
+            max_words = section.get("max_words", 0)
+            
+            if section_title in section_content:
+                content_text = " ".join(section_content[section_title])
+                word_count = len(content_text.split())
+                
+                if word_count < min_words:
+                    self.logger.warning(f"Section '{section_title}' has only {word_count} words, below minimum {min_words} words")
+                elif max_words > 0 and word_count > max_words:
+                    self.logger.warning(f"Section '{section_title}' has {word_count} words, exceeding maximum {max_words} words")
+                else:
+                    self.logger.info(f"Section '{section_title}' has {word_count} words, within requirements ({min_words}-{max_words})")
+            else:
+                self.logger.warning(f"Section '{section_title}' is missing from draft")
+        
+        draft_headers = [line for line in final_draft.split('\n') if line.startswith('#')][:10]
+        self.logger.info(f"Draft section headers: {draft_headers}")
+        
+        return final_draft
+    
+    @openai_retry_decorator
+    async def _infer_section_content(self, section_title: str, description: str, data_sources: Dict, project_name: str) -> str:
+        content = ""
+        for source, data in data_sources.items():
+            if source == "web_research":
+                for query, summary in data.items():
+                    if section_title.lower() in query.lower() and isinstance(summary, str) and summary.strip():
+                        content = summary
+                        self.logger.info(f"Used web research content for '{section_title}' from query '{query}'")
+                        break
+            if content:
+                break
+        
+        if not content and (self.hf_search or self.use_local):
+            prompt = f"Generate a 400-500 word summary for '{section_title}' of {project_name}: {description} based on available data: {json.dumps(data_sources['multi'])}"
+            try:
+                if self.use_local:
+                    content = self.summary_model(prompt, max_length=500, min_length=400, do_sample=False)[0]["summary_text"]
+                else:
+                    result = self.hf_search.query("google/pegasus-xsum", prompt, {"max_length": 500})
+                    content = result[0].get("generated_text", "") if result else ""
+                self.logger.info(f"Inferred content for '{section_title}' via HF/local model")
+            except Exception as e:
+                self.logger.error(f"Failed to infer content for '{section_title}': {str(e)}")
+        
+        return content if content else f"Data unavailable for {section_title}."
+
+    def _get_required_fields(self, section: Dict, report_config: Dict) -> list[str]:
+        fields = set()
+        if "data_fields" in section:
+            fields.update(section["data_fields"])
+        for vis in section.get("visualizations", []):
+            vis_config = report_config.get("visualization_types", {}).get(vis, {})
+            if "data_field" in vis_config:
+                fields.add(vis_config["data_field"])
+            if "data_fields" in vis_config:
+                fields.update(vis_config["data_fields"])
+        if "fallback_fields" in section:
+            fields.update(section["fallback_fields"])
+        return list(fields)
+    
+    @openai_retry_decorator
+    async def _generate_section_content(self, section: Dict, research_summary: str, key_metrics: Dict, data_sources: Dict, project_name: str, is_problem_section: bool = False) -> str:
+        section_title = section["title"]
+        description = section.get("prompt", "")
+        min_words = section["min_words"]
+        max_words = section["max_words"]
+        
+        if not research_summary.strip():
+            research_summary = await self._infer_section_content(section_title, description, data_sources, project_name)
+        
+        # Determine section importance based on config properties
+        # - Higher min_words requirement suggests more important section
+        # - Required sections are more important
+        is_key_section = section.get("required", False) and min_words >= 300
+        
+        # Enhanced template with exact section titles to ensure matching with report_config.json
+        template = (
+            "Write a professional, fact-focused section for a {project_name} cryptocurrency research report.\n\n"
+            "CRITICAL REQUIREMENTS:\n"
+            "1. Use EXACTLY this section title: '{section_title}'\n"
+            "2. Word count: MUST be between {min_words}-{max_words} words\n"
+            "3. Use factual data from the provided sources\n"
+            "4. Include specific dates, numbers, and percentages where available\n"
+            "5. Use a professional tone suitable for crypto investors\n"
+            "6. Generate DETAILED, COMPREHENSIVE content\n"
+            "7. Focus on: {description}\n"
+            "8. If you include subsections, use double hashtag (##) for subsection titles\n"
+            "9. If source data is limited, use general industry knowledge about cryptocurrency projects\n\n"
+            "Research Summary:\n{research_summary}\n\n"
+            "Key Metrics:\n{key_metrics}\n\n"
+            "Data Sources:\n{data_sources}"
         )
         
-        full_draft = f"{title_page}{draft}"
-        word_count = len(full_draft.split())
-        self.logger.info(f"Draft generated: {word_count} words")
-        self.logger.debug(f"Draft preview (first 500 chars):\n{full_draft[:500]}...")
-        return full_draft
-    
-    def _extract_structured_data_from_nodes(self, root_node):
-        """Extract structured data from all research nodes."""
-        structured_data = {}
+        # For important sections, use a more specialized prompt
+        if is_key_section or is_problem_section:
+            template = (
+                "Create a COMPREHENSIVE section for a {project_name} cryptocurrency research report focusing on '{section_title}'.\n\n"
+                "CRITICAL REQUIREMENTS:\n"
+                "1. Section title: EXACTLY '{section_title}' (do not change or modify this title)\n"
+                "2. Length: MINIMUM {min_words} words - REQUIRED\n"
+                "3. Create detailed content even if source data is limited\n"
+                "4. Use a professional tone suitable for crypto investors\n"
+                "5. Focus on: {description}\n\n"
+                "If data is limited:\n"
+                "- Draw on general knowledge about crypto projects\n"
+                "- Include relevant industry standards, trends, and best practices\n"
+                "- Create thoughtful, balanced analysis with proper disclaimers\n\n"
+                "Research Summary:\n{research_summary}\n\n"
+                "Available Data:\n{data_sources}\n\n"
+                "Remember: This section MUST have {min_words}+ words of substantive content"
+            )
         
-        # Helper function to process each node
-        def process_node(node):
-            if hasattr(node, 'structured_data') and node.structured_data:
-                structured_data.update(node.structured_data)
+        # Select the model based on section importance
+        if is_key_section or is_problem_section or min_words > 400:
+            # Use GPT-4 with high token limit for important sections
+            section_llm = ChatOpenAI(
+                model="gpt-4", 
+                temperature=0.7,
+                max_tokens=8000
+            )
+            self.logger.info(f"Using GPT-4 with 8000 tokens for important section: {section_title}")
+        else:
+            # Use main model for other sections
+            section_llm = self.llm
+            self.logger.info(f"Using standard LLM for section: {section_title}")
+        
+        prompt = ChatPromptTemplate.from_template(template)
+        chain = prompt | section_llm | StrOutputParser()
             
-            # Process children recursively
-            for child in node.children:
-                process_node(child)
-        
-        # Start processing from the root
-        process_node(root_node)
-        return structured_data
-    
-    def _format_key_metrics(self, combined_data):
-        """Extract and format key metrics from the combined data."""
+        try:
+            content = await chain.ainvoke({
+                "section_title": section_title,
+                "project_name": project_name,
+                "min_words": min_words,
+                "max_words": max_words,
+                "description": description,
+                "research_summary": research_summary,
+                "key_metrics": json.dumps(key_metrics, indent=2),
+                "data_sources": json.dumps(data_sources["multi"], indent=2)
+            })
+            
+            word_count = len(content.split())
+            if word_count < min_words:
+                self.logger.warning(f"Section {section_title} word count {word_count} below minimum {min_words}")
+                
+                # For insufficient content, retry with a different prompt emphasizing length
+                retry_template = (
+                    "You generated {word_count} words for the '{section_title}' section, but we need AT LEAST {min_words} words.\n\n"
+                    "REWRITE this section to contain AT MINIMUM {min_words} words. Add more detailed analysis, examples, context, and industry insights.\n\n"
+                    "Original content:\n{content}\n\n"
+                    "ENSURE your new version meets the minimum word count of {min_words} words. This is CRITICAL."
+                )
+                retry_prompt = ChatPromptTemplate.from_template(retry_template)
+                retry_chain = retry_prompt | section_llm | StrOutputParser()
+                content = await retry_chain.ainvoke({
+                    "section_title": section_title,
+                    "min_words": min_words,
+                    "word_count": word_count,
+                    "content": content
+                })
+                
+                # Final check after retry
+                new_word_count = len(content.split())
+                self.logger.info(f"After retry for {section_title}: {word_count} → {new_word_count} words")
+            
+            return content
+        except Exception as e:
+            self.logger.error(f"Error generating content for {section_title}: {str(e)}")
+            return await self._infer_section_content(section_title, description, data_sources, project_name)
+
+    def _format_key_metrics(self, combined_data: Dict) -> Dict:
+        formatter = NumberFormatter()
         key_metrics = {}
         for key, value in combined_data.items():
             if key in ["current_price", "market_cap", "24h_volume", "total_supply", "circulating_supply", "tvl"]:
                 if isinstance(value, (int, float)):
                     if key == "current_price":
-                        key_metrics[key] = f"${value:,.2f}"
-                    elif key == "market_cap":
-                        if value >= 1_000_000_000:
-                            key_metrics[key] = f"${value/1_000_000_000:.2f} billion"
-                        else:
-                            key_metrics[key] = f"${value/1_000_000:.2f} million"
-                    elif key == "24h_volume":
-                        if value >= 1_000_000_000:
-                            key_metrics[key] = f"${value/1_000_000_000:.2f} billion"
-                        else:
-                            key_metrics[key] = f"${value/1_000_000:.2f} million"
+                        key_metrics[key] = formatter.format_currency(value, precision=2)
+                    elif key in ["market_cap", "24h_volume", "tvl"]:
+                        key_metrics[key] = formatter.format_currency(value, precision=2)
                     elif key in ["total_supply", "circulating_supply"]:
-                        if value >= 1_000_000_000:
-                            key_metrics[key] = f"{value/1_000_000_000:.2f} billion tokens"
-                        else:
-                            key_metrics[key] = f"{value/1_000_000:.2f} million tokens"
-                    elif key == "tvl":
-                        if value >= 1_000_000_000:
-                            key_metrics[key] = f"${value/1_000_000_000:.2f} billion"
-                        else:
-                            key_metrics[key] = f"${value/1_000_000:.2f} million"
+                        key_metrics[key] = formatter.format_number(value, precision=2) + " tokens"
         return key_metrics
-    
-    def _map_research_to_sections(self, root_node, report_config):
-        """Map research summaries to report sections."""
-        section_research = {}
+
+    @openai_retry_decorator
+    async def _generate_problem_section(self, section_config: Dict, data_sources: Dict, key_metrics: Dict, project_name: str) -> str:
+        """Special method to generate content for problematic sections using a more specialized approach."""
+        section_title = section_config["title"]
+        description = section_config.get("prompt", "")
+        min_words = section_config.get("min_words", 400)
+        max_words = section_config.get("max_words", 700)
         
-        # Safety check - if root_node is None, return empty mapping
-        if root_node is None:
-            self.logger.error("Cannot map research to sections: root_node is None")
-            return {}
-            
-        # Additional safety check - ensure root_node has children attribute
-        if not hasattr(root_node, 'children'):
-            self.logger.error("Cannot map research to sections: root_node has no children attribute")
-            root_node.children = []  # Add empty children to avoid further errors
-            return {}
-            
-        # Get all section titles from the config
-        section_titles = [section.get("title", "") for section in report_config.get("sections", [])]
-        if not section_titles:
-            self.logger.warning("No section titles found in report_config, using default sections")
-            section_titles = ["Introduction", "Tokenomics", "Market Analysis", "Technology"]
-        
-        # Helper function to find the most relevant node for a section
-        def find_nodes_for_section(node, section_title):
-            matching_summaries = []
-            
-            # Check if this node matches the section directly
-            if hasattr(node, 'query') and node.query and section_title.lower() in node.query.lower():
-                if hasattr(node, 'summary') and node.summary:
-                    matching_summaries.append(node.summary)
-            
-            # Also check all child nodes
-            if hasattr(node, 'children') and node.children:
-                for child in node.children:
-                    # Safety check on child node
-                    if not hasattr(child, 'summary'):
-                        continue
-                        
-                    if child.summary:
-                        # Skip data nodes if specified
-                        if hasattr(child, 'data_field') and child.data_field:
-                            continue
-                        matching_summaries.append(child.summary)
-            
-            return "\n\n".join(matching_summaries) if matching_summaries else ""
-        
-        # For each section, find the matching research
-        for section_title in section_titles:
-            # Safety check - ensure node.children exists and is iterable
-            if not root_node.children:
-                self.logger.warning(f"No children in root_node to match for section: {section_title}")
-                continue
-                
-            # Get matching content from any node that seems relevant
-            matching_content = ""
-            for section_node in root_node.children:
-                if hasattr(section_node, 'query') and section_node.query:
-                    if section_title.lower() in section_node.query.lower():
-                        section_summary = find_nodes_for_section(section_node, section_title)
-                        if section_summary:
-                            matching_content = section_summary
-                            break
-            
-            # If we found matching content, add it to the section_research
-            if matching_content:
-                section_research[section_title] = matching_content
-        
-        return section_research
-    
-    def _generate_section_content(self, section, research_summary, key_metrics, data_sources, project_name):
-        """Generate content for a specific section using research and data."""
-        section_title = section["title"]
-        description = section.get("description", "")
-        min_words = section.get("min_words", 500)
-        max_words = section.get("max_words", 1000)
-        
-        self.logger.info(f"Generating content for section: {section_title}")
-        self.logger.info(f"Section description: {description[:100]}..." if len(description) > 100 else f"Section description: {description}")
-        self.logger.info(f"Word count requirements: min={min_words}, max={max_words}")
-        
-        # Check if we actually have research summary for this section
-        if not research_summary or research_summary.strip() == "":
-            self.logger.warning(f"No research summary for section {section_title}. Using description as fallback.")
-            research_summary = f"This section covers {description}"
-        else:
-            self.logger.info(f"Research summary available: {len(research_summary)} characters")
-        
-        # Create a dynamic prompt based on section configuration
-        prompt = (
-            f"Write a professional, fact-focused section on '{section_title}' for a {project_name} cryptocurrency research report.\n\n"
-            f"IMPORTANT GUIDELINES:\n"
-            f"1. Focus ONLY on FACTUAL information—use exact data and metrics whenever available.\n"
-            f"2. The content must be between {min_words}-{max_words} words.\n"
-            f"3. Include specific dates, numbers, and percentages from the research data, ensuring all numerical values are consistent with the key metrics provided.\n"
-            f"4. Format as a cohesive section without any section headings (section title is already added).\n"
-            f"5. Follow these section-specific guidelines: {prompt}\n"
-            f"6. Avoid repeating information covered in other sections—focus on the unique scope of this section as defined in the guidelines.\n"
-            f"7. Use a professional, objective tone suitable for crypto investors and analysts, avoiding speculative or promotional language.\n"
-            f"8. Provide actionable insights for investors where relevant, focusing on implications for investment decisions.\n"
-            f"9. Ensure all claims are supported by data—qualify statements with timeframes (e.g., 'as of [date]') or sources where necessary.\n\n"
-            f"RESEARCH SUMMARY:\n{research_summary}\n\n"
-            f"KEY METRICS (USE THESE EXACT VALUES - DO NOT MODIFY OR ROUND THEM):\n"
+        # Build a generic prompt based on the section's own description
+        prompt_text = (
+            f"Create a comprehensive section on {section_title} for {project_name}.\n\n"
+            f"CRITICAL REQUIREMENTS:\n"
+            f"1. This section MUST contain AT LEAST {min_words} words of detailed content\n"
+            f"2. Create thorough, specific content even if direct data is limited\n"
+            f"3. Use professional investment-focused language\n\n"
+            f"Focus on: {description}\n\n"
+            f"When creating this section:\n"
+            f"- Draw on general knowledge of crypto/blockchain projects\n"
+            f"- Include industry standards and best practices\n"
+            f"- Provide specific examples and detailed analysis\n"
+            f"- Cover all aspects mentioned in the section description\n\n"
+            f"If specific {project_name} data is unavailable, extrapolate from general project patterns "
+            f"and similar blockchain projects in the same category.\n\n"
+            f"THIS SECTION REQUIRES A MINIMUM OF {min_words} WORDS."
         )
         
-        # Add relevant key metrics for this section
-        if key_metrics:
-            for key, value in key_metrics.items():
-                prompt += f"- {key.replace('_', ' ').title()}: {value}\n"
-        else:
-            prompt += f"- Note: Precise metrics are not available for this report.\n"
+        # Use GPT-4 with high token limit for these sections
+        section_llm = ChatOpenAI(
+            model="gpt-4", 
+            temperature=0.7,
+            max_tokens=8000  # Increased to match main settings
+        )
         
-        # Add relevant structured data based on section type
-        section_specific_data = self._get_section_specific_data(section_title, data_sources)
-        if section_specific_data:
-            prompt += f"\nSECTION-SPECIFIC DATA:\n{json.dumps(section_specific_data, indent=2)}\n"
-        else:
-            prompt += f"\nNote: Detailed section data is not available.\n"
+        prompt = ChatPromptTemplate.from_template(prompt_text)
+        chain = prompt | section_llm | StrOutputParser()
         
-        # Generate fallback data based on section title if needed
-        fallback_data = self._generate_fallback_data(section_title, project_name)
-        if fallback_data:
-            prompt += f"\nUSE THIS DATA IF OTHER DATA IS INSUFFICIENT:\n{json.dumps(fallback_data, indent=2)}\n"
+        try:
+            self.logger.info(f"Generating specialized content for section: {section_title}")
+            content = await chain.ainvoke({
+                "section_title": section_title,
+                "project_name": project_name,
+                "min_words": min_words,
+                "max_words": max_words,
+                "description": description,
+                "key_metrics": json.dumps(key_metrics, indent=2),
+                "data_sources": json.dumps(data_sources["multi"], indent=2)
+            })
+            
+            word_count = len(content.split())
+            self.logger.info(f"Generated {word_count} words for section '{section_title}'")
+            
+            # If still insufficient, try one more time with even stronger emphasis
+            if word_count < min_words:
+                self.logger.warning(f"Still insufficient content ({word_count}/{min_words}) for '{section_title}'. Retrying...")
+                
+                retry_prompt = ChatPromptTemplate.from_template(
+                    f"The content you generated for {section_title} is only {word_count} words, but we need AT LEAST {min_words}.\n\n"
+                    f"COMPLETELY REWRITE and EXPAND this section to contain AT MINIMUM {min_words} words.\n\n"
+                    f"Original content:\n{content}\n\n"
+                    f"Add more depth, examples, context, and analysis. THIS IS CRITICAL."
+                )
+                
+                retry_chain = retry_prompt | section_llm | StrOutputParser()
+                content = await retry_chain.ainvoke({})
+                
+                final_word_count = len(content.split())
+                self.logger.info(f"After final retry for '{section_title}': {word_count} → {final_word_count} words")
+            
+            return content
+            
+        except Exception as e:
+            self.logger.error(f"Error in _generate_problem_section for '{section_title}': {str(e)}")
+            return f"Data unavailable for {section_title}. This section requires {min_words} words of content about {description}."
+
+    def _generate_content_for_section(self, project_name: str, section_title: str, section_data: Dict, 
+                                max_tokens: int = 1500, use_gpt4: bool = False) -> str:
+        """Generate content for a specific section with context control."""
+        # Use focused prompt that doesn't include full data context
+        prompt = (
+            f"Write an informative and professional section on '{section_title}' for a cryptocurrency "
+            f"research report about {project_name}. Focus on making this section detailed and "
+            f"investment-grade quality, with at least 500 words of content.\n\n"
+        )
         
-        # Finalize the prompt with proper word count enforcement
+        # Add relevant context based on section title
+        if "executive summary" in section_title.lower():
+            prompt += (
+                f"This should provide a concise overview of {project_name}, highlighting its key features, "
+                f"recent performance, market position, and investment thesis in about 400 words.\n\n"
+            )
+        elif "introduction" in section_title.lower():
+            prompt += (
+                f"This should cover {project_name}'s background, mission, core features, "
+                f"and unique value proposition in the cryptocurrency landscape in about 500 words.\n\n"
+            )
+        elif "tokenomics" in section_title.lower():
+            prompt += (
+                f"This should detail {project_name}'s token supply, distribution, utility, economics model, "
+                f"and any staking/rewards mechanisms in about 600 words. Include specific numbers and percentages.\n\n"
+            )
+        elif "market" in section_title.lower():
+            prompt += (
+                f"This should analyze {project_name}'s market position, competitors, trading volume, "
+                f"liquidity, and price action. Include market cap and trading metrics in about 600 words.\n\n"
+            )
+        elif "technical" in section_title.lower():
+            prompt += (
+                f"This should explain {project_name}'s underlying technology, blockchain architecture, "
+                f"consensus mechanism, and technical innovations in about 500 words.\n\n"
+            )
+        elif "developer" in section_title.lower():
+            prompt += (
+                f"This should cover {project_name}'s developer ecosystem, tools, documentation, "
+                f"and user interface/experience design in about 500 words.\n\n"
+            )
+        elif "security" in section_title.lower():
+            prompt += (
+                f"This should assess {project_name}'s security measures, audit history, "
+                f"vulnerabilities, and security practices in about 400 words.\n\n"
+            )
+        elif "liquidity" in section_title.lower():
+            prompt += (
+                f"This should analyze {project_name}'s liquidity metrics, trading volumes, "
+                f"user adoption, and on-chain activity metrics in about 500 words.\n\n"
+            )
+        elif "governance" in section_title.lower():
+            prompt += (
+                f"This should detail {project_name}'s governance model, voting mechanisms, "
+                f"community participation, and decentralization approach in about 400 words.\n\n"
+            )
+        elif "ecosystem" in section_title.lower():
+            prompt += (
+                f"This should explore {project_name}'s partnerships, integrations, and position "
+                f"within the broader blockchain ecosystem in about 400 words.\n\n"
+            )
+        elif "risk" in section_title.lower():
+            prompt += (
+                f"This should identify key risks and potential opportunities associated with {project_name}, "
+                f"including regulatory concerns, technological risks, and growth potential in about 450 words.\n\n"
+            )
+        elif "team" in section_title.lower():
+            prompt += (
+                f"This should profile {project_name}'s leadership team, development activity, "
+                f"and organizational structure in about 400 words.\n\n"
+            )
+        elif "conclusion" in section_title.lower():
+            prompt += (
+                f"This should summarize the key findings about {project_name} and provide "
+                f"a balanced investment perspective in about 300 words.\n\n"
+            )
+        
+        # Add just the most relevant pieces of data rather than everything
+        relevant_data = {}
+        
+        # Extract only section-relevant data points
+        if "tokenomics" in section_title.lower():
+            keys_to_extract = ['total_supply', 'circulating_supply', 'max_supply']
+            for key in keys_to_extract:
+                if key in section_data:
+                    relevant_data[key] = section_data[key]
+        elif "market" in section_title.lower():
+            keys_to_extract = ['current_price', 'market_cap', '24h_volume', 'price_change_percentage_24h']
+            for key in keys_to_extract:
+                if key in section_data:
+                    relevant_data[key] = section_data[key]
+        
+        if relevant_data:
+            prompt += f"Incorporate these data points: {json.dumps(relevant_data)}\n\n"
+            
+        # Add final instructions
         prompt += (
-            f"\nWrite a comprehensive, factual section addressing the topic thoroughly. "
-            f"Ground all claims in the data provided. "
-            f"STRICTLY ADHERE to the word count requirements: minimum {min_words} words, maximum {max_words} words. "
-            f"If specific data is missing, create reasonable general statements that are likely to be true for most cryptocurrencies, but avoid speculation. "
-            f"Do not include the section title itself as it will be added automatically. "
-            f"Avoid phrases like 'according to the data' or 'the research shows'. "
-            f"Present facts directly and authoritatively with proper citations where appropriate."
+            f"Write in a professional, analytical style suitable for sophisticated investors. "
+            f"Be objective, balanced, and evidence-based. Format the response in clean markdown."
         )
         
         try:
-            response = self.llm.invoke(prompt)
-            content = response.content
-            
-            # Check word count and regenerate if needed
-            word_count = len(content.split())
-            if word_count < min_words:
-                self.logger.warning(f"Section {section_title} content too short ({word_count} words). Regenerating with stronger word count emphasis.")
-                prompt += f"\n\nYOUR RESPONSE MUST BE AT LEAST {min_words} WORDS. CURRENT RESPONSE IS TOO SHORT."
-                response = self.llm.invoke(prompt)
-                content = response.content
-            elif word_count > max_words and max_words > 0:
-                self.logger.warning(f"Section {section_title} content too long ({word_count} words). Regenerating with stronger word count limit.")
-                prompt += f"\n\nYOUR RESPONSE MUST NOT EXCEED {max_words} WORDS. CURRENT RESPONSE IS TOO LONG."
-                response = self.llm.invoke(prompt)
-                content = response.content
-            
+            # Select appropriate model
+            if use_gpt4:
+                # Use GPT-4 for important sections, but with controlled max_tokens
+                content = self.llm.invoke(prompt, max_tokens=max_tokens).content
+            else:
+                # Use standard model for other sections
+                content = self.llm.invoke(prompt, max_tokens=max_tokens).content
+                
+            # Basic validation and fallback
+            if len(content.split()) < 100:
+                self.logger.warning(f"Generated content for {section_title} is suspiciously short. Using fallback.")
+                return self._generate_fallback_content(project_name, section_title)
+                
             return content
         except Exception as e:
-            self.logger.error(f"Error generating content for section {section_title}: {str(e)}")
-            # Create a minimal fallback content instead of returning an error
-            fallback_content = (
-                f"{project_name}'s {section_title.lower()} is an important aspect to consider. " +
-                f"This section would normally cover {description}. " +
-                f"Due to data limitations, this section is currently limited in depth. " +
-                f"Future reports will provide more comprehensive analysis when additional data becomes available."
+            self.logger.error(f"Error generating content for {section_title}: {str(e)}")
+            return self._generate_fallback_content(project_name, section_title)
+            
+    def _generate_fallback_content(self, project_name: str, section_title: str) -> str:
+        """Generate fallback content when the primary content generation fails."""
+        base_content = (
+            f"## {section_title}\n\n"
+            f"This section covers {section_title.lower()} aspects of {project_name}. "
+            f"{project_name} demonstrates several important characteristics in this area that warrant investor attention. "
+            f"Further analysis with more specific data is recommended for a complete understanding."
+        )
+        
+        # Add section-specific fallback content
+        if "executive summary" in section_title.lower():
+            base_content += (
+                f" {project_name} is a cryptocurrency project with distinctive features in the blockchain ecosystem. "
+                f"This report examines its fundamental aspects, market performance, technical architecture, and investment potential."
             )
-            # Repeat the fallback to reach minimum word count
-            while len(fallback_content.split()) < min_words:
-                fallback_content += (
-                    f"\n\nAs a potential investor in {project_name}, it's important to research this aspect thoroughly. " +
-                    f"Consider consulting the project's documentation and official sources for the most up-to-date information."
-                )
-            return fallback_content
+        elif "tokenomics" in section_title.lower():
+            base_content += (
+                f" The token economics of {project_name} include its supply mechanisms, distribution model, and utility within its ecosystem. "
+                f"The token plays a central role in the project's functionality and value proposition."
+            )
             
-    def _generate_fallback_data(self, section_title, project_name):
-        """Generate section-specific fallback data if no real data is available."""
-        fallback_data = {}
-        
-        if "tokenomics" in section_title.lower():
-            fallback_data = {
-                "token_info": f"{project_name} has a token economy designed for its ecosystem.",
-                "token_allocation": [
-                    {"category": "Team", "percentage": 20},
-                    {"category": "Foundation", "percentage": 99},
-                    {"category": "Community", "percentage": 30},
-                    {"category": "Investors", "percentage": 99},
-                    {"category": "Ecosystem", "percentage": 10}
-                ],
-                "general_note": "Token metrics vary across projects. Consider researching exact figures."
-            }
-        elif "market" in section_title.lower():
-            fallback_data = {
-                "market_context": "The cryptocurrency market is highly volatile and competitive.",
-                "typical_metrics": "Projects are evaluated on metrics like market cap, volume, and liquidity.",
-                "competitors": "Major cryptocurrencies compete for market share and adoption."
-            }
-        elif "technical" in section_title.lower():
-            fallback_data = {
-                "blockchain_types": "Cryptocurrencies can be based on their own blockchain or built on existing platforms.",
-                "consensus": "Common consensus mechanisms include Proof of Work, Proof of Stake, and variations.",
-                "scalability": "Projects often focus on improving transaction throughput and reducing fees."
-            }
-        elif "security" in section_title.lower():
-            fallback_data = {
-                "best_practices": "Reputable projects undergo security audits by specialized firms.",
-                "considerations": "Smart contract vulnerabilities remain a significant risk factor.",
-                "history": "The crypto industry has experienced several major security incidents."
-            }
-            
-        return fallback_data
-    
-    def _get_section_specific_data(self, section_title, data_sources):
-        """Get section-specific data based on the section title."""
-        section_data = {}
-        
-        # Extract data relevant to specific sections
-        if "tokenomics" in section_title.lower():
-            for key in ["total_supply", "circulating_supply", "max_supply", "token_allocations"]:
-                if key in data_sources.get("structured_data", {}):
-                    section_data[key] = data_sources["structured_data"][key]
-                elif key in data_sources.get("multi", {}):
-                    section_data[key] = data_sources["multi"][key]
-        
-        elif "market" in section_title.lower():
-            for key in ["price_metrics", "volume_metrics", "market_cap_metrics", "competitors", "technical_indicators", "recent_price_movements"]:
-                if key in data_sources.get("structured_data", {}):
-                    section_data[key] = data_sources["structured_data"][key]
-        
-        elif "governance" in section_title.lower():
-            if "governance_model" in data_sources.get("structured_data", {}):
-                section_data["governance"] = data_sources["structured_data"]["governance_model"]
-        
-        elif "team" in section_title.lower():
-            if "team_size" in data_sources.get("structured_data", {}):
-                section_data["team"] = data_sources["structured_data"]["team_size"]
-        
-        return section_data
+        return base_content
 
-def writer(state: ResearchState, llm: ChatOpenAI, logger: logging.Logger, config: Optional[Dict[str, Any]] = None) -> ResearchState:
-    logger.info(f"Writer agent processing for {state.project_name}")
-    state.update_progress(f"Writing draft report for {state.project_name}...")
+@openai_retry_decorator
+async def writer(state: Dict, llm: ChatOpenAI, logger: logging.Logger, config: Optional[Dict[str, Any]] = None) -> Dict:
+    # Get project name from state
+    project_name = state.get("project_name", "Unknown Project")
+    logger.info(f"Writer agent processing for {project_name}")
+    
+    # Update progress
+    if hasattr(state, 'update_progress'):
+        state.update_progress(f"Writing draft report for {project_name}...")
+    else:
+        state["progress"] = f"Writing draft report for {project_name}..."
     
     try:
-        writer_agent = WriterAgent(llm, logger)
+        hf_api_token = config.get("hf_api_token") if config else os.getenv("HUGGINGFACE_API_KEY")
+        writer_agent = WriterAgent(llm, logger, hf_api_token)
         
-        # Check if root_node exists and has children
-        root_node_valid = hasattr(state, 'root_node') and state.root_node is not None
-        if not root_node_valid:
-            logger.error("No valid root_node in state - research may have failed")
-            # Create a minimal default draft with the information we have
-            state.draft = generate_fallback_draft(state, logger)
-            state.update_progress(f"Created fallback draft for {state.project_name} due to missing research data")
-            return state
+        # Create a temporary ResearchState object for backward compatibility
+        temp_state = ResearchState(project_name=project_name)
+        for key, value in state.items():
+            if hasattr(temp_state, key):
+                setattr(temp_state, key, value)
+                
+        # Call the writer agent with the temp state
+        draft = await writer_agent.write_draft(temp_state)
         
-        # Additional validation - make sure root_node has children
-        if not hasattr(state.root_node, 'children') or not state.root_node.children:
-            logger.error("root_node has no children - research tree generation may have failed")
-            state.root_node.children = []  # Initialize empty list to prevent errors
-            # Create a minimal default draft with the information we have
-            state.draft = generate_fallback_draft(state, logger)
-            state.update_progress(f"Created fallback draft for {state.project_name} due to incomplete research tree")
-            return state
-            
-        # If we have valid data, proceed with normal draft creation
-        draft = writer_agent.write_draft(state)
-        state.draft = draft
-        state.update_progress(f"Draft report written for {state.project_name}")
+        # Set the draft in the dictionary state
+        state["draft"] = draft
         
+        # Update progress
+        if hasattr(state, 'update_progress'):
+            state.update_progress(f"Draft report written for {project_name}")
+        else:
+            state["progress"] = f"Draft report written for {project_name}"
     except Exception as e:
         logger.error(f"Error in writer: {str(e)}", exc_info=True)
-        # Create an emergency fallback draft
-        state.draft = generate_fallback_draft(state, logger)
-        state.update_progress(f"Created emergency fallback draft due to error: {str(e)}")
+        state["draft"] = f"# {project_name} Research Report\n\n*Generated on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*\n\nThis report is generated with AI assistance and should not be considered financial advice.\n\n" + \
+                     f"Error: {str(e)}. Insufficient data from API, web search, or inference."
         
+        # Update progress
+        if hasattr(state, 'update_progress'):
+            state.update_progress(f"Created minimal draft due to error: {str(e)}")
+        else:
+            state["progress"] = f"Created minimal draft due to error: {str(e)}"
+    
     return state
-    
-def generate_fallback_draft(state: ResearchState, logger: logging.Logger) -> str:
-    """Generate a minimal fallback draft when normal research fails."""
-    logger.info(f"Generating fallback draft for {state.project_name}")
-    
-    # Use whatever data we have available
-    from datetime import datetime
-    
-    # Start with a title
-    draft = f"# {state.project_name} Research Report\n\n"
-    draft += f"*Generated on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*\n\n"
-    draft += "**Note: This is a limited report due to data collection issues.**\n\n"
-    
-    # Add whatever research summary we have
-    if hasattr(state, 'research_summary') and state.research_summary:
-        draft += f"## Overview\n\n{state.research_summary}\n\n"
-    else:
-        draft += f"## Overview\n\nThis is a research report on {state.project_name}. "
-        draft += "Limited information is available due to data collection challenges.\n\n"
-    
-    # Add key features if available
-    if hasattr(state, 'key_features') and state.key_features:
-        draft += f"## Key Features\n\n{state.key_features}\n\n"
-    
-    # Add tokenomics if available
-    if hasattr(state, 'tokenomics') and state.tokenomics:
-        draft += f"## Tokenomics\n\n{state.tokenomics}\n\n"
-        
-    # Add price analysis if available
-    if hasattr(state, 'price_analysis') and state.price_analysis:
-        draft += f"## Market Analysis\n\n{state.price_analysis}\n\n"
-    
-    # Add governance if available
-    if hasattr(state, 'governance') and state.governance:
-        draft += f"## Governance\n\n{state.governance}\n\n"
-    
-    # Add team info if available
-    if hasattr(state, 'team_and_development') and state.team_and_development:
-        draft += f"## Team & Development\n\n{state.team_and_development}\n\n"
-    
-    # Use structured data if available
-    if hasattr(state, 'structured_data') and state.structured_data:
-        draft += "## Available Data Points\n\n"
-        for key, value in state.structured_data.items():
-            if isinstance(value, dict) or isinstance(value, list):
-                continue  # Skip complex nested structures
-            draft += f"- **{key.replace('_', ' ').title()}**: {value}\n"
-        draft += "\n"
-    
-    # Add any references we might have
-    if hasattr(state, 'references') and state.references:
-        draft += "## References\n\n"
-        for ref in state.references:
-            if 'title' in ref and 'url' in ref:
-                draft += f"- [{ref['title']}]({ref['url']})\n"
-        draft += "\n"
-    
-    # Add disclaimer
-    draft += "## Disclaimer\n\n"
-    draft += "This report is AI-generated and not financial advice. "
-    draft += "The information contained may be incomplete due to data collection limitations. "
-    draft += "Always conduct your own research before making investment decisions."
-    
-    return draft
+
+def writer_sync(state: Dict, llm: ChatOpenAI, logger: logging.Logger, config: Optional[Dict[str, Any]] = None) -> Dict:
+    return asyncio.run(writer(state, llm, logger, config))

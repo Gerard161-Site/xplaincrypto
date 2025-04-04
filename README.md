@@ -14,13 +14,15 @@ XplainCrypto is a powerful platform that produces comprehensive, factual, and re
 
 ## 🏗️ Architecture
 
-The system implements a multi-agent research approach:
+The system implements a modular, service-based architecture:
 
-1. **Research Planning** - Creates a hierarchical tree of research questions
-2. **Specialized Research** - Different agents handle technical, tokenomics, market, and ecosystem research
-3. **Data Gathering** - Real-time API integration for cryptocurrency data
-4. **Visualization** - Generates charts, graphs and tables from the collected data
-5. **Report Generation** - Synthesizes findings into a cohesive report
+1. **Core Layer** - Application initialization, configuration and server setup
+2. **Service Layer** - Shared services for progress tracking, error handling and communication 
+3. **Orchestration Layer** - Workflow management and coordination
+4. **Agent Layer** - Specialized AI agents for different tasks
+5. **Retrieval Layer** - API integration and data gathering components
+
+This architecture provides clear separation of concerns, improved error handling, standardized progress tracking, and flexible configuration options.
 
 ## 📝 Report Structure
 
@@ -111,11 +113,34 @@ xplaincrypto/
 │   │   ├── reviewer.py   # Report review agent
 │   │   └── publisher.py  # Report publishing agent
 │   ├── config/           # Configuration files
-│   │   └── report_config.json # Report customization settings
+│   │   ├── app_config.json # Main application configuration
+│   │   ├── report_config.json # Report customization settings
+│   │   ├── style_config.json # Visual styling configuration
+│   │   └── error_categories.json # Error handling configuration
+│   ├── core/             # Core application components
+│   │   ├── app_factory.py # Application initialization
+│   │   ├── config_loader.py # Configuration management
+│   │   └── server.py     # Server setup and routes
+│   ├── orchestration/    # Workflow coordination
+│   │   └── workflow_manager.py # Manages workflow execution
 │   ├── research/         # Research system components
-│   │   ├── orchestrator.py # Orchestrates the research workflow
-│   │   ├── data_modules.py # Data gathering modules
-│   │   └── core.py       # Core research components
+│   │   ├── core.py       # Core research components
+│   │   ├── agents.py     # Specialized research agents
+│   │   └── orchestrator.py # Orchestrates research process
+│   ├── retriever/        # Web & API retrieval components
+│   │   ├── tavily_search.py # Web search integration
+│   │   ├── huggingface_search.py # HuggingFace integration
+│   │   ├── coingecko_api.py # CoinGecko API retriever
+│   │   ├── coinmarketcap_api.py # CoinMarketCap API retriever
+│   │   ├── defillama_api.py # DeFi Llama API retriever 
+│   │   └── data_gatherer.py # Manages multiple data sources
+│   ├── services/         # Shared services
+│   │   ├── communication/ # Communication services
+│   │   │   └── socket_service.py # Socket.IO handling
+│   │   └── reporting/    # Reporting services
+│   │       ├── progress_tracker.py # Progress tracking
+│   │       ├── error_reporter.py # Error reporting
+│   │       └── logging_config.py # Centralized logging config
 │   ├── utils/            # Utility functions
 │   │   └── style_utils.py # Styling utilities for visualizations
 │   ├── visualizations/   # Modular visualization components
@@ -125,12 +150,30 @@ xplaincrypto/
 │   │   ├── pie_chart.py  # Pie chart visualizer
 │   │   ├── table.py      # Table visualizer
 │   │   └── timeline.py   # Timeline visualizer
+│   ├── state.py          # State definitions
 │   └── main.py           # Server entry point
 ├── frontend/             # Next.js frontend
 │   ├── pages/            # React components and pages
 │   └── styles/           # CSS and styling
 └── docs/                 # Generated reports and visualizations
 ```
+
+## Key Features
+
+- **Centralized Error Handling** - Standardized error reporting, categorization, and user messaging
+- **Progress Tracking** - Real-time progress updates with configurable verbosity
+- **Modular API Retrievers** - Separate components for different cryptocurrency data sources
+- **Workflow Management** - LangGraph workflow with error handling and metrics
+- **Configurable System** - JSON configuration with environment variable overrides
+- **Consistent Styling** - Centralized style configuration for reports and visualizations
+- **Improved Testability** - Clear component boundaries for easier testing
+
+## Future Roadmap
+
+- **State Management** - Adding a dedicated state manager component
+- **Caching Service** - Centralizing cache management for API responses
+- **Microservices Architecture** - Gradual transition to separate services
+- **Client Notification System** - Enhanced notification capabilities
 
 ## Contributing
 

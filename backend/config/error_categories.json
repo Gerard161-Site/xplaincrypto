@@ -1,0 +1,52 @@
+{
+  "api_error": {
+    "severity": "warning",
+    "retry_allowed": true,
+    "user_message": "Data source connection issue. Using fallback data."
+  },
+  "research_error": {
+    "severity": "warning",
+    "retry_allowed": true,
+    "user_message": "Research retrieval issue. Using available information."
+  },
+  "processing_error": {
+    "severity": "error",
+    "retry_allowed": true,
+    "user_message": "Error processing report data. Please try again."
+  },
+  "system_error": {
+    "severity": "critical",
+    "retry_allowed": false,
+    "user_message": "System error occurred. Our team has been notified."
+  },
+  "visualization_error": {
+    "severity": "warning",
+    "retry_allowed": false,
+    "user_message": "Error generating visualization. Using text description instead."
+  },
+  "authentication_error": {
+    "severity": "error",
+    "retry_allowed": true,
+    "user_message": "Authentication failed. Please check your credentials."
+  },
+  "network_error": {
+    "severity": "warning",
+    "retry_allowed": true,
+    "user_message": "Network connectivity issue. Some data may be unavailable."
+  },
+  "timeout_error": {
+    "severity": "warning",
+    "retry_allowed": true,
+    "user_message": "Request timed out. Operation may need to be retried."
+  },
+  "invalid_input_error": {
+    "severity": "error",
+    "retry_allowed": true,
+    "user_message": "Invalid input provided. Please check your parameters."
+  },
+  "file_error": {
+    "severity": "error",
+    "retry_allowed": true,
+    "user_message": "Error reading or writing file. Check file permissions."
+  }
+} 

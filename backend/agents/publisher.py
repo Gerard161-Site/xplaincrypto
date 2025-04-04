@@ -1,551 +1,595 @@
+# backend/agents/publisher.py
 import logging
 import os
 import datetime
-import json
-import re
 from reportlab.pdfgen import canvas
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, PageBreak, Frame
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.pagesizes import letter, A4
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, PageBreak, KeepTogether
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
 from reportlab.lib.units import inch
-from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY, TA_LEFT
 from backend.state import ResearchState
 from backend.utils.style_utils import StyleManager
 from PIL import Image as PilImage
-import matplotlib.pyplot as plt
-from typing import List
+from backend.utils.logging_utils import log_safe  # Import from utils module
+from backend.utils.inference import openai_retry_decorator  # Import the decorator for potential future use
+
+logger = logging.getLogger(__name__)
 
 def escape_xml(text):
-    """Escape XML characters that might cause problems with ReportLab"""
+    """Escape XML characters for proper rendering in ReportLab."""
     if not text:
         return ""
-    text = text.replace('&', '&amp;')
-    text = text.replace('<', '&lt;')
-    text = text.replace('>', '&gt;')
-    text = text.replace('"', '&quot;')
-    text = text.replace("'", '&apos;')  # Corrected to use single quotes consistently
+    replacements = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&apos;'
+    }
+    for original, escaped in replacements.items():
+        text = text.replace(original, escaped)
     return text
 
 def add_page_number(canvas, doc):
-    """Add page numbers and footer to each page"""
-    # Add page number
+    """Add page numbers and footer to each page."""
     page_num = canvas.getPageNumber()
-    text = "Page %s" % page_num
     canvas.setFont("Helvetica", 9)
-    canvas.drawRightString(8.25*inch, 0.75*inch, text)
+    canvas.drawRightString(8*inch, 0.5*inch, f"Page {page_num}")
     
-    # Add footer with website and date
     canvas.setFont("Helvetica", 8)
-    canvas.setFillColorRGB(0.5, 0.5, 0.5)  # Gray color
+    canvas.setFillColorRGB(0.5, 0.5, 0.5)
     today = datetime.datetime.now().strftime("%Y-%m-%d")
-    canvas.drawString(1*inch, 0.75*inch, f"XPlainCrypto Research Report • {today}")
-    canvas.drawCentredString(4.25*inch, 0.75*inch, "www.xplaincrypto.com")
+    canvas.drawString(0.75*inch, 0.5*inch, f"XPlainCrypto Research Report • {today}")
+    canvas.drawCentredString(4.25*inch, 0.5*inch, "www.xplaincrypto.com")
 
 def publisher(state, llm, logger, config=None):
     """Process the report content and create a PDF."""
     try:
         logger.info("Publisher agent starting")
         
-        # Get project name and report config from state
+        # Get project name from state (try dict first, then attribute)
         if isinstance(state, dict):
             project_name = state.get("project_name", "Unknown Project")
             report_config = state.get("report_config", {})
         else:
             project_name = getattr(state, "project_name", "Unknown Project")
             report_config = getattr(state, "report_config", {})
+        
+        logger.info(f"Publisher agent processing report for project: '{project_name}'")
+        
+        # Update progress
+        if isinstance(state, dict):
+            state["progress"] = f"Publishing report for {project_name}..."
+        elif hasattr(state, 'update_progress'):
+            state.update_progress(f"Publishing report for {project_name}...")
+        
+        # CRITICAL: LOG STATE CONTENT
+        draft_sources = ["draft", "edited_draft", "final_report"]
+        if isinstance(state, dict):
+            for source in draft_sources:
+                if source in state:
+                    content_length = len(state[source]) if isinstance(state[source], str) else 0
+                    logger.info(f"Found state['{source}'] with {content_length} chars")
                 
-        # Create output directory
+        # Try multiple sources for the draft content, in order of preference
+        draft = None
+        possible_sources = ["edited_draft", "draft", "final_report"]
+        
+        # First check if state is a dictionary
+        if isinstance(state, dict):
+            for source in possible_sources:
+                if source in state and isinstance(state[source], str) and len(state[source]) > 500:
+                    draft = state[source]
+                    logger.info(f"Using content from state['{source}'] ({len(draft)} chars)")
+                    break
+                elif source in state and isinstance(state[source], str):
+                    logger.warning(f"Content in state['{source}'] is too short: {len(state[source])} chars")
+        
+        # Then fall back to attribute access if needed
+        if not draft:
+            logger.info("No suitable draft found in state dict, checking attributes")
+            for source in possible_sources:
+                content = getattr(state, source, None) if hasattr(state, source) else None
+                if content and isinstance(content, str) and len(content) > 500:  # Ensure meaningful content
+                    draft = content
+                    logger.info(f"Using content from state.{source} ({len(draft)} chars)")
+                    break
+                elif content and isinstance(content, str):
+                    logger.warning(f"Content in state.{source} is too short: {len(content)} chars")
+        
+        # If no substantial draft was found, attempt to generate a minimal one
+        if not draft or len(draft) < 500:
+            logger.warning(f"No substantial draft found in state (best length: {len(draft) if draft else 0} chars)")
+            
+            # Emergency: try to extract any text content from state for emergency report
+            emergency_content = ""
+            
+            if isinstance(state, dict):
+                # Try to extract any text fields from the state dictionary
+                for key, value in state.items():
+                    if isinstance(value, str) and len(value) > 100 and key not in ["progress", "errors"]:
+                        emergency_content += f"\n\n## {key.replace('_', ' ').title()}\n\n{value}"
+                        logger.info(f"Added emergency content from state['{key}'] ({len(value)} chars)")
+            
+            # Generate a minimal draft from any available content
+            minimal_draft = f"# {project_name} Research Report\n\n"
+            minimal_draft += f"*Generated on {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*\n\n"
+            minimal_draft += "## Executive Summary\n\n"
+            
+            if emergency_content:
+                minimal_draft += emergency_content
+            elif isinstance(state, dict) and "research_summary" in state and state["research_summary"]:
+                minimal_draft += state["research_summary"] + "\n\n"
+            elif hasattr(state, "research_summary") and getattr(state, "research_summary"):
+                minimal_draft += getattr(state, "research_summary") + "\n\n"
+            else:
+                minimal_draft += f"{project_name} is a cryptocurrency project. Due to technical limitations, a full analysis could not be generated.\n\n"
+                
+            # Try to add basic tokenomics info if available
+            minimal_draft += "## Tokenomics\n\n"
+            
+            if isinstance(state, dict) and "tokenomics" in state and state["tokenomics"]:
+                minimal_draft += state["tokenomics"] + "\n\n"
+            elif hasattr(state, "tokenomics") and getattr(state, "tokenomics"):
+                minimal_draft += getattr(state, "tokenomics") + "\n\n"
+            else:
+                minimal_draft += f"Tokenomics data for {project_name} is not available in this report.\n\n"
+            
+            # Add disclaimer
+            minimal_draft += "\n\n## Disclaimer\n\nThis report was generated with limited data. Please consult additional sources for investment decisions."
+            
+            draft = minimal_draft
+            logger.info(f"Generated minimal draft with {len(draft.split())} words")
+            
+            # Save the minimal draft to state to avoid future problems
+            if isinstance(state, dict):
+                state["draft"] = draft
+                state["edited_draft"] = draft  # Also set as edited_draft for future runs
+            else:
+                state.draft = draft
+                state.edited_draft = draft
+        
+        # Get visualizations
+        if isinstance(state, dict):
+            vis_list = state.get("visualizations", [])
+        else:
+            vis_list = getattr(state, "visualizations", [])
+        
+        # Debug log the visualizations
+        logger.info(f"Found {len(vis_list)} visualizations in state")
+        if vis_list:
+            logger.info(f"Visualization types: {[v.get('type', 'unknown') for v in vis_list]}")
+        
+        # Add section mapping for visualizations
+        section_vis_map = {}
+        if report_config and "sections" in report_config:
+            for section in report_config.get("sections", []):
+                if "visualizations" in section and section["title"]:
+                    section_vis_map[section["title"].lower()] = section["visualizations"]
+        
+        # Process visualizations to ensure they have all required fields
+        processed_vis_list = []
+        for vis in vis_list:
+            if isinstance(vis, dict):
+                # Ensure all visualizations have required fields
+                vis_type = vis.get("type", "unknown")
+                vis_path = vis.get("path")
+                
+                # Only include visualizations with valid paths
+                if vis_path and os.path.exists(vis_path):
+                    # Try to determine target section
+                    target_section = vis.get("target_section_title")
+                    
+                    # If no target section, try to match based on type and section mapping
+                    if not target_section:
+                        for section_title, vis_types in section_vis_map.items():
+                            if vis_type in vis_types:
+                                target_section = section_title
+                                logger.info(f"Mapped visualization '{vis_type}' to section '{section_title}'")
+                                break
+                    
+                    processed_vis_list.append({
+                        "path": vis_path,
+                        "title": vis.get("title", vis_type.replace("_", " ").title()),
+                        "description": vis.get("description", ""),
+                        "type": vis_type,
+                        "target_section_title": target_section
+                    })
+                    logger.info(f"Included visualization: {vis_type} -> {target_section}")
+                else:
+                    logger.warning(f"Skipping visualization '{vis_type}' - missing or invalid path: {vis_path}")
+        
+        # Use processed list for further processing
+        vis_list = processed_vis_list
+        logger.info(f"Processed {len(vis_list)} valid visualizations")
+        
         safe_project_name = project_name.lower().replace(" ", "_")
         output_dir = os.path.join("docs", safe_project_name)
         os.makedirs(output_dir, exist_ok=True)
+        logger.info(f"Using output directory: {output_dir}")
         
-        # Get visualizations from state
-        visualizations = {}
-        if isinstance(state, dict):
-            visualizations = state.get("visualizations", {})
-        else:
-            visualizations = getattr(state, "visualizations", {})
+        # Save the raw draft for debugging
+        raw_draft_path = os.path.join(output_dir, f"{safe_project_name}_raw_draft.md")
+        with open(raw_draft_path, "w", encoding="utf-8") as f:
+            f.write(draft)
+        logger.info(f"Saved raw draft to {raw_draft_path}")
         
-        logger.info(f"Found {len(visualizations)} visualizations in state")
-        
-        # Create visualization mapping from report config
-        section_vis_map = {}
-        if "sections" in report_config:
-            for section in report_config["sections"]:
-                section_title = section.get("title", "").lower()
-                if section_title and "visualizations" in section:
-                    section_vis_map[section_title] = section["visualizations"]
-                    logger.info(f"Section '{section_title}' expects visualizations: {section['visualizations']}")
-        
-        # Convert visualizations to list format with section mapping
-        vis_list = []
-        for vis_id, vis_data in visualizations.items():
-            if isinstance(vis_data, dict) and "file_path" in vis_data:
-                # Find which section this visualization belongs to
-                target_section = None
-                for section_title, expected_vis in section_vis_map.items():
-                    if vis_id in expected_vis:
-                        target_section = section_title
-                        break
-                
-                vis_list.append({
-                    "path": vis_data["file_path"],
-                    "title": vis_data.get("title", vis_id.replace("_", " ").title()),
-                    "description": vis_data.get("description", ""),
-                    "type": vis_id,
-                    "target_section": target_section
-                })
-                logger.info(f"Visualization {vis_id} mapped to section: {target_section}")
-        
-        logger.info(f"Processed {len(vis_list)} visualizations")
-        
-        # Get draft content
-        draft = ""
-        if isinstance(state, dict):
-            draft = state.get("draft", "")
-        else:
-            draft = getattr(state, "draft", "")
-            
-        if not draft:
-            logger.error("No draft content available")
-            return state
-        
-        # Parse sections
+        # Log draft stats for debugging
         lines = draft.split("\n")
-        sections = []
-        current_section = None
-        current_content = []
+        logger.info(f"Draft contains {len(lines)} lines and {len(draft.split())} words")
         
-        # Skip the initial title page content from the draft
-        skip_initial_content = True
+        # Log the first few non-empty lines to understand structure
+        non_empty_lines = [line for line in lines[:10] if line.strip()]
+        logger.info(f"Draft starts with: {non_empty_lines[:3]}")
+        
+        sections = []
+        seen_titles = set()
+        current_section = {"title": None, "content": [], "subsections": []}
+        current_subsection = None
+        
+        # Normalize heading formats
+        normalized_lines = []
         for line in lines:
-            if skip_initial_content:
-                if line.startswith("# ") and not any(x in line.lower() for x in ["research report", "generated on", "disclaimer"]):
-                    skip_initial_content = False
+            # Convert various heading formats to standard ones
+            if line.startswith("###") and not line.startswith("####"):
+                line = "## " + line[3:].lstrip()  # Convert ### to ##
+            elif line.startswith("##") and not line.startswith("###"):
+                if not line.startswith("## "):
+                    line = "## " + line[2:].lstrip()  # Ensure space after ## for subsections
+            elif line.startswith("#") and not line.startswith("##"):
+                if not line.startswith("# "):
+                    line = "# " + line[1:].lstrip()  # Ensure space after # for main headings
+            normalized_lines.append(line)
+        
+        logger.info(f"Normalized {len(normalized_lines)} lines for processing")
+        
+        # Get the expected sections from report_config
+        expected_section_titles = {s["title"] for s in report_config.get("sections", [])}
+        expected_section_details = {s["title"]: s for s in report_config.get("sections", [])}
+        logger.info(f"Expected sections from report_config: {list(expected_section_titles)}")
+        
+        # Parse sections from normalized content
+        in_header = True  # Flag to skip title page content
+        for line in normalized_lines:
+            # Skip title page content (everything before first section heading)
+            if in_header:
+                # Check for both # and ## section markers to end the header section
+                if (line.startswith("# ") and not any(x in line.lower() for x in ["research report", "generated on", "disclaimer"])) or \
+                   (line.startswith("## ") and not any(x in line.lower() for x in ["research report", "generated on", "disclaimer"])):
+                    in_header = False
+                    logger.info(f"Found first content section: {line.strip()}")
                 else:
                     continue
-            
+                    
+            # Now handle both # and ## as main sections
             if line.startswith("# ") or line.startswith("## "):
-                # Save previous section if exists
-                if current_section:
-                    sections.append({
-                        "title": current_section,
-                        "content": "\n".join(current_content)
-                    })
+                # Extract title properly from both formats
+                title = line[2:].strip() if line.startswith("# ") else line[3:].strip()
                 
-                # Start new section
-                if line.startswith("# "):
-                    current_section = line[2:].strip()
+                if title in expected_section_titles:
+                    logger.info(f"Found expected section: {title}")
                 else:
-                    current_section = line[3:].strip()
-                current_content = [line]
-            else:
-                current_content.append(line)
+                    logger.warning(f"Found unexpected section: {title} (not in report_config)")
+                
+                if current_section["title"] and current_section["title"] not in seen_titles:
+                    sections.append(current_section)
+                    seen_titles.add(current_section["title"])
+                current_section = {"title": title, "content": [], "subsections": []}
+                current_subsection = None
+            elif line.startswith("### "):
+                if current_subsection:
+                    current_section["subsections"].append(current_subsection)
+                current_subsection = {"title": line[4:].strip(), "content": []}
+                logger.info(f"Found subsection: {current_subsection['title']} in {current_section['title']}")
+            elif line.strip():
+                if current_subsection:
+                    current_subsection["content"].append(line)
+                else:
+                    current_section["content"].append(line)
         
-        # Add the last section
-        if current_section:
-            sections.append({
-                "title": current_section,
-                "content": "\n".join(current_content)
-            })
+        if current_subsection:
+            current_section["subsections"].append(current_subsection)
+        if current_section["title"] and current_section["title"] not in seen_titles:
+            sections.append(current_section)
+            seen_titles.add(current_section["title"])
         
-        logger.info(f"Parsed {len(sections)} sections from draft")
+        logger.info(f"Parsed {len(sections)} unique main sections from draft")
         
-        # Generate PDF report
+        # Count word counts against min/max requirements and verify we have all required sections
+        for i, section in enumerate(sections):
+            section_config = expected_section_details.get(section["title"])
+            if section_config:
+                min_words = section_config.get("min_words", 0)
+                max_words = section_config.get("max_words", 0)
+                
+                all_content = " ".join(section["content"])
+                for subsection in section["subsections"]:
+                    all_content += " " + " ".join(subsection["content"])
+                
+                word_count = len(all_content.split())
+                
+                if word_count < min_words:
+                    logger.warning(f"Section '{section['title']}' has {word_count} words, below minimum requirement of {min_words}")
+                elif max_words > 0 and word_count > max_words:
+                    logger.warning(f"Section '{section['title']}' has {word_count} words, exceeding maximum requirement of {max_words}")
+                else:
+                    logger.info(f"Section '{section['title']}' has {word_count} words, within requirements ({min_words}-{max_words})")
+                
+                content_preview = " ".join(section["content"][:20])
+                logger.info(f"Section {i+1}: {section['title']} - Content preview: {log_safe(content_preview, max_length=100)}...")
+                logger.info(f"  Subsections: {[s['title'] for s in section['subsections']]}")
+        
+        # Create any missing sections from report_config
+        missing_sections = expected_section_titles - seen_titles
+        if missing_sections:
+            logger.warning(f"Missing sections from draft: {missing_sections}")
+            for title in missing_sections:
+                section_config = expected_section_details.get(title)
+                min_words = section_config.get("min_words", 200) if section_config else 200
+                sections.append({
+                    "title": title, 
+                    "content": [f"Data unavailable for {title}. This section requires a minimum of {min_words} words."], 
+                    "subsections": []
+                })
+                logger.info(f"Added placeholder for missing section: {title}")
+        
+        # Reorder sections to match report_config order
+        ordered_sections = []
+        for section_title in [s["title"] for s in report_config.get("sections", [])]:
+            matching_sections = [s for s in sections if s["title"] == section_title]
+            if matching_sections:
+                ordered_sections.append(matching_sections[0])
+        
+        if len(ordered_sections) != len(sections):
+            logger.warning(f"Some sections weren't in report_config: {len(sections) - len(ordered_sections)} sections ignored")
+        
+        sections = ordered_sections
+        logger.info(f"Reordered sections to match report_config order: {[s['title'] for s in sections]}")
+        
         pdf_file = os.path.join(output_dir, f"{safe_project_name}_report.pdf")
         
-        try:
-            # Create PDF using ReportLab
-            doc = SimpleDocTemplate(
-                pdf_file,
-                pagesize=letter,
-                leftMargin=1*inch,
-                rightMargin=1*inch,
-                topMargin=1*inch,
-                bottomMargin=1*inch,
-                title=f"{project_name} Research Report",
-                author="XPlainCrypto",
-                subject=f"Research Report on {project_name}",
-                creator="XPlainCrypto Publisher"
-            )
-            
-            # Initialize StyleManager
-            style_manager = StyleManager(logger)
-            styles = style_manager.get_reportlab_styles()
-            
-            # Build PDF content
-            story = []
-            
-            # Add title page
-            story.append(Spacer(1, 2*inch))
-            story.append(Paragraph(escape_xml(f"{project_name} Research Report"), styles['Title']))
-            story.append(Spacer(1, 0.5*inch))
-            
-            # Add date
-            today = datetime.datetime.now().strftime("%B %d, %Y")
-            story.append(Paragraph(escape_xml(f"Generated on {today}"), styles['CenteredText']))
-            
-            # Add disclaimer
-            story.append(Spacer(1, 2*inch))
-            disclaimer_text = "This report is AI-generated and should not be considered financial advice. Always conduct your own research before making investment decisions."
-            story.append(Paragraph(escape_xml(disclaimer_text), styles['Disclaimer']))
-            
-            # Add page break after title page
-            story.append(PageBreak())
-            
-            # Add table of contents
-            story.append(Paragraph("Table of Contents", styles['SectionHeading']))
-            story.append(Spacer(1, 0.2*inch))
-            
-            # Add TOC entries
-            for i, section in enumerate(sections):
-                story.append(Paragraph(f"{i+1}. {escape_xml(section['title'])}", styles['TOCEntry']))
-                story.append(Spacer(1, 0.1*inch))
-            
-            # Add page break after TOC
-            story.append(PageBreak())
-            
-            # Process each section
-            for section in sections:
-                # Get visualizations for this section based on report config mapping
-                section_vis = []
-                section_title = section["title"].lower()
-                
-                # First try exact match from report config mapping
-                for vis in vis_list:
-                    if vis["target_section"] == section_title:
-                        section_vis.append(vis)
-                        logger.info(f"Adding visualization {vis['type']} to section '{section['title']}' (exact match)")
-                
-                # If no visualizations found and this is a main section, check if it's in report config
-                if not section_vis and section_title in section_vis_map:
-                    expected_vis = section_vis_map[section_title]
-                    for vis in vis_list:
-                        if vis["type"] in expected_vis:
-                            section_vis.append(vis)
-                            logger.info(f"Adding visualization {vis['type']} to section '{section['title']}' (config match)")
-                
-                logger.info(f"Found {len(section_vis)} visualizations for section '{section['title']}'")
-                process_section_content(section["content"], section_vis, story, styles, logger)
-                story.append(PageBreak())
-            
-            # Build the PDF
-            doc.build(story, onFirstPage=add_page_number, onLaterPages=add_page_number)
-            
-            logger.info(f"Generated PDF report: {pdf_file}")
-            
-            # Update state with final report path
-            if isinstance(state, dict):
-                state["final_report"] = pdf_file
-            else:
-                state.final_report = pdf_file
-            
-            return state
-            
-        except Exception as e:
-            logger.error(f"Error generating PDF: {str(e)}", exc_info=True)
-            return state
-            
-    except Exception as e:
-        logger.error(f"Error in publisher: {str(e)}", exc_info=True)
-        return state
-
-def process_section_visualizations(section_data, state):
-    """Process visualizations for a section and ensure they're included in the report."""
-    section_title = section_data.get("title", "")
-    visualization_paths = []
-    
-    # Check for visualizations in section data
-    section_visualizations = section_data.get("visualizations", [])
-    
-    if section_visualizations:
-        for vis in section_visualizations:
-            if isinstance(vis, dict) and "path" in vis and vis["path"]:
-                # Verify the file exists
-                if os.path.exists(vis["path"]) and os.path.getsize(vis["path"]) > 0:
-                    visualization_paths.append({
-                        "path": vis["path"],
-                        "title": vis.get("title", os.path.basename(vis["path"])),
-                        "description": vis.get("description", "")
-                    })
-    
-    # Look for visualizations in the global visualizations dict as backup
-    if hasattr(state, "visualizations") and state.visualizations:
-        for vis_type, vis_data in state.visualizations.items():
-            # Check if this visualization belongs to this section
-            section_match = False
-            
-            # Check visualization types in report config
-            if hasattr(state, "report_config") and "visualization_types" in state.report_config:
-                vis_config = state.report_config.get("visualization_types", {})
-                if vis_config.get("section", "").lower() == section_title.lower():
-                    section_match = True
-            
-            # Add the visualization if it matches this section and isn't already included
-            if section_match and vis_data.get("file_path") and os.path.exists(vis_data["file_path"]):
-                vis_path = vis_data["file_path"]
-                if not any(v["path"] == vis_path for v in visualization_paths):
-                    visualization_paths.append({
-                        "path": vis_path,
-                        "title": vis_data.get("title", os.path.basename(vis_path)),
-                        "description": vis_data.get("description", "")
-                    })
-    
-    return visualization_paths
-
-def insert_visualizations_markdown(text, visualizations):
-    """Insert visualization images into the markdown text."""
-    if not visualizations:
-        return text
-    
-    # Add visualizations at the end of the section
-    vis_markdown = "\n\n"
-    for vis in visualizations:
-        vis_path = vis["path"]
-        vis_title = vis.get("title", "")
-        vis_description = vis.get("description", "")
-        
-        # Create relative path for markdown
-        rel_path = os.path.relpath(vis_path, "docs")
-        
-        # Add the image with title and description
-        vis_markdown += f"\n\n![{vis_title}]({rel_path})\n\n"
-        if vis_description:
-            vis_markdown += f"*{vis_description}*\n\n"
-    
-    # Append visualizations to the section content
-    return text + vis_markdown
-
-def _create_table_image(self, headers: List[str], data_rows: List[List[str]], title: str, output_path: str) -> bool:
-    """Create a table image using matplotlib."""
-    try:
-        # Fixed width for all tables (reduced by 5%)
-        FIXED_WIDTH = 11.4  # Reduced from 12 to 11.4 (5% reduction)
-        MIN_HEIGHT = 3    # Minimum height
-        ROW_HEIGHT = 0.5  # Height per row
-        
-        # Calculate height based on content
-        content_height = len(data_rows) * ROW_HEIGHT
-        title_and_padding = 1.5  # Space for title and padding
-        height = max(MIN_HEIGHT, content_height + title_and_padding)
-        
-        # Create figure and axis
-        fig = plt.figure(figsize=(FIXED_WIDTH, height))
-        ax = fig.add_subplot(111)
-        ax.axis('tight')
-        ax.axis('off')
-        
-        # Create the table with fixed proportions
-        table = ax.table(
-            cellText=data_rows,
-            colLabels=headers,
-            loc='center',
-            cellLoc='left',
-            colWidths=[0.6, 0.4]  # Fixed proportions: 60% for metric, 40% for value
+        doc = SimpleDocTemplate(
+            pdf_file,
+            pagesize=letter,
+            leftMargin=0.75*inch,
+            rightMargin=0.75*inch,
+            topMargin=1*inch,
+            bottomMargin=1*inch,
+            title=f"{project_name} Research Report",
+            author="XPlainCrypto",
+            subject=f"Research Report on {project_name}",
+            creator="XPlainCrypto Publisher"
         )
         
-        # Adjust table style
-        table.auto_set_font_size(False)
-        table.set_fontsize(11)  # Slightly reduced font size for better fit
-        
-        # Calculate scale based on content
-        num_rows = len(data_rows) + 1  # +1 for header
-        vertical_scale = min(2.0, 8.0 / num_rows)  # Adjust scale based on number of rows
-        table.scale(1.2, vertical_scale)
-        
-        # Style header row
-        for i, key in enumerate(headers):
-            header_cell = table[(0, i)]
-            header_cell.set_facecolor('#4472C4')
-            header_cell.set_text_props(color='white', weight='bold')
-            header_cell.set_text_props(ha='center')
-            header_cell.set_height(0.15)  # Fixed header height
-        
-        # Style data rows
-        row_colors = ['#f5f5f5', 'white']
-        for i, row in enumerate(range(1, len(data_rows) + 1)):
-            row_height = 0.1  # Fixed row height
-            for j, col in enumerate(range(len(headers))):
-                cell = table[(row, col)]
-                cell.set_facecolor(row_colors[i % 2])
-                cell.set_height(row_height)
-                
-                # Left-align first column (metrics), right-align second column (values)
-                if j == 0:
-                    cell.set_text_props(ha='left', va='center')
-                    cell._text.set_x(0.05)  # 5% padding from left
-                else:
-                    cell.set_text_props(ha='right', va='center')
-                    cell._text.set_x(0.95)  # 5% padding from right
-                
-                # Add subtle borders
-                cell.set_edgecolor('#dddddd')
-                cell.set_linewidth(0.5)
-        
-        # Add title with consistent padding
-        plt.title(title.replace("_", " ").title(), pad=20, fontsize=13, weight='bold')
-        
-        # Adjust layout to ensure consistent spacing
-        plt.subplots_adjust(left=0.1, right=0.9, top=0.9, bottom=0.1)
-        
-        # Save the figure with high quality
-        plt.savefig(
-            output_path,
-            dpi=300,
-            bbox_inches='tight',
-            facecolor='white',
-            edgecolor='none',
-            pad_inches=0.2  # Consistent padding around the figure
-        )
-        plt.close()
-        
-        return True
-    except Exception as e:
-        self.logger.error(f"Error creating table image: {str(e)}")
-        plt.close()
-        return False
-
-def add_visualization_to_story(story, vis_path, title, description, logger):
-    """Add a visualization to the PDF story with proper sizing and formatting."""
-    try:
         style_manager = StyleManager(logger)
         styles = style_manager.get_reportlab_styles()
         
-        if not os.path.exists(vis_path):
-            logger.warning(f"Visualization file not found: {vis_path}")
-            return
-            
-        # Open and get image dimensions
-        img = PilImage.open(vis_path)
-        width, height = img.size
-        aspect = height / width
+        story = []
         
-        # Calculate dimensions to fit page width
-        max_width = 6.5 * inch  # Standard page width minus margins
-        max_height = 8 * inch   # Max height to ensure it fits on one page
+        story.append(Spacer(1, 2*inch))
+        story.append(Paragraph(escape_xml(f"{project_name} Research Report"), styles['Title']))
+        story.append(Spacer(1, 0.5*inch))
+        today = datetime.datetime.now().strftime("%B %d, %Y")
+        story.append(Paragraph(escape_xml(f"Generated on {today}"), styles['CenteredText']))
+        story.append(Spacer(1, 2*inch))
+        disclaimer_text = "This report is AI-generated and should not be considered financial advice. Always conduct your own research before making investment decisions."
+        story.append(Paragraph(escape_xml(disclaimer_text), styles['Disclaimer']))
+        story.append(PageBreak())
         
-        # Calculate initial dimensions
-        img_width = min(width, max_width)
-        img_height = img_width * aspect
-        
-        # If height is too large, scale down proportionally
-        if img_height > max_height:
-            img_height = max_height
-            img_width = img_height / aspect
-        
-        # Add some spacing before the visualization
+        story.append(Paragraph("Table of Contents", styles['SectionHeading']))
         story.append(Spacer(1, 0.2*inch))
-        
-        # Add the visualization title if provided
-        if title:
-            story.append(Paragraph(escape_xml(title), styles['Caption']))
+        section_counter = 1
+        for section in sections:
+            story.append(Paragraph(f"{section_counter}. {escape_xml(section['title'])}", styles['TOCEntry']))
             story.append(Spacer(1, 0.1*inch))
+            section_counter += 1
+        story.append(PageBreak())
         
-        # Add the image
-        story.append(Image(vis_path, width=img_width, height=img_height))
+        for section in sections:
+            section_vis = [vis for vis in vis_list if vis["target_section_title"] == section["title"].lower()]
+            process_section_content(section, section_vis, story, styles, logger)
         
-        # Add the description if provided
-        if description:
-            story.append(Spacer(1, 0.1*inch))
-            story.append(Paragraph(escape_xml(description), styles['Caption']))
+        doc.build(story, onFirstPage=add_page_number, onLaterPages=add_page_number)
         
-        # Add spacing after the visualization
-        story.append(Spacer(1, 0.3*inch))
-        
-        logger.info(f"Successfully added visualization: {vis_path}")
-        return True
-    except Exception as e:
-        logger.error(f"Error adding visualization {vis_path}: {str(e)}")
-        return False
-
-def process_section_content(section_content, visualizations, story, styles, logger):
-    """Process section content and add it to the PDF story."""
-    lines = section_content.split('\n')
-    current_paragraph = []
-    section_title = None
-    
-    # Calculate text width and reduce visualization width by 10%
-    TEXT_WIDTH = 7.0 * inch
-    VIS_WIDTH = TEXT_WIDTH * 0.9  # 10% smaller than text width
-    
-    for line in lines:
-        if line.startswith("# ") or line.startswith("## "):
-            # Handle section headers
-            if current_paragraph:
-                story.append(Paragraph(escape_xml(" ".join(current_paragraph)), styles['BodyText']))
-                current_paragraph = []
-            
-            section_title = line[2:] if line.startswith("# ") else line[3:]
-            style = styles['SectionHeading'] if line.startswith("# ") else styles['SubsectionHeading']
-            story.append(Paragraph(escape_xml(section_title), style))
-            story.append(Spacer(1, 0.2*inch))
-            
-        elif line.startswith("### "):
-            # Skip subsection headers as they'll be handled with visualizations
-            continue
-            
-        elif line.strip() == "":
-            # Handle empty lines
-            if current_paragraph:
-                story.append(Paragraph(escape_xml(" ".join(current_paragraph)), styles['BodyText']))
-                current_paragraph = []
-                story.append(Spacer(1, 0.1*inch))
-            
+        logger.info(f"Generated PDF report: {pdf_file}")
+        # Set final_report path in state using dict or attribute access
+        if isinstance(state, dict):
+            state["final_report"] = pdf_file
         else:
-            # Add line to current paragraph
-            current_paragraph.append(line)
-    
-    # Add any remaining paragraph
-    if current_paragraph:
-        story.append(Paragraph(escape_xml(" ".join(current_paragraph)), styles['BodyText']))
-        story.append(Spacer(1, 0.2*inch))
-    
-    # After processing text, add relevant visualizations for this section
-    if section_title and visualizations:
-        logger.info(f"Looking for visualizations for section: {section_title}")
-        for vis in visualizations:
-            try:
-                # Check if visualization exists and is readable
-                if os.path.exists(vis["path"]) and os.path.getsize(vis["path"]) > 0:
-                    logger.info(f"Adding visualization: {vis['path']}")
-                    
-                    # Get image dimensions
-                    img = PilImage.open(vis["path"])
-                    width, height = img.size
-                    aspect = height / width
-                    
-                    # Calculate dimensions to fit the reduced width
-                    img_width = min(width, VIS_WIDTH)
-                    img_height = img_width * aspect
-                    
-                    # If height is too large, scale down proportionally
-                    max_height = 9 * inch
-                    if img_height > max_height:
-                        img_height = max_height
-                        img_width = img_height / aspect
-                    
-                    # Add spacing before visualization
-                    story.append(Spacer(1, 0.3*inch))
-                    
-                    # Add the image without additional title (since it's embedded in the image)
-                    story.append(Image(vis["path"], width=img_width, height=img_height))
-                    
-                    # Add description if available
-                    if vis.get("description"):
-                        story.append(Spacer(1, 0.1*inch))
-                        story.append(Paragraph(escape_xml(vis["description"]), styles['Caption']))
-                    
-                    # Add spacing after visualization
-                    story.append(Spacer(1, 0.3*inch))
-                    
-                    logger.info(f"Successfully added visualization: {vis['path']}")
+            state.final_report = pdf_file
+            
+        # Update progress
+        if isinstance(state, dict):
+            state["progress"] = f"Report published for {project_name}"
+        elif hasattr(state, 'update_progress'):
+            state.update_progress(f"Report published for {project_name}")
+            
+        return state
+        
+    except Exception as e:
+        logger.error(f"Error in publisher: {str(e)}", exc_info=True)
+        # Update progress with error
+        if isinstance(state, dict):
+            state["progress"] = f"Error publishing report: {str(e)}"
+        elif hasattr(state, 'update_progress'):
+            state.update_progress(f"Error publishing report: {str(e)}")
+        return state
+
+def process_section_content(section, visualizations, story, styles, logger):
+    """Process a section for the PDF report, including text content and visualizations."""
+    try:
+        section_elements = []
+        section_title = section.get("title", "")
+        
+        # Add section title
+        section_elements.append(Paragraph(escape_xml(section_title), styles['SectionHeading']))
+        section_elements.append(Spacer(1, 0.2*inch))
+        
+        # Even if content is minimal, include it
+        content_lines = section.get("content", [])
+        content_text = " ".join(content_lines).strip() if content_lines else ""
+        
+        # Log content stats for debugging
+        logger.info(f"Processing section '{section_title}' with {len(content_lines)} content lines")
+        
+        # Only show the placeholder if content is completely empty or just contains data unavailable message
+        if (not content_text or 
+            ("Data unavailable for" in content_text and len(content_lines) <= 2) and
+            not section.get("subsections", [])):
+            logger.warning(f"No meaningful content for section '{section_title}'")
+            section_elements.append(Paragraph(escape_xml(f"No detailed content available for {section_title}."), styles['BodyText']))
+            section_elements.append(Spacer(1, 0.2*inch))
+        else:
+            # Process content as multiple paragraphs
+            paragraphs = []
+            current_para = []
+            in_list = False
+            
+            # Process content line by line
+            for line in content_lines:
+                line = line.strip() if line else ""
+                if not line:
+                    # End of paragraph
+                    if current_para:
+                        paragraphs.append((current_para, in_list))
+                        current_para = []
+                        in_list = False
+                # Check for list items
+                elif line.startswith("- ") or line.startswith("* "):
+                    if not in_list and current_para:
+                        # End the current paragraph before starting a list
+                        paragraphs.append((current_para, False))
+                        current_para = []
+                    in_list = True
+                    current_para.append(line)
                 else:
-                    logger.warning(f"Visualization file not found or empty: {vis['path']}")
-            except Exception as e:
-                logger.error(f"Error adding visualization {vis.get('path', 'unknown')}: {str(e)}")
-                continue
+                    if in_list and not (line.startswith("- ") or line.startswith("* ")):
+                        # End the list and start a new paragraph
+                        if current_para:
+                            paragraphs.append((current_para, True))
+                            current_para = []
+                        in_list = False
+                    current_para.append(line)
+            
+            # Add final paragraph if any
+            if current_para:
+                paragraphs.append((current_para, in_list))
+            
+            logger.info(f"Found {len(paragraphs)} content blocks in section '{section_title}'")
+            
+            # Render paragraphs with appropriate styling
+            for para_lines, is_list in paragraphs:
+                if is_list:
+                    # Format as a bulleted list
+                    list_text = ""
+                    for item in para_lines:
+                        item = item.strip()
+                        if item.startswith("- ") or item.startswith("* "):
+                            item = "• " + item[2:]
+                        list_text += item + "<br/>"
+                    section_elements.append(Paragraph(escape_xml(list_text), styles['BulletList']))
+                    section_elements.append(Spacer(1, 0.1*inch))
+                else:
+                    # Format as regular paragraph
+                    para_text = " ".join(para_lines)
+                    section_elements.append(Paragraph(escape_xml(para_text), styles['BodyText']))
+                    section_elements.append(Spacer(1, 0.1*inch))
+        
+        # Process subsections
+        subsections = section.get("subsections", [])
+        for subsection in subsections:
+            subsection_title = subsection.get("title", "")
+            if subsection_title:
+                section_elements.append(Paragraph(escape_xml(subsection_title), styles['SubsectionHeading']))
+                section_elements.append(Spacer(1, 0.1*inch))
+            
+                subsection_content = subsection.get("content", [])
+                subsection_text = " ".join(subsection_content).strip() if subsection_content else ""
+                
+                if not subsection_text:
+                    section_elements.append(Paragraph(escape_xml(f"No detailed content available for {subsection_title}."), styles['BodyText']))
+                    section_elements.append(Spacer(1, 0.1*inch))
+                else:
+                    # Process subsection content similarly to main content
+                    paragraphs = []
+                    current_para = []
+                    in_list = False
+                    
+                    for line in subsection_content:
+                        line = line.strip() if line else ""
+                        if not line:
+                            if current_para:
+                                paragraphs.append((current_para, in_list))
+                                current_para = []
+                                in_list = False
+                        elif line.startswith("- ") or line.startswith("* "):
+                            if not in_list and current_para:
+                                paragraphs.append((current_para, False))
+                                current_para = []
+                            in_list = True
+                            current_para.append(line)
+                        else:
+                            if in_list and not (line.startswith("- ") or line.startswith("* ")):
+                                if current_para:
+                                    paragraphs.append((current_para, True))
+                                    current_para = []
+                                in_list = False
+                            current_para.append(line)
+                    
+                    if current_para:
+                        paragraphs.append((current_para, in_list))
+                    
+                    for para_lines, is_list in paragraphs:
+                        if is_list:
+                            list_text = ""
+                            for item in para_lines:
+                                item = item.strip()
+                                if item.startswith("- ") or item.startswith("* "):
+                                    item = "• " + item[2:]
+                                list_text += item + "<br/>"
+                            section_elements.append(Paragraph(escape_xml(list_text), styles['BulletList']))
+                            section_elements.append(Spacer(1, 0.1*inch))
+                        else:
+                            para_text = " ".join(para_lines)
+                            section_elements.append(Paragraph(escape_xml(para_text), styles['BodyText']))
+                            section_elements.append(Spacer(1, 0.1*inch))
+        
+        # Add visualizations if available
+        if visualizations:
+            logger.info(f"Adding {len(visualizations)} visualizations to section '{section_title}'")
+            for vis in visualizations:
+                if "path" in vis and vis["path"] and os.path.exists(vis["path"]):
+                    try:
+                        # Add visualization title
+                        if "title" in vis and vis["title"]:
+                            section_elements.append(Paragraph(escape_xml(vis["title"]), styles['CaptionTitle']))
+                        
+                        # Add the image
+                        section_elements.append(Spacer(1, 0.1*inch))
+                        section_elements.append(Image(vis["path"], width=5*inch, height=3*inch))
+                        section_elements.append(Spacer(1, 0.1*inch))
+                        
+                        # Add description if available
+                        if "description" in vis and vis["description"]:
+                            section_elements.append(Paragraph(escape_xml(vis["description"]), styles['Caption']))
+                            section_elements.append(Spacer(1, 0.2*inch))
+                        
+                        logger.info(f"Added visualization: {vis.get('title', 'Untitled')} - {vis.get('path')}")
+                    except Exception as e:
+                        logger.error(f"Error adding visualization {vis.get('title', 'unknown')}: {str(e)}")
+                        section_elements.append(Paragraph(escape_xml(f"Visualization could not be included due to an error: {str(e)}"), styles['Caption']))
+                else:
+                    logger.warning(f"Visualization path invalid or missing: {vis.get('path')}")
+                    section_elements.append(Paragraph(escape_xml("Visualization unavailable"), styles['Caption']))
+        
+        # Add all elements to the story
+        story.extend(section_elements)
+        story.append(PageBreak())
+        logger.info(f"Completed processing section '{section_title}'")
     
-    # Add page break only if this is a main section (not subsection)
-    if section_title and line.startswith("# "):
+    except Exception as e:
+        logger.error(f"Error processing section '{section.get('title', 'unknown')}': {str(e)}")
+        # Add error message to PDF
+        story.append(Paragraph(escape_xml(f"Error processing section: {str(e)}"), styles['BodyText']))
         story.append(PageBreak())

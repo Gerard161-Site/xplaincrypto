@@ -13,15 +13,34 @@ XplainCrypto/
 │   │   ├── reviewer.py            # Report review agent
 │   │   └── publisher.py           # Report publishing agent
 │   ├── config/                    # Configuration files
-│   │   └── report_config.json     # Customizable report configuration
+│   │   ├── app_config.json        # Main application configuration
+│   │   ├── report_config.json     # Customizable report configuration
+│   │   ├── style_config.json      # Visual styling configuration
+│   │   └── error_categories.json  # Error categorization configuration
+│   ├── core/                      # Core application components
+│   │   ├── app_factory.py         # Application initialization
+│   │   ├── config_loader.py       # Configuration management
+│   │   └── server.py              # Server setup and routes
+│   ├── orchestration/             # Workflow coordination
+│   │   └── workflow_manager.py    # Workflow execution and state management
 │   ├── research/                  # Enhanced research system
 │   │   ├── core.py                # Core research components
 │   │   ├── agents.py              # Specialized research agents
-│   │   ├── data_modules.py        # Real-time data gathering modules
-│   │   ├── orchestrator.py        # Research workflow orchestrator
-│   │   └── README.md              # Research module documentation
-│   ├── retriever/                 # Web retrieval components
-│   │   └── tavily_search.py       # Tavily API integration
+│   │   └── orchestrator.py        # Research workflow orchestrator
+│   ├── retriever/                 # Web retrieval and API components
+│   │   ├── tavily_search.py       # Tavily API integration
+│   │   ├── huggingface_search.py  # HuggingFace API integration
+│   │   ├── coingecko_api.py       # CoinGecko API retriever
+│   │   ├── coinmarketcap_api.py   # CoinMarketCap API retriever
+│   │   ├── defillama_api.py       # DeFi Llama API retriever
+│   │   └── data_gatherer.py       # Coordinates data gathering from multiple APIs
+│   ├── services/                  # Shared services
+│   │   ├── communication/         # Communication services
+│   │   │   └── socket_service.py  # Socket.IO handling
+│   │   └── reporting/             # Reporting services
+│   │       ├── progress_tracker.py # Progress tracking
+│   │       ├── error_reporter.py   # Error reporting
+│   │       └── logging_config.py   # Centralized logging config
 │   ├── utils/                     # Utility functions
 │   │   └── style_utils.py         # Styling utilities for visualizations
 │   ├── visualizations/            # Modular visualization components
@@ -32,8 +51,8 @@ XplainCrypto/
 │   │   ├── pie_chart.py           # Pie chart visualizer
 │   │   ├── table.py               # Table visualizer
 │   │   └── timeline.py            # Timeline visualizer
-│   ├── state.py                   # State management
-│   └── main.py                    # FastAPI server and entry point
+│   ├── state.py                   # State definitions
+│   └── main.py                    # Simplified entry point
 ├── frontend/                      # Frontend web application
 ├── docs/                          # Generated reports and visualizations
 │   ├── cache/                     # Cached research results
@@ -43,88 +62,52 @@ XplainCrypto/
 
 ## Component Architecture
 
-The system is built with a multi-tier architecture:
+The system is built with a modular, service-based architecture:
 
-### Tier 1: Web Interface (Frontend)
-Provides a user-friendly interface for initiating research and displaying results.
+### Core Layer
+- **Application Factory** (`app_factory.py`): Creates and configures the FastAPI application
+- **Configuration Loader** (`config_loader.py`): Loads and manages configuration with environment variable overrides
+- **Server Configuration** (`server.py`): Sets up server middleware, routes and request handling
 
-### Tier 2: Orchestration (Backend/Main)
-- **FastAPI Server**: Handles HTTP requests and WebSocket connections
-- **LangGraph Workflow**: Manages the full report generation lifecycle
+### Service Layer
+- **Progress Tracking Service**: Manages and reports progress of operations
+- **Error Reporting Service**: Standardizes error handling and reporting
+- **Socket Communication Service**: Manages real-time communication with clients
+- **Logging Service**: Centralizes logging configuration and management
 
-### Tier 3: Agent System (Backend/Agents)
+### Orchestration Layer
+- **Workflow Manager**: Coordinates the execution of the LangGraph workflow
+  - Handles LLM initialization
+  - Manages agent wrappers with error handling
+  - Tracks active workflows and completion status
+
+### Agent Layer
 - **Enhanced Researcher**: Entry point for the research process
-  - **Web Research Fallback**: Populates missing web research data when web search is unavailable
-  - **Cache Management**: Stores and retrieves research results to optimize performance
-  - **Data Normalization**: Ensures consistent data format across sources
-- **Visualization Agent**: Generates charts, graphs, and tables from data
-  - **Professional Styling**: Applies consistent styling to all visualizations
-  - **Markdown Processing**: Properly handles text formatting in report generation
 - **Writer**: Converts research into narrative format
+- **Visualization Agent**: Generates charts, graphs, and tables from data
 - **Reviewer**: Checks report for accuracy and completeness
 - **Editor**: Polishes and structures the report
 - **Publisher**: Creates the final report in various formats
-  - **PDF Formatting**: Professional PDF layout with consistent typography and spacing
 
-### Tier 4: Research System (Backend/Research)
-- **Research Manager**: Manages research tree generation and data gathering
-- **Specialized Agents**: Domain-specific agents for different research aspects
-- **DataGatherer**: Collects real-time cryptocurrency data
+### Retrieval Layer
+- **Web Search**: Tavily and HuggingFace for web content
+- **Crypto API Retrievers**: 
+  - CoinGecko API
+  - CoinMarketCap API
+  - DeFi Llama API
+- **Data Gatherer**: Coordinates multiple data sources
 
-### Tier 5: Data Sources
-- **Web Search**: Using TavilySearch for web content
-- **API Integration**: CoinGecko, CoinMarketCap, DeFiLlama
-- **Data Processing**: Data normalization and visualization
+### Configuration System
+The application uses a layered configuration approach:
+1. **Base Configuration**: Default settings in JSON files
+2. **Environment Overrides**: Environment variables that override JSON settings
+3. **Runtime Configuration**: Settings that can be changed during operation
 
-## Report Configuration System
-
-The `report_config.json` file serves as a central configuration system that defines:
-
-1. **Report Structure**: The sections included in the report and their order
-2. **Section Requirements**: Which sections are required vs. optional
-3. **Data Sources**: The data sources to use for each section
-4. **Visualizations**: Which visualizations to include in each section
-5. **Visualization Types**: Configuration for each type of visualization (charts, tables, etc.)
-
-This configuration system enables:
-- Customizable reports for different use cases
-- Consistent report structure across projects
-- Efficient sharing of data between components
-- Template-based visualization generation
-
-## Visualization Agent
-
-The VisualizationAgent is responsible for generating visual representations of the research data:
-
-1. **Modular Architecture**: Coordinates specialized visualizer classes for each chart type:
-   - **BaseVisualizer**: Defines the common interface and utility functions
-   - **LineChartVisualizer**: Creates time-series visualizations
-   - **BarChartVisualizer**: Handles categorical data comparisons
-   - **PieChartVisualizer**: Shows proportional distributions
-   - **TableVisualizer**: Presents structured tabular data
-   - **TimelineVisualizer**: Displays chronological events and milestones
-
-2. **Data Flow**: The visualization agent:
-   - Maps visualization type to the appropriate visualizer class
-   - Extracts and prepares data from multiple sources (API, web research)
-   - Passes data to the specialized visualizer
-   - Generates AI descriptions for each visualization
-   - Stores the visualization files and metadata
-
-3. **Professional Styling**: Applies consistent styling via a centralized StyleManager
-   - Typography: Consistent font usage with Times Roman for readability
-   - Color schemes: Coordinated color palettes for visual consistency
-   - Spacing: Optimized spacing between chart elements for readability
-   - Formatting: Proper handling of numeric data with appropriate units
-   - Bold text: Special emphasis on key metrics via proper Markdown processing
-   - PDF formatting: Professional PDF layout with page numbering
-
-Supported visualization types:
-- **Line Charts**: Price history, volume, TVL trends with shaded areas and marker points
-- **Bar Charts**: Competitive comparisons, performance metrics with data labels
-- **Pie Charts**: Token distribution, allocation breakdowns with highlighted segments
-- **Tables**: Key metrics, tokenomics details, performance data with alternating row colors
-- **Timelines**: Development roadmaps, milestone tracking with connecting lines
+Configuration files:
+- `app_config.json`: Main application settings
+- `report_config.json`: Report structure and content settings
+- `style_config.json`: Visual styling configuration
+- `error_categories.json`: Error categories and handling strategies
 
 ## System Flow Diagram
 
@@ -137,12 +120,34 @@ Supported visualization types:
 └────────┬────────┘                                          
          │                                                   
          ▼                                                   
+┌─────────────────┐                                          
+│                 │                                          
+│  App Factory    │                                          
+│                 │                                          
+└────────┬────────┘                                          
+         │                                                   
+         ▼                                                   
+┌─────────────────┐     ┌────────────────┐    ┌────────────────┐
+│                 │     │                │    │                │
+│   FastAPI       │◄────┤ Config Loader  │◄───┤ app_config.json│
+│   Server        │     │                │    │                │
+│                 │     └────────────────┘    └────────────────┘
+└────────┬────────┘                                          
+         │                                                   
+         ▼                                                   
 ┌─────────────────┐     ┌────────────────┐                  
 │                 │     │                │                  
-│     FastAPI     │◄────┤ report_config  │                  
-│     Server      │     │     .json      │                  
+│  Socket Service │◄────┤ Error Reporter │                  
 │                 │     │                │                  
-└────────┬────────┘     └────────────────┘                  
+└────────┬────────┘     └───────▲────────┘                  
+         │                      │                           
+         ▼                      │                           
+┌─────────────────┐     ┌───────┴────────┐                  
+│                 │     │                │                  
+│   Workflow      │◄────┤Progress Tracker│                  
+│   Manager       │     │                │                  
+│                 │     └────────────────┘                  
+└────────┬────────┘                                         
          │                                                   
          ▼                                                   
 ┌─────────────────┐                                          
@@ -224,193 +229,102 @@ Supported visualization types:
                                                └────────────────┘
 ```
 
-## Data Flow
+## Modular Architecture Benefits
 
-The end-to-end flow of data through the system follows these steps:
+The current modular architecture provides several benefits:
 
-1. **Input Processing**
-   - User submits a project name through the frontend User Interface
-   - FastAPI server receives the request and initializes the workflow
-   - Server loads the report_config.json for configuration parameters
-   - The LangGraph Workflow is created and the initial state is initialized
-   - The initial state is created with the project name and passed to the Enhanced Researcher
+1. **Separation of Concerns**
+   - Each component has a well-defined responsibility
+   - Services are decoupled, enhancing maintainability
+   - Clear boundaries between layers
 
-2. **Research Planning**
-   - Enhanced Researcher agent loads the report_config.json
-   - Invokes the Research Manager with the configuration
-   - Research Manager generates a hierarchical research tree based on configured sections
-   - Research types are determined from section titles in the configuration
+2. **Enhanced Error Handling**
+   - Centralized error reporting with standardized categories
+   - Consistent user messaging for different error types
+   - Better error tracking and debugging
 
-3. **Data Gathering**
-   - Data sources are extracted from the report configuration
-   - DataGatherer fetches real-time data from configured APIs
-   - Cache is checked for recent data to reduce API calls
-   - Data is organized and stored in the state object
-   - Price, token, and market data are structured for later use
+3. **Improved Progress Tracking**
+   - Standardized progress reporting across all components
+   - Real-time updates via socket service
+   - Configurable verbosity levels
 
-4. **Research Execution**
-   - Research Manager coordinates the research process
-   - Specialized agents conduct research for each node in the tree
-   - Research Manager makes Tavily Search API calls for web research with the following process:
-     - Query generation based on research context
-     - Parallel search execution for efficiency
-     - Result filtering and relevance scoring
-     - Content extraction and summarization
-     - Source tracking and citation management
-   - References are collected and deduplicated
-   - Research data is structured for visualization
+4. **Flexible Configuration**
+   - Environment variable overrides for deployment flexibility
+   - Consolidated configuration files
+   - Runtime configuration adaptability
 
-5. **Data Fallback Mechanisms**
-   - Research Manager checks if web research data is available
-   - If missing, populate_web_research_data function provides fallback data for:
-     - Governance metrics (governance_model, proposal_count, voting_participation)
-     - Partnerships (partner_name, partnership_type, partnership_date)
-     - Risks (risk_type, risk_description, risk_level)
-     - Opportunities (opportunity_type, opportunity_description, potential_impact)
-     - Team metrics (team_size, notable_members, development_activity)
-     - Key takeaways (aspect, assessment, recommendation)
-   - This ensures all visualization tables can be generated even without web search
+5. **Simplified Main Module**
+   - Main.py reduced to a few lines of initialization code
+   - Business logic moved to appropriate services
+   - Better testability and component isolation
 
-6. **Report Writing**
-   - Writer agent receives complete research data from Research Manager
-   - Synthesizes research into narrative form
-   - Creates structured content based on the report configuration
-   - Adds metadata for effective visualization integration
+## Future Enhancements
 
-7. **Visualization Generation**
-   - Visualization Agent receives the fully prepared research state with complete data
-   - Reads visualization types from the report configuration
-   - For each visualization type:
-     - Determines the appropriate visualizer class (LineChart, BarChart, PieChart, etc.)
-     - Extracts and prepares data from relevant sources (API data, web research)
-     - Delegates visualization creation to the specialized visualizer
-     - Applies consistent styling via the StyleManager
-   - Each specialized visualizer:
-     - Processes data specific to its chart type
-     - Creates the visualization using matplotlib:
-       - Sets up figure with appropriate dimensions
-       - Plots the data with proper formatting
-       - Adds labels, titles, and styling elements
-       - Saves the figure as a PNG file to the project's output directory (docs/project_name/visualization_type.png)
-       - Verifies the file was successfully saved and has appropriate content
-     - Returns metadata about the visualization to the agent, including the file path
-   - Visualization Agent uses the LLM to generate descriptive text for each visualization
-   - Stores visualization file paths and metadata in the state for use by the Publisher agent
-   - If image creation fails, detailed error information is logged and reported back to the agent
+While our current implementation provides a solid foundation, future enhancements could include:
 
-8. **Report Finalization**
-   - Reviewer checks content for accuracy and completeness
-   - Editor structures the content according to the report configuration
-   - Publisher creates the final PDF report with:
-     - Enhanced typography using Times Roman font family
-     - Proper paragraph spacing for improved readability
-     - Professional title page with project details
-     - Table of contents section for easy navigation
-     - Consistent page numbering format
-     - Bold formatting for emphasis on key metrics
-     - Alternating row colors in tables for readability
-   - Incorporates visualizations from the Visualization Agent
+1. **State Management**: Adding a dedicated state manager to handle state transitions more explicitly
+2. **Caching Service**: Implementing a centralized caching service for API responses and research results
+3. **Client Notification System**: Extracting notification logic from socket service for better separation
+4. **Workflow Definition**: Separating workflow definition from workflow management
 
-9. **Output Delivery**
-   - Final report is stored in the docs directory
-   - Result is sent back to the frontend for display
-   - Visualizations are embedded in the report
+## Scalability to Microservices
 
-## State Management
+This architecture is designed to facilitate a future transition to microservices:
 
-The system uses two state models:
+1. **API Retrievers**: Each cryptocurrency data API retriever can be run as a separate service
+2. **Socket Service**: Can be separated into a dedicated communication service
+3. **Workflow Manager**: Can be evolved into a distributed workflow orchestrator
+4. **Agents**: Each agent can be deployed as an independent service
 
-1. **Global ResearchState** (backend/state.py):
-   - Tracks the overall progress
-   - Holds visualizations and references
-   - Stores the final report
-   - Contains data from various sources
-   - Holds the report configuration
+The `DataGatherer` already serves as a coordinator for multiple data sources, which can be easily adapted to communicate with external services rather than in-process modules.
 
-2. **Research-specific ResearchState** (research/orchestrator.py):
-   - Manages the internal research workflow
-   - Contains the research tree structure
-   - Tracks completion status of research steps
-   - Holds intermediate research results
+## Error Handling Flow
 
-State properties include:
-- **project_name**: Target of the research
-- **research_summary**: Consolidated research findings
-- **tokenomics**: Structured token economic data
-- **price_analysis**: Market performance data
-- **visualizations**: Generated charts and tables
-- **research_data**: Structured research information
-- **report_config**: Configuration for the report
-- **progress**: Status updates for tracking
+The error handling system follows this process:
 
-## Component Integration
+1. Exception occurs in any component
+2. Component reports error to ErrorReporter service
+3. ErrorReporter categorizes the error and logs appropriately
+4. ErrorReporter notifies subscribers (Socket Service)
+5. Socket Service sends appropriate user message to client
+6. Workflow continues with graceful degradation when possible
 
-### Configuration Flow
-The report_config.json file is loaded and used by multiple components:
+Error categories are defined in `error_categories.json` with properties:
+- `severity`: critical, error, warning, info
+- `retry_allowed`: whether the operation can be retried
+- `user_message`: the human-readable message to display
 
-1. **ResearchManager**: Uses the config to determine research types and data sources
-2. **VisualizationAgent**: Uses the config to determine which visualizations to generate
-3. **Publisher**: Uses the config to structure the final report
+## Progress Tracking Flow
 
-### Data Sharing
-Data is efficiently shared between components:
+The progress tracking system follows this process:
 
-1. **DataGatherer → ResearchManager → Enhanced Researcher**: API data flows through
-2. **ResearchManager → VisualizationAgent**: Research data is passed for visualization
-3. **VisualizationAgent → Publisher**: Visualizations are incorporated into the final report
+1. Workflow steps update progress via ProgressTracker service
+2. ProgressTracker logs progress based on verbosity settings
+3. ProgressTracker notifies subscribers (Socket Service)
+4. Socket Service sends real-time updates to client
+5. Client renders progress indicators
 
-### Configuration-Based Customization
-The system allows for customization at multiple levels:
+Each progress update includes:
+- `step`: The current workflow step
+- `percentage`: Completion percentage (0-100)
+- `message`: Human-readable progress message
 
-1. **Report Sections**: Define which sections to include
-2. **Data Sources**: Specify which data sources to use
-3. **Visualization Types**: Choose which visualizations to generate
-4. **Description Templates**: Customize automatic text generation
+## Configuration System
 
-## API Integration
+The configuration system uses a layered approach:
 
-The system integrates with external APIs for real-time data:
+1. Default settings from JSON configuration files
+2. Environment variable overrides using the XC_ prefix
+   - For example, XC_LOGGING_LEVEL=DEBUG overrides logging.level
+3. Runtime configuration changes (future enhancement)
 
-1. **CoinGecko**: Price, market cap, and supply information
-2. **CoinMarketCap**: Alternative market metrics
-3. **DeFiLlama**: Total Value Locked (TVL) and protocol data
-4. **Tavily**: Web search for comprehensive research
+## Deployment Options
 
-## Extensibility
+This architecture supports multiple deployment options:
 
-The architecture is designed for easy extension:
+1. **Monolithic Deployment**: Run as a single application (current approach)
+2. **Containerized Deployment**: Each major component in its own container
+3. **Serverless Deployment**: Agents as serverless functions
+4. **Microservices**: Full microservice architecture with service discovery
 
-1. **New Agents**: Add specialized agents for specific research tasks
-2. **New Visualizations**: Define new visualization types in the configuration
-3. **New Data Sources**: Integrate additional APIs by adding new data modules
-4. **Custom Report Formats**: Support additional output formats beyond PDF 
-
-## Resilience and Fault Tolerance
-
-The system includes multiple mechanisms to ensure robustness and handle failures gracefully:
-
-1. **Data Source Redundancy**:
-   - Multiple API sources (CoinGecko, CoinMarketCap, DeFiLlama) provide redundancy
-   - If one data source fails, others can fill in missing information
-
-2. **Web Research Fallback**:
-   - When web search is unavailable or returns no results, synthetic data is provided
-   - The populate_web_research_data function ensures all visualizations can be generated
-   - This prevents critical report sections from being empty or incomplete
-
-3. **Caching System**:
-   - Research results are cached to disk with timestamps
-   - Reports can be generated even when external APIs are temporarily unavailable
-   - Cache TTL (Time To Live) ensures data freshness while balancing API usage
-
-4. **Error Handling**:
-   - Graceful degradation when components fail
-   - Detailed logging of errors for debugging
-   - Fallback to default values when data is incomplete
-
-5. **Visualization Robustness**:
-   - Charts and tables adapt to available data
-   - Consistent styling even with different data sources
-   - Automatic handling of missing or invalid data points
-
-These features ensure that the system can produce complete, high-quality reports even under suboptimal conditions or when certain data sources are unavailable. 
+The transition between these approaches can be gradual, starting with the extraction of API retrievers into separate services. 

@@ -38,3 +38,5 @@ docs/*/*.png
 docs/*/*.jpg
 docs/*/*.jpeg
 docs/*/*.gif
+
+cache/*

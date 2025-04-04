@@ -600,7 +600,7 @@ class APIDataTest:
         # Only get CoinGecko data if CMC data has issues or missing fields
         missing_required_fields = self.check_visualization_fields(combined_data)
         
-        # Check if CoinGecko is needed
+        # Check if CoinGecko is enabled and needed
         needs_coingecko = False
         if "error" in cmc_data:
             needs_coingecko = True
@@ -609,7 +609,7 @@ class APIDataTest:
             needs_coingecko = True
             logger.info(f"Missing {len(missing_required_fields)} fields from CMC, using CoinGecko as backup: {missing_required_fields}")
         
-        if needs_coingecko:
+        if needs_coingecko and os.getenv("COINGECKO_ENABLED", "true").lower() == "true":
             cg_data = self.test_coingecko()
             if "error" not in cg_data:
                 # Only add missing fields from CoinGecko
@@ -617,6 +617,8 @@ class APIDataTest:
                     if key not in combined_data or not combined_data[key]:
                         combined_data[key] = value
                         logger.info(f"Added missing field {key} from CoinGecko")
+        elif needs_coingecko:
+            logger.warning("CoinGecko is disabled, skipping fallback data collection")
         
         # Add DeFiLlama TVL data only if needed (TVL or TVL history missing)
         if "tvl" not in combined_data or "tvl_history" not in combined_data:

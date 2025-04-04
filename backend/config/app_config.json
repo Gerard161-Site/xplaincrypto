@@ -1,0 +1,26 @@
+{
+  "app_name": "XplainCrypto",
+  "app_description": "Advanced Cryptocurrency Research Platform",
+  "app_version": "1.0.0",
+  "static_dir": "docs",
+  "report_config_file": "backend/config/report_config.json",
+  "error_categories_file": "backend/config/error_categories.json",
+  
+  "logging": {
+    "file": "logs/xplaincrypto.log",
+    "level": "INFO",
+    "console_level": "INFO",
+    "progress_verbosity": "info"
+  },
+  
+  "socketio": {
+    "cors_allowed_origins": ["http://localhost:3000"],
+    "ping_timeout": 60,
+    "ping_interval": 25,
+    "max_buffer_size": 5242880
+  },
+  
+  "openai": {
+    "model_name": "gpt-4o-mini"
+  }
+} 
