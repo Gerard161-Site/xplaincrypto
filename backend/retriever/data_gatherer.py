@@ -128,45 +128,10 @@ class DataGatherer:
             self.logger.info("DeFiLlama API is disabled or not available")
             all_data["defillama"] = {"error": "API disabled"}
         
-        # If no API data was found, use synthetic data to avoid errors
+        # If no API data was found, log an error but don't generate fake data
         if not any(key in all_data for key in ["current_price", "market_cap"]):
-            self.logger.warning(f"No real price data found for {self.project_name}, using synthetic data")
-            all_data["current_price"] = 1.0
-            all_data["market_cap"] = 1000000.0
-            all_data["total_supply"] = 100000000.0
-            all_data["circulating_supply"] = 50000000.0
-            all_data["max_supply"] = 100000000.0
-            all_data["24h_volume"] = 500000.0
-            all_data["price_change_percentage_24h"] = 0.0
-            
-            # Generate synthetic price history
-            from datetime import datetime, timedelta
-            import random
-            
-            price_history = []
-            volume_history = []
-            current_price = 1.0
-            current_volume = 500000.0
-            
-            # Generate 60 days of synthetic data
-            for i in range(60):
-                dt = datetime.now() - timedelta(days=60-i)
-                timestamp = int(dt.timestamp() * 1000)
-                
-                # Random price fluctuation
-                price_change = random.uniform(-0.05, 0.05)  # -5% to +5%
-                current_price = max(0.01, current_price * (1 + price_change))
-                price_history.append([timestamp, current_price])
-                
-                # Random volume fluctuation
-                volume_change = random.uniform(-0.2, 0.2)  # -20% to +20%
-                current_volume = max(10000, current_volume * (1 + volume_change))
-                volume_history.append([timestamp, current_volume])
-            
-            all_data["price_history"] = price_history
-            all_data["volume_history"] = volume_history
-            all_data["data_source"] = "synthetic"
-            self.logger.info("Generated synthetic historical data")
+            self.logger.error(f"No price data found for {self.project_name}. Will use RAG/HuggingFace fallback.")
+            all_data["data_source_error"] = f"No API data available for {self.project_name}"
         
         # Normalize field names for consistency
         self._normalize_field_names(all_data)

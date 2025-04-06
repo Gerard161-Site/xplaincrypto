@@ -1,0 +1,515 @@
+2025-04-06 12:29:06,972 - XplainCrypto - server.handle_message - INFO - Received message from client OQYbppELYYUUs8NXAAAC: {'project_name': 'ONDO', 'fast_mode': False}
+2025-04-06 12:29:06,972 - XplainCrypto - server.handle_message - INFO - Received project name from JSON: 'ONDO'
+2025-04-06 12:29:06,972 - XplainCrypto - server.handle_message - INFO - Using project name for workflow: 'ONDO' (type: <class 'str'>)
+2025-04-06 12:29:06,973 - XplainCrypto - server.handle_message - INFO - Updated session OQYbppELYYUUs8NXAAAC with project: 'ONDO'
+2025-04-06 12:29:06,973 - XplainCrypto - server.handle_message - INFO - About to execute workflow with project name: 'ONDO'
+2025-04-06 12:29:06,973 - XplainCrypto - workflow_manager.execute_workflow - INFO - Running async initialization before workflow execution
+2025-04-06 12:29:06,973 - XplainCrypto - workflow_manager.initialize - INFO - Starting asynchronous initialization of workflow components
+2025-04-06 12:29:06,973 - XplainCrypto - workflow_manager.initialize - INFO - Initializing researcher with MCP endpoints
+2025-04-06 12:29:07,982 - XplainCrypto - researcher.initialize - ERROR - Error initializing MCP endpoints: Server process for defillama failed to start: Traceback (most recent call last):
+  File "/Users/gkavanagh/Development/xplaincrypto/backend/orchestration/mcp/retriever_servers/defillama_server.py", line 2, in <module>
+    from retriever.defillama_api import DeFiLlamaAPI
+  File "/Users/gkavanagh/Development/xplaincrypto/backend/retriever/defillama_api.py", line 10, in <module>
+    from backend.retriever.coingecko_api import DataModule
+ModuleNotFoundError: No module named 'backend'
+
+2025-04-06 12:29:07,982 - XplainCrypto - workflow_manager.initialize - INFO - Researcher initialization complete
+2025-04-06 12:29:07,982 - XplainCrypto - workflow_manager.initialize - INFO - All components initialized successfully
+2025-04-06 12:29:07,982 - XplainCrypto - workflow_manager.execute_workflow - INFO - Creating initial state with project_name: 'ONDO'
+2025-04-06 12:29:07,983 - XplainCrypto - progress_tracker._log - INFO - Started tracking job ONDO with 6 total steps
+2025-04-06 12:29:07,983 - XplainCrypto - workflow_manager.execute_workflow - INFO - Starting workflow execution for ONDO (fast_mode: False)
+2025-04-06 12:29:07,983 - XplainCrypto - workflow_manager.execute_workflow - INFO - Executing with state keys: ['project_name', 'report_config', 'fast_mode', 'errors']
+2025-04-06 12:29:07,983 - XplainCrypto - workflow_manager.execute_workflow - INFO - State project_name: 'ONDO'
+2025-04-06 12:29:07,988 - XplainCrypto - progress_tracker._log - INFO - Progress: Research - 0% complete: Starting research for ONDO
+2025-04-06 12:29:07,988 - XplainCrypto - workflow_manager.wrapped_agent - INFO - Starting agent: Research for 'ONDO'
+2025-04-06 12:29:07,988 - XplainCrypto - workflow_manager.researcher_wrapper - INFO - Executing researcher with MCP for: ONDO
+2025-04-06 12:29:07,988 - XplainCrypto - researcher.execute_workflow - WARNING - MCP mode requested but not available. Using string query with classic mode.
+2025-04-06 12:29:07,988 - XplainCrypto - progress_tracker._log - INFO - Progress: Research - 100% complete: Completed research for ONDO in 0.00s
+2025-04-06 12:29:07,988 - XplainCrypto - workflow_manager.wrapped_agent - INFO - Completed agent: Research for 'ONDO' in 0.00s
+2025-04-06 12:29:07,989 - XplainCrypto - progress_tracker._log - INFO - Progress: Writing - 0% complete: Starting writing for ONDO
+2025-04-06 12:29:07,989 - XplainCrypto - workflow_manager.wrapped_agent - INFO - Starting agent: Writing for 'ONDO'
+2025-04-06 12:29:07,989 - XplainCrypto - writer.writer - INFO - Writer agent processing for ONDO
+2025-04-06 12:29:07,990 - XplainCrypto - writer.__init__ - INFO - Using Hugging Face API with google/pegasus-xsum
+2025-04-06 12:29:07,990 - XplainCrypto - writer.write_draft - INFO - Writing draft for ONDO
+2025-04-06 12:29:07,990 - XplainCrypto - writer.write_draft - INFO - Identified potential problem section 'Executive Summary' with 4 missing fields
+2025-04-06 12:29:07,990 - XplainCrypto - writer.write_draft - INFO - Identified potential problem section 'Introduction' with 5 missing fields
+2025-04-06 12:29:07,990 - XplainCrypto - writer.write_draft - INFO - Identified potential problem section 'Tokenomics and Distribution' with 4 missing fields
+2025-04-06 12:29:07,990 - XplainCrypto - writer.write_draft - INFO - Identified potential problem section 'Market Analysis' with 6 missing fields
+2025-04-06 12:29:07,990 - XplainCrypto - writer.write_draft - INFO - Identified potential problem section 'Technical Analysis' with 5 missing fields
+2025-04-06 12:29:07,990 - XplainCrypto - writer.write_draft - INFO - Identified potential problem section 'Developer Tools and User Experience' with 2 missing fields
+2025-04-06 12:29:07,990 - XplainCrypto - writer.write_draft - INFO - Identified potential problem section 'Security' with 2 missing fields
+2025-04-06 12:29:07,990 - XplainCrypto - writer.write_draft - INFO - Identified potential problem section 'Liquidity and Adoption Metrics' with 4 missing fields
+2025-04-06 12:29:07,990 - XplainCrypto - writer.write_draft - INFO - Identified potential problem section 'Governance and Community' with 2 missing fields
+2025-04-06 12:29:07,990 - XplainCrypto - writer.write_draft - INFO - Identified potential problem section 'Ecosystem and Partnerships' with 2 missing fields
+2025-04-06 12:29:07,990 - XplainCrypto - writer.write_draft - INFO - Identified potential problem section 'Risks and Opportunities' with 2 missing fields
+2025-04-06 12:29:07,990 - XplainCrypto - writer.write_draft - INFO - Identified potential problem section 'Team and Development Activity' with 2 missing fields
+2025-04-06 12:29:07,990 - XplainCrypto - inference.infer_missing_data - INFO - Inferring 4 missing fields: ['tvl', '24h_volume', 'market_cap', 'current_price']
+2025-04-06 12:29:08,250 - XplainCrypto - inference.infer_missing_data - INFO - Inferred tvl: {}
+2025-04-06 12:29:08,413 - XplainCrypto - inference.infer_missing_data - INFO - Inferred 24h_volume: {}
+2025-04-06 12:29:08,570 - XplainCrypto - inference.infer_missing_data - INFO - Inferred market_cap: {}
+2025-04-06 12:29:08,739 - XplainCrypto - inference.infer_missing_data - INFO - Inferred current_price: {}
+2025-04-06 12:29:08,740 - XplainCrypto - writer.write_draft - INFO - Inferred 4 fields for Executive Summary: ['tvl', '24h_volume', 'market_cap', 'current_price']
+2025-04-06 12:29:08,740 - XplainCrypto - inference.infer_missing_data - INFO - Inferring 2 missing fields: ['total_supply', 'circulating_supply']
+2025-04-06 12:29:19,425 - XplainCrypto - inference.infer_missing_data - INFO - Inferred total_supply: current_price
+2025-04-06 12:29:19,698 - XplainCrypto - inference.infer_missing_data - INFO - Inferred circulating_supply: current_price
+2025-04-06 12:29:19,698 - XplainCrypto - writer.write_draft - INFO - Inferred 2 fields for Introduction: ['total_supply', 'circulating_supply']
+2025-04-06 12:29:19,698 - XplainCrypto - inference.infer_missing_data - INFO - Inferring 2 missing fields: ['max_supply', 'token_allocation']
+2025-04-06 12:29:19,956 - XplainCrypto - inference.infer_missing_data - INFO - Inferred max_supply: total_supply
+2025-04-06 12:29:20,190 - XplainCrypto - inference.infer_missing_data - INFO - Inferred token_allocation: market_cap
+2025-04-06 12:29:20,190 - XplainCrypto - writer.write_draft - INFO - Inferred 2 fields for Tokenomics and Distribution: ['max_supply', 'token_allocation']
+2025-04-06 12:29:20,190 - XplainCrypto - inference.infer_missing_data - INFO - Inferring 5 missing fields: ['price_history', 'tvl_history', 'price_change_percentage_24h', 'competitors', 'volume_history']
+2025-04-06 12:29:20,423 - XplainCrypto - inference.infer_missing_data - INFO - Inferred price_history: current_price
+2025-04-06 12:29:20,659 - XplainCrypto - inference.infer_missing_data - INFO - Inferred tvl_history: "24h_volume"
+2025-04-06 12:29:20,902 - XplainCrypto - inference.infer_missing_data - INFO - Inferred price_change_percentage_24h: "{}"
+2025-04-06 12:29:21,145 - XplainCrypto - inference.infer_missing_data - INFO - Inferred competitors: market_cap
+2025-04-06 12:29:21,368 - XplainCrypto - inference.infer_missing_data - INFO - Inferred volume_history: 24h_volume
+2025-04-06 12:29:21,369 - XplainCrypto - writer.write_draft - INFO - Inferred 5 fields for Market Analysis: ['price_history', 'tvl_history', 'price_change_percentage_24h', 'competitors', 'volume_history']
+2025-04-06 12:29:21,369 - XplainCrypto - inference.infer_missing_data - INFO - Inferring 2 missing fields: ['tool_name', 'metric']
+2025-04-06 12:29:21,747 - XplainCrypto - inference.infer_missing_data - INFO - Inferred tool_name: market_cap
+2025-04-06 12:29:22,161 - XplainCrypto - inference.infer_missing_data - INFO - Inferred metric: current_price
+2025-04-06 12:29:22,161 - XplainCrypto - writer.write_draft - INFO - Inferred 2 fields for Developer Tools and User Experience: ['tool_name', 'metric']
+2025-04-06 12:29:22,162 - XplainCrypto - inference.infer_missing_data - INFO - Inferring 2 missing fields: ['findings', 'audit_date']
+2025-04-06 12:29:22,642 - XplainCrypto - inference.infer_missing_data - INFO - Inferred findings: "competitors
+2025-04-06 12:29:22,979 - XplainCrypto - inference.infer_missing_data - INFO - Inferred audit_date: 24h_volume
+2025-04-06 12:29:22,979 - XplainCrypto - writer.write_draft - INFO - Inferred 2 fields for Security: ['findings', 'audit_date']
+2025-04-06 12:29:22,979 - XplainCrypto - inference.infer_missing_data - INFO - Inferring 2 missing fields: ['active_addresses', 'exchange_count']
+2025-04-06 12:29:23,406 - XplainCrypto - inference.infer_missing_data - INFO - Inferred active_addresses: "tvl
+2025-04-06 12:29:23,794 - XplainCrypto - inference.infer_missing_data - INFO - Inferred exchange_count: current_price": "{}"
+2025-04-06 12:29:23,794 - XplainCrypto - writer.write_draft - INFO - Inferred 2 fields for Liquidity and Adoption Metrics: ['active_addresses', 'exchange_count']
+2025-04-06 12:29:23,794 - XplainCrypto - inference.infer_missing_data - INFO - Inferring 2 missing fields: ['proposal_count', 'governance_model']
+2025-04-06 12:29:24,105 - XplainCrypto - inference.infer_missing_data - INFO - Inferred proposal_count: exchange_count
+2025-04-06 12:29:24,442 - XplainCrypto - inference.infer_missing_data - INFO - Inferred governance_model: audit_date
+2025-04-06 12:29:24,442 - XplainCrypto - writer.write_draft - INFO - Inferred 2 fields for Governance and Community: ['proposal_count', 'governance_model']
+2025-04-06 12:29:24,442 - XplainCrypto - inference.infer_missing_data - INFO - Inferring 2 missing fields: ['partnership_type', 'partner_name']
+2025-04-06 12:29:24,808 - XplainCrypto - inference.infer_missing_data - INFO - Inferred partnership_type: competitors
+2025-04-06 12:29:25,174 - XplainCrypto - inference.infer_missing_data - INFO - Inferred partner_name: competitors
+2025-04-06 12:29:25,175 - XplainCrypto - writer.write_draft - INFO - Inferred 2 fields for Ecosystem and Partnerships: ['partnership_type', 'partner_name']
+2025-04-06 12:29:25,175 - XplainCrypto - inference.infer_missing_data - INFO - Inferring 2 missing fields: ['risk_type', 'opportunity_type']
+2025-04-06 12:29:25,592 - XplainCrypto - inference.infer_missing_data - INFO - Inferred risk_type: partnership_type
+2025-04-06 12:29:25,940 - XplainCrypto - inference.infer_missing_data - INFO - Inferred opportunity_type: partnership
+2025-04-06 12:29:25,940 - XplainCrypto - writer.write_draft - INFO - Inferred 2 fields for Risks and Opportunities: ['risk_type', 'opportunity_type']
+2025-04-06 12:29:25,940 - XplainCrypto - inference.infer_missing_data - INFO - Inferring 2 missing fields: ['development_activity', 'team_size']
+2025-04-06 12:29:26,290 - XplainCrypto - inference.infer_missing_data - INFO - Inferred development_activity: audit_date
+2025-04-06 12:29:26,683 - XplainCrypto - inference.infer_missing_data - INFO - Inferred team_size: competitors
+2025-04-06 12:29:26,684 - XplainCrypto - writer.write_draft - INFO - Inferred 2 fields for Team and Development Activity: ['development_activity', 'team_size']
+2025-04-06 12:29:37,210 - XplainCrypto - writer._infer_section_content - INFO - Inferred content for 'Executive Summary' via HF/local model
+2025-04-06 12:29:37,225 - XplainCrypto - writer._generate_section_content - INFO - Using GPT-4 with 8000 tokens for important section: Executive Summary
+2025-04-06 12:29:53,382 - XplainCrypto - writer._infer_section_content - INFO - Inferred content for 'Introduction' via HF/local model
+2025-04-06 12:29:53,412 - XplainCrypto - writer._generate_section_content - INFO - Using GPT-4 with 8000 tokens for important section: Introduction
+2025-04-06 12:29:56,215 - XplainCrypto - writer._infer_section_content - INFO - Inferred content for 'Tokenomics and Distribution' via HF/local model
+2025-04-06 12:29:56,230 - XplainCrypto - writer._generate_section_content - INFO - Using GPT-4 with 8000 tokens for important section: Tokenomics and Distribution
+2025-04-06 12:30:00,722 - XplainCrypto - writer._infer_section_content - INFO - Inferred content for 'Market Analysis' via HF/local model
+2025-04-06 12:30:00,782 - XplainCrypto - writer._generate_section_content - INFO - Using GPT-4 with 8000 tokens for important section: Market Analysis
+2025-04-06 12:30:04,573 - XplainCrypto - writer._infer_section_content - INFO - Inferred content for 'Technical Analysis' via HF/local model
+2025-04-06 12:30:04,586 - XplainCrypto - writer._generate_section_content - INFO - Using GPT-4 with 8000 tokens for important section: Technical Analysis
+2025-04-06 12:30:08,939 - XplainCrypto - writer._infer_section_content - INFO - Inferred content for 'Developer Tools and User Experience' via HF/local model
+2025-04-06 12:30:08,952 - XplainCrypto - writer._generate_section_content - INFO - Using GPT-4 with 8000 tokens for important section: Developer Tools and User Experience
+2025-04-06 12:30:13,584 - XplainCrypto - writer._infer_section_content - INFO - Inferred content for 'Security' via HF/local model
+2025-04-06 12:30:13,616 - XplainCrypto - writer._generate_section_content - INFO - Using GPT-4 with 8000 tokens for important section: Security
+2025-04-06 12:30:19,214 - XplainCrypto - writer._infer_section_content - INFO - Inferred content for 'Liquidity and Adoption Metrics' via HF/local model
+2025-04-06 12:30:19,230 - XplainCrypto - writer._generate_section_content - INFO - Using GPT-4 with 8000 tokens for important section: Liquidity and Adoption Metrics
+2025-04-06 12:30:25,252 - XplainCrypto - writer._infer_section_content - INFO - Inferred content for 'Governance and Community' via HF/local model
+2025-04-06 12:30:25,273 - XplainCrypto - writer._generate_section_content - INFO - Using GPT-4 with 8000 tokens for important section: Governance and Community
+2025-04-06 12:30:31,095 - XplainCrypto - writer._infer_section_content - INFO - Inferred content for 'Ecosystem and Partnerships' via HF/local model
+2025-04-06 12:30:31,126 - XplainCrypto - writer._generate_section_content - INFO - Using GPT-4 with 8000 tokens for important section: Ecosystem and Partnerships
+2025-04-06 12:30:37,635 - XplainCrypto - writer._infer_section_content - INFO - Inferred content for 'Risks and Opportunities' via HF/local model
+2025-04-06 12:30:37,647 - XplainCrypto - writer._generate_section_content - INFO - Using GPT-4 with 8000 tokens for important section: Risks and Opportunities
+2025-04-06 12:30:45,209 - XplainCrypto - writer._infer_section_content - INFO - Inferred content for 'Team and Development Activity' via HF/local model
+2025-04-06 12:30:45,221 - XplainCrypto - writer._generate_section_content - INFO - Using GPT-4 with 8000 tokens for important section: Team and Development Activity
+2025-04-06 12:30:52,020 - XplainCrypto - writer._infer_section_content - INFO - Inferred content for 'Conclusion' via HF/local model
+2025-04-06 12:30:52,033 - XplainCrypto - writer._generate_section_content - INFO - Using GPT-4 with 8000 tokens for important section: Conclusion
+2025-04-06 12:30:52,385 - XplainCrypto - writer._generate_section_content - ERROR - Error generating content for Market Analysis: Error code: 400 - {'error': {'message': "This model's maximum context length is 8192 tokens. However, you requested 8454 tokens (454 in the messages, 8000 in the completion). Please reduce the length of the messages or completion.", 'type': 'invalid_request_error', 'param': 'messages', 'code': 'context_length_exceeded'}}
+2025-04-06 12:30:52,564 - XplainCrypto - writer._infer_section_content - INFO - Inferred content for 'Market Analysis' via HF/local model
+2025-04-06 12:30:52,573 - XplainCrypto - writer._generate_section_content - ERROR - Error generating content for Governance and Community: Error code: 400 - {'error': {'message': "This model's maximum context length is 8192 tokens. However, you requested 8454 tokens (454 in the messages, 8000 in the completion). Please reduce the length of the messages or completion.", 'type': 'invalid_request_error', 'param': 'messages', 'code': 'context_length_exceeded'}}
+2025-04-06 12:30:52,758 - XplainCrypto - writer._infer_section_content - INFO - Inferred content for 'Governance and Community' via HF/local model
+2025-04-06 12:30:52,758 - XplainCrypto - writer._generate_section_content - ERROR - Error generating content for Tokenomics and Distribution: Error code: 400 - {'error': {'message': "This model's maximum context length is 8192 tokens. However, you requested 8431 tokens (431 in the messages, 8000 in the completion). Please reduce the length of the messages or completion.", 'type': 'invalid_request_error', 'param': 'messages', 'code': 'context_length_exceeded'}}
+2025-04-06 12:30:52,921 - XplainCrypto - writer._infer_section_content - INFO - Inferred content for 'Tokenomics and Distribution' via HF/local model
+2025-04-06 12:30:52,921 - XplainCrypto - writer._generate_section_content - ERROR - Error generating content for Introduction: Error code: 400 - {'error': {'message': "This model's maximum context length is 8192 tokens. However, you requested 8450 tokens (450 in the messages, 8000 in the completion). Please reduce the length of the messages or completion.", 'type': 'invalid_request_error', 'param': 'messages', 'code': 'context_length_exceeded'}}
+2025-04-06 12:30:53,118 - XplainCrypto - writer._infer_section_content - INFO - Inferred content for 'Introduction' via HF/local model
+2025-04-06 12:30:53,118 - XplainCrypto - writer._generate_section_content - ERROR - Error generating content for Team and Development Activity: Error code: 400 - {'error': {'message': "This model's maximum context length is 8192 tokens. However, you requested 8457 tokens (457 in the messages, 8000 in the completion). Please reduce the length of the messages or completion.", 'type': 'invalid_request_error', 'param': 'messages', 'code': 'context_length_exceeded'}}
+2025-04-06 12:30:53,337 - XplainCrypto - writer._infer_section_content - INFO - Inferred content for 'Team and Development Activity' via HF/local model
+2025-04-06 12:30:53,337 - XplainCrypto - writer._generate_section_content - ERROR - Error generating content for Developer Tools and User Experience: Error code: 400 - {'error': {'message': "This model's maximum context length is 8192 tokens. However, you requested 8463 tokens (463 in the messages, 8000 in the completion). Please reduce the length of the messages or completion.", 'type': 'invalid_request_error', 'param': 'messages', 'code': 'context_length_exceeded'}}
+2025-04-06 12:30:53,511 - XplainCrypto - writer._infer_section_content - INFO - Inferred content for 'Developer Tools and User Experience' via HF/local model
+2025-04-06 12:30:53,512 - XplainCrypto - writer._generate_section_content - ERROR - Error generating content for Liquidity and Adoption Metrics: Error code: 400 - {'error': {'message': "This model's maximum context length is 8192 tokens. However, you requested 8469 tokens (469 in the messages, 8000 in the completion). Please reduce the length of the messages or completion.", 'type': 'invalid_request_error', 'param': 'messages', 'code': 'context_length_exceeded'}}
+2025-04-06 12:30:53,791 - XplainCrypto - writer._infer_section_content - INFO - Inferred content for 'Liquidity and Adoption Metrics' via HF/local model
+2025-04-06 12:30:53,794 - XplainCrypto - writer._generate_section_content - ERROR - Error generating content for Ecosystem and Partnerships: Error code: 400 - {'error': {'message': "This model's maximum context length is 8192 tokens. However, you requested 8457 tokens (457 in the messages, 8000 in the completion). Please reduce the length of the messages or completion.", 'type': 'invalid_request_error', 'param': 'messages', 'code': 'context_length_exceeded'}}
+2025-04-06 12:30:54,188 - XplainCrypto - writer._infer_section_content - INFO - Inferred content for 'Ecosystem and Partnerships' via HF/local model
+2025-04-06 12:30:54,188 - XplainCrypto - writer._generate_section_content - ERROR - Error generating content for Executive Summary: Error code: 400 - {'error': {'message': "This model's maximum context length is 8192 tokens. However, you requested 8453 tokens (453 in the messages, 8000 in the completion). Please reduce the length of the messages or completion.", 'type': 'invalid_request_error', 'param': 'messages', 'code': 'context_length_exceeded'}}
+2025-04-06 12:30:59,466 - XplainCrypto - writer._infer_section_content - INFO - Inferred content for 'Executive Summary' via HF/local model
+2025-04-06 12:30:59,467 - XplainCrypto - writer._generate_section_content - ERROR - Error generating content for Conclusion: Error code: 400 - {'error': {'message': "This model's maximum context length is 8192 tokens. However, you requested 8446 tokens (446 in the messages, 8000 in the completion). Please reduce the length of the messages or completion.", 'type': 'invalid_request_error', 'param': 'messages', 'code': 'context_length_exceeded'}}
+2025-04-06 12:30:59,679 - XplainCrypto - writer._infer_section_content - INFO - Inferred content for 'Conclusion' via HF/local model
+2025-04-06 12:30:59,679 - XplainCrypto - writer._generate_section_content - ERROR - Error generating content for Technical Analysis: Error code: 400 - {'error': {'message': "This model's maximum context length is 8192 tokens. However, you requested 8449 tokens (449 in the messages, 8000 in the completion). Please reduce the length of the messages or completion.", 'type': 'invalid_request_error', 'param': 'messages', 'code': 'context_length_exceeded'}}
+2025-04-06 12:31:00,358 - XplainCrypto - writer._infer_section_content - INFO - Inferred content for 'Technical Analysis' via HF/local model
+2025-04-06 12:31:00,358 - XplainCrypto - writer._generate_section_content - ERROR - Error generating content for Security: Error code: 400 - {'error': {'message': "This model's maximum context length is 8192 tokens. However, you requested 8444 tokens (444 in the messages, 8000 in the completion). Please reduce the length of the messages or completion.", 'type': 'invalid_request_error', 'param': 'messages', 'code': 'context_length_exceeded'}}
+2025-04-06 12:31:00,551 - XplainCrypto - writer._infer_section_content - INFO - Inferred content for 'Security' via HF/local model
+2025-04-06 12:31:00,552 - XplainCrypto - writer._generate_section_content - ERROR - Error generating content for Risks and Opportunities: Error code: 400 - {'error': {'message': "This model's maximum context length is 8192 tokens. However, you requested 8454 tokens (454 in the messages, 8000 in the completion). Please reduce the length of the messages or completion.", 'type': 'invalid_request_error', 'param': 'messages', 'code': 'context_length_exceeded'}}
+2025-04-06 12:31:00,743 - XplainCrypto - writer._infer_section_content - INFO - Inferred content for 'Risks and Opportunities' via HF/local model
+2025-04-06 12:31:00,744 - XplainCrypto - writer.write_draft - WARNING - Section 'Executive Summary' needs retry: insufficient content
+2025-04-06 12:31:00,768 - XplainCrypto - writer._generate_problem_section - INFO - Generating specialized content for section: Executive Summary
+2025-04-06 12:31:09,053 - XplainCrypto - writer._generate_problem_section - INFO - Generated 245 words for section 'Executive Summary'
+2025-04-06 12:31:09,053 - XplainCrypto - writer.write_draft - INFO - Successfully regenerated content for 'Executive Summary' with 245 words
+2025-04-06 12:31:09,053 - XplainCrypto - writer.write_draft - WARNING - Section 'Introduction' needs retry: insufficient content
+2025-04-06 12:31:09,065 - XplainCrypto - writer._generate_problem_section - INFO - Generating specialized content for section: Introduction
+2025-04-06 12:31:19,162 - XplainCrypto - writer._generate_problem_section - INFO - Generated 315 words for section 'Introduction'
+2025-04-06 12:31:19,163 - XplainCrypto - writer.write_draft - INFO - Successfully regenerated content for 'Introduction' with 315 words
+2025-04-06 12:31:19,163 - XplainCrypto - writer.write_draft - WARNING - Section 'Tokenomics and Distribution' needs retry: insufficient content
+2025-04-06 12:31:19,181 - XplainCrypto - writer._generate_problem_section - INFO - Generating specialized content for section: Tokenomics and Distribution
+2025-04-06 12:31:31,695 - XplainCrypto - writer._generate_problem_section - INFO - Generated 462 words for section 'Tokenomics and Distribution'
+2025-04-06 12:31:31,695 - XplainCrypto - writer.write_draft - INFO - Successfully regenerated content for 'Tokenomics and Distribution' with 462 words
+2025-04-06 12:31:31,696 - XplainCrypto - writer.write_draft - WARNING - Section 'Market Analysis' needs retry: insufficient content
+2025-04-06 12:31:31,731 - XplainCrypto - writer._generate_problem_section - INFO - Generating specialized content for section: Market Analysis
+2025-04-06 12:31:47,879 - XplainCrypto - writer._generate_problem_section - INFO - Generated 494 words for section 'Market Analysis'
+2025-04-06 12:31:47,879 - XplainCrypto - writer._generate_problem_section - WARNING - Still insufficient content (494/600) for 'Market Analysis'. Retrying...
+2025-04-06 12:31:48,081 - XplainCrypto - writer._generate_problem_section - ERROR - Error in _generate_problem_section for 'Market Analysis': Error code: 400 - {'error': {'message': "This model's maximum context length is 8192 tokens. However, you requested 8697 tokens (697 in the messages, 8000 in the completion). Please reduce the length of the messages or completion.", 'type': 'invalid_request_error', 'param': 'messages', 'code': 'context_length_exceeded'}}
+2025-04-06 12:31:48,081 - XplainCrypto - writer.write_draft - WARNING - Section 'Technical Analysis' needs retry: insufficient content
+2025-04-06 12:31:48,097 - XplainCrypto - writer._generate_problem_section - INFO - Generating specialized content for section: Technical Analysis
+2025-04-06 12:32:04,332 - XplainCrypto - writer._generate_problem_section - INFO - Generated 475 words for section 'Technical Analysis'
+2025-04-06 12:32:04,333 - XplainCrypto - writer._generate_problem_section - WARNING - Still insufficient content (475/500) for 'Technical Analysis'. Retrying...
+2025-04-06 12:32:08,734 - XplainCrypto - writer._generate_problem_section - ERROR - Error in _generate_problem_section for 'Technical Analysis': Error code: 400 - {'error': {'message': "This model's maximum context length is 8192 tokens. However, you requested 8674 tokens (674 in the messages, 8000 in the completion). Please reduce the length of the messages or completion.", 'type': 'invalid_request_error', 'param': 'messages', 'code': 'context_length_exceeded'}}
+2025-04-06 12:32:08,734 - XplainCrypto - writer.write_draft - WARNING - Section 'Developer Tools and User Experience' needs retry: insufficient content
+2025-04-06 12:32:08,748 - XplainCrypto - writer._generate_problem_section - INFO - Generating specialized content for section: Developer Tools and User Experience
+2025-04-06 12:32:24,773 - XplainCrypto - writer._generate_problem_section - INFO - Generated 430 words for section 'Developer Tools and User Experience'
+2025-04-06 12:32:24,773 - XplainCrypto - writer.write_draft - INFO - Successfully regenerated content for 'Developer Tools and User Experience' with 430 words
+2025-04-06 12:32:24,773 - XplainCrypto - writer.write_draft - WARNING - Section 'Security' needs retry: insufficient content
+2025-04-06 12:32:24,787 - XplainCrypto - writer._generate_problem_section - INFO - Generating specialized content for section: Security
+2025-04-06 12:32:37,724 - XplainCrypto - writer._generate_problem_section - INFO - Generated 414 words for section 'Security'
+2025-04-06 12:32:37,724 - XplainCrypto - writer.write_draft - INFO - Successfully regenerated content for 'Security' with 414 words
+2025-04-06 12:32:37,724 - XplainCrypto - writer.write_draft - WARNING - Section 'Liquidity and Adoption Metrics' needs retry: insufficient content
+2025-04-06 12:32:37,737 - XplainCrypto - writer._generate_problem_section - INFO - Generating specialized content for section: Liquidity and Adoption Metrics
+2025-04-06 12:32:54,395 - XplainCrypto - writer._generate_problem_section - INFO - Generated 518 words for section 'Liquidity and Adoption Metrics'
+2025-04-06 12:32:54,395 - XplainCrypto - writer.write_draft - INFO - Successfully regenerated content for 'Liquidity and Adoption Metrics' with 518 words
+2025-04-06 12:32:54,395 - XplainCrypto - writer.write_draft - WARNING - Section 'Governance and Community' needs retry: insufficient content
+2025-04-06 12:32:54,408 - XplainCrypto - writer._generate_problem_section - INFO - Generating specialized content for section: Governance and Community
+2025-04-06 12:33:07,378 - XplainCrypto - writer._generate_problem_section - INFO - Generated 433 words for section 'Governance and Community'
+2025-04-06 12:33:07,379 - XplainCrypto - writer.write_draft - INFO - Successfully regenerated content for 'Governance and Community' with 433 words
+2025-04-06 12:33:07,379 - XplainCrypto - writer.write_draft - WARNING - Section 'Ecosystem and Partnerships' needs retry: insufficient content
+2025-04-06 12:33:07,391 - XplainCrypto - writer._generate_problem_section - INFO - Generating specialized content for section: Ecosystem and Partnerships
+2025-04-06 12:33:20,358 - XplainCrypto - writer._generate_problem_section - INFO - Generated 407 words for section 'Ecosystem and Partnerships'
+2025-04-06 12:33:20,358 - XplainCrypto - writer.write_draft - INFO - Successfully regenerated content for 'Ecosystem and Partnerships' with 407 words
+2025-04-06 12:33:20,358 - XplainCrypto - writer.write_draft - WARNING - Section 'Risks and Opportunities' needs retry: insufficient content
+2025-04-06 12:33:20,400 - XplainCrypto - writer._generate_problem_section - INFO - Generating specialized content for section: Risks and Opportunities
+2025-04-06 12:33:38,942 - XplainCrypto - writer._generate_problem_section - INFO - Generated 518 words for section 'Risks and Opportunities'
+2025-04-06 12:33:38,942 - XplainCrypto - writer.write_draft - INFO - Successfully regenerated content for 'Risks and Opportunities' with 518 words
+2025-04-06 12:33:38,942 - XplainCrypto - writer.write_draft - WARNING - Section 'Team and Development Activity' needs retry: insufficient content
+2025-04-06 12:33:38,966 - XplainCrypto - writer._generate_problem_section - INFO - Generating specialized content for section: Team and Development Activity
+2025-04-06 12:33:53,041 - XplainCrypto - writer._generate_problem_section - INFO - Generated 402 words for section 'Team and Development Activity'
+2025-04-06 12:33:53,042 - XplainCrypto - writer.write_draft - INFO - Successfully regenerated content for 'Team and Development Activity' with 402 words
+2025-04-06 12:33:53,042 - XplainCrypto - writer.write_draft - WARNING - Section 'Conclusion' needs retry: insufficient content
+2025-04-06 12:33:53,055 - XplainCrypto - writer._generate_problem_section - INFO - Generating specialized content for section: Conclusion
+2025-04-06 12:34:04,261 - XplainCrypto - writer._generate_problem_section - INFO - Generated 346 words for section 'Conclusion'
+2025-04-06 12:34:04,262 - XplainCrypto - writer.write_draft - INFO - Successfully regenerated content for 'Conclusion' with 346 words
+2025-04-06 12:34:04,262 - XplainCrypto - writer.write_draft - INFO - Draft generated: 4564 words
+2025-04-06 12:34:04,262 - XplainCrypto - writer.write_draft - INFO - Section 'Executive Summary' has 245 words, within requirements (200-300)
+2025-04-06 12:34:04,262 - XplainCrypto - writer.write_draft - INFO - Section 'Introduction' has 315 words, within requirements (250-350)
+2025-04-06 12:34:04,262 - XplainCrypto - writer.write_draft - INFO - Section 'Tokenomics and Distribution' has 462 words, within requirements (400-600)
+2025-04-06 12:34:04,262 - XplainCrypto - writer.write_draft - WARNING - Section 'Market Analysis' has only 5 words, below minimum 600 words
+2025-04-06 12:34:04,262 - XplainCrypto - writer.write_draft - WARNING - Section 'Technical Analysis' has only 5 words, below minimum 500 words
+2025-04-06 12:34:04,262 - XplainCrypto - writer.write_draft - INFO - Section 'Developer Tools and User Experience' has 430 words, within requirements (400-700)
+2025-04-06 12:34:04,262 - XplainCrypto - writer.write_draft - INFO - Section 'Security' has 414 words, within requirements (400-700)
+2025-04-06 12:34:04,262 - XplainCrypto - writer.write_draft - INFO - Section 'Liquidity and Adoption Metrics' has 518 words, within requirements (500-700)
+2025-04-06 12:34:04,262 - XplainCrypto - writer.write_draft - INFO - Section 'Governance and Community' has 433 words, within requirements (400-700)
+2025-04-06 12:34:04,262 - XplainCrypto - writer.write_draft - INFO - Section 'Ecosystem and Partnerships' has 407 words, within requirements (400-700)
+2025-04-06 12:34:04,262 - XplainCrypto - writer.write_draft - INFO - Section 'Risks and Opportunities' has 518 words, within requirements (450-700)
+2025-04-06 12:34:04,262 - XplainCrypto - writer.write_draft - INFO - Section 'Team and Development Activity' has 402 words, within requirements (400-700)
+2025-04-06 12:34:04,263 - XplainCrypto - writer.write_draft - INFO - Section 'Conclusion' has 346 words, within requirements (300-500)
+2025-04-06 12:34:04,263 - XplainCrypto - writer.write_draft - INFO - Draft section headers: ['# ONDO', '# Executive Summary', '# Introduction', '# Tokenomics and Distribution', '# Market Analysis', '# Technical Analysis', '# Developer Tools and User Experience', '# Security', '# Liquidity and Adoption Metrics', '# Governance and Community']
+2025-04-06 12:34:04,263 - XplainCrypto - progress_tracker._log - INFO - Progress: Writing - 100% complete: Completed writing for ONDO in 296.27s
+2025-04-06 12:34:04,263 - XplainCrypto - workflow_manager.wrapped_agent - INFO - Completed agent: Writing for 'ONDO' in 296.27s
+2025-04-06 12:34:04,264 - XplainCrypto - progress_tracker._log - INFO - Progress: Visualization - 0% complete: Starting visualization for ONDO
+2025-04-06 12:34:04,264 - XplainCrypto - workflow_manager.wrapped_agent - INFO - Starting agent: Visualization for 'ONDO'
+2025-04-06 12:34:04,264 - XplainCrypto - visualizer.visualizer - INFO - ----------- VISUALIZATION DIAGNOSTIC INFO -----------
+2025-04-06 12:34:04,264 - XplainCrypto - visualizer.visualizer - INFO - Current working directory: /Users/gkavanagh/Development/xplaincrypto
+2025-04-06 12:34:04,264 - XplainCrypto - visualizer.visualizer - INFO - Docs directory exists: /Users/gkavanagh/Development/xplaincrypto/docs
+2025-04-06 12:34:04,264 - XplainCrypto - visualizer.visualizer - INFO - Docs directory contents: ['cache', 'ondo']
+2025-04-06 12:34:04,264 - XplainCrypto - visualizer.visualizer - INFO - Project directory exists: /Users/gkavanagh/Development/xplaincrypto/docs/ondo
+2025-04-06 12:34:04,264 - XplainCrypto - visualizer.visualizer - INFO - Project directory contents: ['.gitkeep']
+2025-04-06 12:34:04,265 - XplainCrypto - visualizer.visualizer - INFO - -----------------------------------------------------
+2025-04-06 12:34:04,265 - XplainCrypto - visualizer.run - INFO - Verified visualization output directory: docs/ondo
+2025-04-06 12:34:04,265 - XplainCrypto - visualizer.run - INFO - Successfully verified file system write access
+2025-04-06 12:34:04,265 - XplainCrypto - visualizer.run - WARNING - Skipping key_metrics_table, missing fields: current_price, market_cap, 24h_volume, tvl
+2025-04-06 12:34:04,265 - XplainCrypto - visualizer.run - WARNING - Skipping basic_metrics_table, missing fields: current_price, market_cap, circulating_supply, total_supply, 24h_volume
+2025-04-06 12:34:04,265 - XplainCrypto - visualizer.run - WARNING - Skipping token_distribution_pie, missing fields: token_allocation
+2025-04-06 12:34:04,265 - XplainCrypto - visualizer.run - WARNING - Skipping supply_metrics_table, missing fields: total_supply, circulating_supply, max_supply
+2025-04-06 12:34:04,265 - XplainCrypto - base.__init__ - INFO - Initializing visualizer with output directory: docs/ondo
+2025-04-06 12:34:04,265 - XplainCrypto - base.__init__ - INFO - Created/verified output directory: docs/ondo
+2025-04-06 12:34:04,265 - XplainCrypto - line_chart.create - INFO - Creating line chart: price_history_chart
+2025-04-06 12:34:04,266 - XplainCrypto - base.validate_output_dir - INFO - Validated output directory: docs/ondo
+2025-04-06 12:34:04,266 - XplainCrypto - line_chart._get_chart_data - ERROR - No data found for price_history_chart in fields: ['price_history', 'prices', 'price_history', 'price_data']
+2025-04-06 12:34:04,266 - XplainCrypto - visualizer.run - ERROR - Failed to generate price_history_chart: No file created for price_history_chart
+Traceback (most recent call last):
+  File "/Users/gkavanagh/Development/xplaincrypto/backend/agents/visualizer.py", line 307, in run
+    raise ValueError(f"No file created for {viz_type}")
+ValueError: No file created for price_history_chart
+2025-04-06 12:34:04,267 - XplainCrypto - base.__init__ - INFO - Initializing visualizer with output directory: docs/ondo
+2025-04-06 12:34:04,267 - XplainCrypto - base.__init__ - INFO - Created/verified output directory: docs/ondo
+2025-04-06 12:34:04,267 - XplainCrypto - line_chart.create - INFO - Creating line chart: volume_chart
+2025-04-06 12:34:04,267 - XplainCrypto - base.validate_output_dir - INFO - Validated output directory: docs/ondo
+2025-04-06 12:34:04,267 - XplainCrypto - line_chart._get_chart_data - ERROR - No data found for volume_chart in fields: ['volume_history', 'total_volumes', 'volume_history', 'volumes']
+2025-04-06 12:34:04,267 - XplainCrypto - visualizer.run - ERROR - Failed to generate volume_chart: No file created for volume_chart
+Traceback (most recent call last):
+  File "/Users/gkavanagh/Development/xplaincrypto/backend/agents/visualizer.py", line 307, in run
+    raise ValueError(f"No file created for {viz_type}")
+ValueError: No file created for volume_chart
+2025-04-06 12:34:04,268 - XplainCrypto - base.__init__ - INFO - Initializing visualizer with output directory: docs/ondo
+2025-04-06 12:34:04,268 - XplainCrypto - base.__init__ - INFO - Created/verified output directory: docs/ondo
+2025-04-06 12:34:04,268 - XplainCrypto - line_chart.create - INFO - Creating line chart: tvl_chart
+2025-04-06 12:34:04,268 - XplainCrypto - base.validate_output_dir - INFO - Validated output directory: docs/ondo
+2025-04-06 12:34:04,268 - XplainCrypto - line_chart._get_chart_data - ERROR - No data found for tvl_chart in fields: ['tvl_history', 'tvl_history', 'tvl_data']
+2025-04-06 12:34:04,268 - XplainCrypto - visualizer.run - ERROR - Failed to generate tvl_chart: No file created for tvl_chart
+Traceback (most recent call last):
+  File "/Users/gkavanagh/Development/xplaincrypto/backend/agents/visualizer.py", line 307, in run
+    raise ValueError(f"No file created for {viz_type}")
+ValueError: No file created for tvl_chart
+2025-04-06 12:34:04,268 - XplainCrypto - visualizer.run - WARNING - Skipping competitor_comparison_chart, missing fields: market_cap, price_change_percentage_24h
+2025-04-06 12:34:04,268 - XplainCrypto - base.__init__ - INFO - Initializing visualizer with output directory: docs/ondo
+2025-04-06 12:34:04,268 - XplainCrypto - base.__init__ - INFO - Created/verified output directory: docs/ondo
+2025-04-06 12:34:04,268 - XplainCrypto - line_chart.create - INFO - Creating line chart: liquidity_trends_chart
+2025-04-06 12:34:04,268 - XplainCrypto - base.validate_output_dir - INFO - Validated output directory: docs/ondo
+2025-04-06 12:34:04,268 - XplainCrypto - line_chart._get_chart_data - ERROR - No data found for liquidity_trends_chart in fields: ['volume_history', 'total_volumes', 'volume_history', 'volumes']
+2025-04-06 12:34:04,268 - XplainCrypto - visualizer.run - ERROR - Failed to generate liquidity_trends_chart: No file created for liquidity_trends_chart
+Traceback (most recent call last):
+  File "/Users/gkavanagh/Development/xplaincrypto/backend/agents/visualizer.py", line 307, in run
+    raise ValueError(f"No file created for {viz_type}")
+ValueError: No file created for liquidity_trends_chart
+2025-04-06 12:34:04,269 - XplainCrypto - visualizer.run - WARNING - Skipping adoption_metrics_table, missing fields: tvl, active_addresses, exchange_count
+2025-04-06 12:34:04,269 - XplainCrypto - visualizer.run - WARNING - Encountered 10 visualization errors
+2025-04-06 12:34:04,269 - XplainCrypto - visualizer.visualizer - INFO - Generated 0 visualizations
+2025-04-06 12:34:04,269 - XplainCrypto - visualizer.visualizer - WARNING - Visualization errors: {'key_metrics_table': 'Missing required data: current_price, market_cap, 24h_volume, tvl', 'basic_metrics_table': 'Missing required data: current_price, market_cap, circulating_supply, total_supply, 24h_volume', 'token_distribution_pie': 'Missing required data: token_allocation', 'supply_metrics_table': 'Missing required data: total_supply, circulating_supply, max_supply', 'price_history_chart': 'Generation error: No file created for price_history_chart', 'volume_chart': 'Generation error: No file created for volume_chart', 'tvl_chart': 'Generation error: No file created for tvl_chart', 'competitor_comparison_chart': 'Missing required data: market_cap, price_change_percentage_24h', 'liquidity_trends_chart': 'Generation error: No file created for liquidity_trends_chart', 'adoption_metrics_table': 'Missing required data: tvl, active_addresses, exchange_count'}
+2025-04-06 12:34:04,269 - XplainCrypto - progress_tracker._log - INFO - Progress: Visualization - 100% complete: Completed visualization for ONDO in 0.00s
+2025-04-06 12:34:04,269 - XplainCrypto - workflow_manager.wrapped_agent - INFO - Completed agent: Visualization for 'ONDO' in 0.00s
+2025-04-06 12:34:04,270 - XplainCrypto - progress_tracker._log - INFO - Progress: Review - 0% complete: Starting review for ONDO
+2025-04-06 12:34:04,270 - XplainCrypto - workflow_manager.wrapped_agent - INFO - Starting agent: Review for 'ONDO'
+2025-04-06 12:34:04,270 - XplainCrypto - reviewer.reviewer - INFO - Reviewer agent processing for ONDO
+2025-04-06 12:34:04,271 - XplainCrypto - reviewer.review_draft - INFO - Reviewing draft for ONDO
+2025-04-06 12:34:04,277 - XplainCrypto - reviewer.review_draft - INFO - Split draft into 14 sections for review
+2025-04-06 12:34:04,277 - XplainCrypto - reviewer.review_draft - INFO - Reviewing section 1/14: 'Executive Summary' (248 words)
+2025-04-06 12:34:11,123 - XplainCrypto - reviewer.review_draft - INFO - Successfully reviewed section 'Executive Summary': 298 words
+2025-04-06 12:34:11,124 - XplainCrypto - reviewer.review_draft - INFO - Reviewing section 2/14: 'Introduction' (317 words)
+2025-04-06 12:34:16,788 - XplainCrypto - reviewer.review_draft - INFO - Successfully reviewed section 'Introduction': 355 words
+2025-04-06 12:34:16,788 - XplainCrypto - reviewer.review_draft - INFO - Reviewing section 3/14: 'Tokenomics and Distribution' (466 words)
+2025-04-06 12:34:26,643 - XplainCrypto - reviewer.review_draft - INFO - Successfully reviewed section 'Tokenomics and Distribution': 423 words
+2025-04-06 12:34:26,644 - XplainCrypto - reviewer.review_draft - INFO - Reviewing section 4/14: 'Developer Tools and User Experience' (436 words)
+2025-04-06 12:34:34,239 - XplainCrypto - reviewer.review_draft - INFO - Successfully reviewed section 'Developer Tools and User Experience': 408 words
+2025-04-06 12:34:34,241 - XplainCrypto - reviewer.review_draft - INFO - Reviewing section 5/14: 'Security' (416 words)
+2025-04-06 12:34:41,271 - XplainCrypto - reviewer.review_draft - INFO - Successfully reviewed section 'Security': 398 words
+2025-04-06 12:34:41,272 - XplainCrypto - reviewer.review_draft - INFO - Reviewing section 6/14: 'Liquidity and Adoption Metrics' (523 words)
+2025-04-06 12:34:55,897 - XplainCrypto - reviewer.review_draft - INFO - Successfully reviewed section 'Liquidity and Adoption Metrics': 499 words
+2025-04-06 12:34:55,899 - XplainCrypto - reviewer.review_draft - INFO - Reviewing section 7/14: 'Governance and Community' (437 words)
+2025-04-06 12:35:04,226 - XplainCrypto - reviewer.review_draft - INFO - Successfully reviewed section 'Governance and Community': 414 words
+2025-04-06 12:35:04,226 - XplainCrypto - reviewer.review_draft - INFO - Reviewing section 8/14: 'Ecosystem and Partnerships' (411 words)
+2025-04-06 12:35:11,472 - XplainCrypto - reviewer.review_draft - INFO - Successfully reviewed section 'Ecosystem and Partnerships': 386 words
+2025-04-06 12:35:11,472 - XplainCrypto - reviewer.review_draft - INFO - Reviewing section 9/14: 'Risks and Opportunities' (522 words)
+2025-04-06 12:35:21,756 - XplainCrypto - reviewer.review_draft - INFO - Successfully reviewed section 'Risks and Opportunities': 523 words
+2025-04-06 12:35:21,757 - XplainCrypto - reviewer.review_draft - INFO - Reviewing section 10/14: 'Team and Development Activity' (407 words)
+2025-04-06 12:35:31,764 - XplainCrypto - reviewer.review_draft - INFO - Successfully reviewed section 'Team and Development Activity': 393 words
+2025-04-06 12:35:31,764 - XplainCrypto - reviewer.review_draft - INFO - Reviewing section 11/14: 'Conclusion' (348 words)
+2025-04-06 12:35:38,796 - XplainCrypto - reviewer.review_draft - INFO - Successfully reviewed section 'Conclusion': 357 words
+2025-04-06 12:35:38,799 - XplainCrypto - reviewer.review_draft - INFO - Completed review: 4487 words from original 4564 words
+2025-04-06 12:35:38,800 - XplainCrypto - progress_tracker._log - INFO - Progress: Review - 100% complete: Completed review for ONDO in 94.53s
+2025-04-06 12:35:38,800 - XplainCrypto - workflow_manager.wrapped_agent - INFO - Completed agent: Review for 'ONDO' in 94.53s
+2025-04-06 12:35:38,817 - XplainCrypto - progress_tracker._log - INFO - Progress: Editing - 0% complete: Starting editing for ONDO
+2025-04-06 12:35:38,818 - XplainCrypto - workflow_manager.wrapped_agent - INFO - Starting agent: Editing for 'ONDO'
+2025-04-06 12:35:38,819 - XplainCrypto - editor.editor - INFO - Editor agent starting
+2025-04-06 12:35:38,819 - XplainCrypto - editor.editor - INFO - Performing comprehensive editing for ONDO
+2025-04-06 12:40:35,277 - XplainCrypto - editor.editor - INFO - Processing 59 sections separately to avoid context limit issues
+2025-04-06 12:40:45,677 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Executive Summary': 480 words
+2025-04-06 12:40:54,822 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Introduction': 524 words
+2025-04-06 12:41:03,705 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Vision and Mission': 534 words
+2025-04-06 12:41:14,902 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Key Features': 466 words
+2025-04-06 12:41:26,174 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Tokenomics and Distribution': 631 words
+2025-04-06 12:41:37,524 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Utility of ONDO Tokens': 537 words
+2025-04-06 12:41:51,241 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Supply Metrics': 503 words
+2025-04-06 12:42:03,518 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Distribution Strategy': 592 words
+2025-04-06 12:42:14,199 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Vesting Schedules': 516 words
+2025-04-06 12:42:25,064 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Market Analysis': 592 words
+2025-04-06 12:42:35,148 - XplainCrypto - editor.editor - INFO - Successfully edited section 'DeFi Market Overview': 585 words
+2025-04-06 12:42:48,713 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Competitive Landscape': 605 words
+2025-04-06 12:42:59,768 - XplainCrypto - editor.editor - INFO - Successfully edited section 'User Adoption Trends': 494 words
+2025-04-06 12:43:07,140 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Regulatory Environment': 529 words
+2025-04-06 12:43:17,330 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Future Growth Projections': 534 words
+2025-04-06 12:43:26,276 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Technical Analysis': 519 words
+2025-04-06 12:43:38,465 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Blockchain Architecture': 569 words
+2025-04-06 12:43:51,716 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Scalability Considerations': 664 words
+2025-04-06 12:44:10,509 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Security Features': 672 words
+2025-04-06 12:44:22,816 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Overall Technical Viability': 549 words
+2025-04-06 12:44:33,544 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Developer Tools and User Experience': 637 words
+2025-04-06 12:44:46,003 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Developer Tools': 627 words
+2025-04-06 12:45:07,022 - XplainCrypto - editor.editor - INFO - Successfully edited section 'User Experience': 700 words
+2025-04-06 12:45:17,086 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Performance Metrics': 490 words
+2025-04-06 12:45:26,860 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Conclusion': 352 words
+2025-04-06 12:45:36,796 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Security': 598 words
+2025-04-06 12:45:50,584 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Security Protocols': 685 words
+2025-04-06 12:46:04,549 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Risk Management': 592 words
+2025-04-06 12:46:20,641 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Vulnerability Management': 610 words
+2025-04-06 12:46:30,389 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Liquidity and Adoption Metrics': 577 words
+2025-04-06 12:46:40,235 - XplainCrypto - editor.editor - INFO - Successfully edited section 'User Growth Trends': 604 words
+2025-04-06 12:47:00,774 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Market Integration': 699 words
+2025-04-06 12:47:10,151 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Total Value Locked (TVL)': 527 words
+2025-04-06 12:47:21,661 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Exchange Listings': 634 words
+2025-04-06 12:47:35,645 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Governance and Community': 644 words
+2025-04-06 12:47:46,346 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Governance Structure': 578 words
+2025-04-06 12:47:57,655 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Community Engagement': 642 words
+2025-04-06 12:48:07,542 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Proposal Adoption and Activity': 536 words
+2025-04-06 12:48:17,216 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Community Growth Metrics': 652 words
+2025-04-06 12:48:25,960 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Ecosystem and Partnerships': 576 words
+2025-04-06 12:48:39,154 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Strategic Partnerships': 541 words
+2025-04-06 12:48:54,239 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Ecosystem Development': 516 words
+2025-04-06 12:49:08,619 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Adoption and Usage': 613 words
+2025-04-06 12:49:27,143 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Risks and Opportunities': 623 words
+2025-04-06 12:49:39,763 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Risks': 672 words
+2025-04-06 12:49:50,504 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Opportunities': 555 words
+2025-04-06 12:50:02,069 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Risk Management Strategies': 630 words
+2025-04-06 12:50:14,716 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Team and Development Activity': 640 words
+2025-04-06 12:50:26,090 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Team Composition': 636 words
+2025-04-06 12:50:36,609 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Development Activity': 562 words
+2025-04-06 12:50:49,192 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Roadmap Execution': 529 words
+2025-04-06 12:50:49,195 - XplainCrypto - editor.editor - INFO - Edited draft content updated - Preview: # ONDO
+
+## Executive Summary
+
+ONDO represents a groundbreaking advancement in the rapidly evolving landscape of Decentralized Finance (DeFi). By leveraging innovative blockchain technology, the project is poised to capture considerable attention from investors seeking strategic opportunities within ...
+2025-04-06 12:50:49,197 - XplainCrypto - editor.editor - INFO - Section headers: ['ONDO']
+2025-04-06 12:50:49,197 - XplainCrypto - editor.editor - INFO - Stored edited content in state['draft'], state['edited_draft'], and state['final_report'] keys
+2025-04-06 12:50:49,198 - XplainCrypto - editor.editor - INFO - Saved emergency backup of edited content to docs/ondo/edited_content_20250406_125049.md
+2025-04-06 12:50:49,198 - XplainCrypto - editor.editor - INFO - Editing completed: 4564 words → 32038 words (+27474 words)
+2025-04-06 12:50:49,199 - XplainCrypto - workflow_manager.wrapped_agent - ERROR - Error in Editing: object dict can't be used in 'await' expression
+Traceback (most recent call last):
+  File "/Users/gkavanagh/Development/xplaincrypto/backend/orchestration/workflow_manager.py", line 262, in wrapped_agent
+    updated_state = await agent_function(working_state, llm, logger, config)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: object dict can't be used in 'await' expression
+2025-04-06 12:50:49,199 - XplainCrypto - error_reporter.report_error - ERROR - Error in agent.editing: object dict can't be used in 'await' expression [ID: err_20250406125049_5531205056]
+Traceback (most recent call last):
+  File "/Users/gkavanagh/Development/xplaincrypto/backend/orchestration/workflow_manager.py", line 262, in wrapped_agent
+    updated_state = await agent_function(working_state, llm, logger, config)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: object dict can't be used in 'await' expression
+2025-04-06 12:50:49,200 - XplainCrypto - progress_tracker._log - INFO - Progress: Editing - 100% complete: Error in editing: object dict can't be used in 'await' expression
+2025-04-06 12:50:49,224 - XplainCrypto - progress_tracker._log - INFO - Progress: Publishing - 0% complete: Starting publishing for ONDO
+2025-04-06 12:50:49,224 - XplainCrypto - workflow_manager.wrapped_agent - INFO - Starting agent: Publishing for 'ONDO'
+2025-04-06 12:50:49,225 - XplainCrypto - publisher.publisher - INFO - Publisher agent starting
+2025-04-06 12:50:49,225 - XplainCrypto - publisher.publisher - INFO - Publisher agent processing report for project: 'ONDO'
+2025-04-06 12:50:49,225 - XplainCrypto - publisher.publisher - INFO - Found state['draft'] with 31140 chars
+2025-04-06 12:50:49,225 - XplainCrypto - publisher.publisher - INFO - Found state['final_report'] with 32708 chars
+2025-04-06 12:50:49,225 - XplainCrypto - publisher.publisher - INFO - Using content from state['draft'] (31140 chars)
+2025-04-06 12:50:49,225 - XplainCrypto - publisher.publisher - INFO - Found 0 visualizations in state
+2025-04-06 12:50:49,225 - XplainCrypto - publisher.publisher - INFO - Processed 0 valid visualizations
+2025-04-06 12:50:49,225 - XplainCrypto - publisher.publisher - INFO - Using output directory: docs/ondo
+2025-04-06 12:50:49,226 - XplainCrypto - publisher.publisher - INFO - Saved raw draft to docs/ondo/ondo_raw_draft.md
+2025-04-06 12:50:49,226 - XplainCrypto - publisher.publisher - INFO - Draft contains 224 lines and 4564 words
+2025-04-06 12:50:49,226 - XplainCrypto - publisher.publisher - INFO - Draft starts with: ['# ONDO', 'Provide comprehensive research about ONDO cryptocurrency', 'MCP mode not available. Please provide direct API access.']
+2025-04-06 12:50:49,226 - XplainCrypto - publisher.publisher - INFO - Normalized 224 lines for processing
+2025-04-06 12:50:49,226 - XplainCrypto - publisher.publisher - INFO - Expected sections from report_config: ['Executive Summary', 'Risks and Opportunities', 'Conclusion', 'Tokenomics and Distribution', 'Governance and Community', 'Developer Tools and User Experience', 'Technical Analysis', 'Introduction', 'Security', 'Ecosystem and Partnerships', 'Liquidity and Adoption Metrics', 'Team and Development Activity', 'Market Analysis']
+2025-04-06 12:50:49,226 - XplainCrypto - publisher.publisher - INFO - Found first content section: # ONDO
+2025-04-06 12:50:49,226 - XplainCrypto - publisher.publisher - WARNING - Found unexpected section: ONDO (not in report_config)
+2025-04-06 12:50:49,226 - XplainCrypto - publisher.publisher - INFO - Found expected section: Executive Summary
+2025-04-06 12:50:49,226 - XplainCrypto - publisher.publisher - INFO - Found expected section: Introduction
+2025-04-06 12:50:49,226 - XplainCrypto - publisher.publisher - INFO - Found expected section: Tokenomics and Distribution
+2025-04-06 12:50:49,226 - XplainCrypto - publisher.publisher - INFO - Found expected section: Market Analysis
+2025-04-06 12:50:49,226 - XplainCrypto - publisher.publisher - INFO - Found expected section: Technical Analysis
+2025-04-06 12:50:49,226 - XplainCrypto - publisher.publisher - INFO - Found expected section: Developer Tools and User Experience
+2025-04-06 12:50:49,226 - XplainCrypto - publisher.publisher - INFO - Found expected section: Security
+2025-04-06 12:50:49,227 - XplainCrypto - publisher.publisher - INFO - Found expected section: Liquidity and Adoption Metrics
+2025-04-06 12:50:49,227 - XplainCrypto - publisher.publisher - INFO - Found expected section: Governance and Community
+2025-04-06 12:50:49,227 - XplainCrypto - publisher.publisher - INFO - Found expected section: Ecosystem and Partnerships
+2025-04-06 12:50:49,227 - XplainCrypto - publisher.publisher - INFO - Found expected section: Risks and Opportunities
+2025-04-06 12:50:49,227 - XplainCrypto - publisher.publisher - INFO - Found expected section: Team and Development Activity
+2025-04-06 12:50:49,227 - XplainCrypto - publisher.publisher - INFO - Found expected section: Conclusion
+2025-04-06 12:50:49,227 - XplainCrypto - publisher.publisher - INFO - Parsed 14 unique main sections from draft
+2025-04-06 12:50:49,227 - XplainCrypto - publisher.publisher - INFO - Section 'Executive Summary' has 245 words, within requirements (200-300)
+2025-04-06 12:50:49,227 - XplainCrypto - publisher.publisher - INFO - Section 2: Executive Summary - Content preview: Executive Summary ONDO is a cutting-edge blockchain project that offers a strategic investment oppor... [truncated, total length: 1699]...
+2025-04-06 12:50:49,227 - XplainCrypto - publisher.publisher - INFO -   Subsections: []
+2025-04-06 12:50:49,227 - XplainCrypto - publisher.publisher - INFO - Section 'Introduction' has 315 words, within requirements (250-350)
+2025-04-06 12:50:49,227 - XplainCrypto - publisher.publisher - INFO - Section 3: Introduction - Content preview: ONDO is an innovative project that has a clear vision to revolutionize the DeFi industry by providin... [truncated, total length: 1969]...
+2025-04-06 12:50:49,227 - XplainCrypto - publisher.publisher - INFO -   Subsections: []
+2025-04-06 12:50:49,227 - XplainCrypto - publisher.publisher - INFO - Section 'Tokenomics and Distribution' has 462 words, within requirements (400-600)
+2025-04-06 12:50:49,227 - XplainCrypto - publisher.publisher - INFO - Section 4: Tokenomics and Distribution - Content preview: Tokenomics and Distribution for ONDO Tokenomics, a term derived from 'token economics', is an integr... [truncated, total length: 2984]...
+2025-04-06 12:50:49,227 - XplainCrypto - publisher.publisher - INFO -   Subsections: []
+2025-04-06 12:50:49,227 - XplainCrypto - publisher.publisher - WARNING - Section 'Market Analysis' has 5 words, below minimum requirement of 600
+2025-04-06 12:50:49,227 - XplainCrypto - publisher.publisher - INFO - Section 5: Market Analysis - Content preview: Data unavailable for Market Analysis....
+2025-04-06 12:50:49,227 - XplainCrypto - publisher.publisher - INFO -   Subsections: []
+2025-04-06 12:50:49,227 - XplainCrypto - publisher.publisher - WARNING - Section 'Technical Analysis' has 5 words, below minimum requirement of 500
+2025-04-06 12:50:49,228 - XplainCrypto - publisher.publisher - INFO - Section 6: Technical Analysis - Content preview: Data unavailable for Technical Analysis....
+2025-04-06 12:50:49,228 - XplainCrypto - publisher.publisher - INFO -   Subsections: []
+2025-04-06 12:50:49,228 - XplainCrypto - publisher.publisher - INFO - Section 'Developer Tools and User Experience' has 430 words, within requirements (400-700)
+2025-04-06 12:50:49,228 - XplainCrypto - publisher.publisher - INFO - Section 7: Developer Tools and User Experience - Content preview: Developer Tools and User Experience for ONDO ONDO is a blockchain project that offers a seamless and... [truncated, total length: 2872]...
+2025-04-06 12:50:49,228 - XplainCrypto - publisher.publisher - INFO -   Subsections: []
+2025-04-06 12:50:49,228 - XplainCrypto - publisher.publisher - INFO - Section 'Security' has 414 words, within requirements (400-700)
+2025-04-06 12:50:49,228 - XplainCrypto - publisher.publisher - INFO - Section 8: Security - Content preview: SECURITY In the blockchain and cryptocurrency world, security is of paramount importance. This is pa... [truncated, total length: 2815]...
+2025-04-06 12:50:49,228 - XplainCrypto - publisher.publisher - INFO -   Subsections: []
+2025-04-06 12:50:49,228 - XplainCrypto - publisher.publisher - INFO - Section 'Liquidity and Adoption Metrics' has 518 words, within requirements (500-700)
+2025-04-06 12:50:49,228 - XplainCrypto - publisher.publisher - INFO - Section 9: Liquidity and Adoption Metrics - Content preview: Liquidity and Adoption Metrics for ONDO  ONDO is an emerging platform in the Decentralized Finance (... [truncated, total length: 3266]...
+2025-04-06 12:50:49,228 - XplainCrypto - publisher.publisher - INFO -   Subsections: []
+2025-04-06 12:50:49,228 - XplainCrypto - publisher.publisher - INFO - Section 'Governance and Community' has 433 words, within requirements (400-700)
+2025-04-06 12:50:49,228 - XplainCrypto - publisher.publisher - INFO - Section 10: Governance and Community - Content preview: Governance and Community: ONDO ONDO's governance structure is designed to facilitate decentralized d... [truncated, total length: 2939]...
+2025-04-06 12:50:49,228 - XplainCrypto - publisher.publisher - INFO -   Subsections: []
+2025-04-06 12:50:49,228 - XplainCrypto - publisher.publisher - INFO - Section 'Ecosystem and Partnerships' has 407 words, within requirements (400-700)
+2025-04-06 12:50:49,228 - XplainCrypto - publisher.publisher - INFO - Section 11: Ecosystem and Partnerships - Content preview: Ecosystem and Partnerships ONDO's ecosystem is an integral part of its overall business strategy, en... [truncated, total length: 2971]...
+2025-04-06 12:50:49,228 - XplainCrypto - publisher.publisher - INFO -   Subsections: []
+2025-04-06 12:50:49,229 - XplainCrypto - publisher.publisher - INFO - Section 'Risks and Opportunities' has 518 words, within requirements (450-700)
+2025-04-06 12:50:49,229 - XplainCrypto - publisher.publisher - INFO - Section 12: Risks and Opportunities - Content preview: Risks and Opportunities for ONDO In assessing the risks and opportunities for ONDO, it is crucial to... [truncated, total length: 3731]...
+2025-04-06 12:50:49,229 - XplainCrypto - publisher.publisher - INFO -   Subsections: []
+2025-04-06 12:50:49,229 - XplainCrypto - publisher.publisher - INFO - Section 'Team and Development Activity' has 402 words, within requirements (400-700)
+2025-04-06 12:50:49,229 - XplainCrypto - publisher.publisher - INFO - Section 13: Team and Development Activity - Content preview: Team and Development Activity of ONDO ONDO is a cutting-edge project in the blockchain industry, and... [truncated, total length: 2705]...
+2025-04-06 12:50:49,229 - XplainCrypto - publisher.publisher - INFO -   Subsections: []
+2025-04-06 12:50:49,229 - XplainCrypto - publisher.publisher - INFO - Section 'Conclusion' has 346 words, within requirements (300-500)
+2025-04-06 12:50:49,229 - XplainCrypto - publisher.publisher - INFO - Section 14: Conclusion - Content preview: Conclusion In conclusion, ONDO is a promising investment opportunity in the blockchain and cryptocur... [truncated, total length: 2547]...
+2025-04-06 12:50:49,229 - XplainCrypto - publisher.publisher - INFO -   Subsections: []
+2025-04-06 12:50:49,229 - XplainCrypto - publisher.publisher - WARNING - Some sections weren't in report_config: 1 sections ignored
+2025-04-06 12:50:49,229 - XplainCrypto - publisher.publisher - INFO - Reordered sections to match report_config order: ['Executive Summary', 'Introduction', 'Tokenomics and Distribution', 'Market Analysis', 'Technical Analysis', 'Developer Tools and User Experience', 'Security', 'Liquidity and Adoption Metrics', 'Governance and Community', 'Ecosystem and Partnerships', 'Risks and Opportunities', 'Team and Development Activity', 'Conclusion']
+2025-04-06 12:50:49,242 - XplainCrypto - publisher.process_section_content - INFO - Processing section 'Executive Summary' with 5 content lines
+2025-04-06 12:50:49,242 - XplainCrypto - publisher.process_section_content - INFO - Found 1 content blocks in section 'Executive Summary'
+2025-04-06 12:50:49,243 - XplainCrypto - publisher.process_section_content - INFO - Completed processing section 'Executive Summary'
+2025-04-06 12:50:49,243 - XplainCrypto - publisher.process_section_content - INFO - Processing section 'Introduction' with 5 content lines
+2025-04-06 12:50:49,243 - XplainCrypto - publisher.process_section_content - INFO - Found 1 content blocks in section 'Introduction'
+2025-04-06 12:50:49,243 - XplainCrypto - publisher.process_section_content - INFO - Completed processing section 'Introduction'
+2025-04-06 12:50:49,243 - XplainCrypto - publisher.process_section_content - INFO - Processing section 'Tokenomics and Distribution' with 9 content lines
+2025-04-06 12:50:49,243 - XplainCrypto - publisher.process_section_content - INFO - Found 1 content blocks in section 'Tokenomics and Distribution'
+2025-04-06 12:50:49,243 - XplainCrypto - publisher.process_section_content - INFO - Completed processing section 'Tokenomics and Distribution'
+2025-04-06 12:50:49,243 - XplainCrypto - publisher.process_section_content - INFO - Processing section 'Market Analysis' with 1 content lines
+2025-04-06 12:50:49,243 - XplainCrypto - publisher.process_section_content - WARNING - No meaningful content for section 'Market Analysis'
+2025-04-06 12:50:49,243 - XplainCrypto - publisher.process_section_content - INFO - Completed processing section 'Market Analysis'
+2025-04-06 12:50:49,243 - XplainCrypto - publisher.process_section_content - INFO - Processing section 'Technical Analysis' with 1 content lines
+2025-04-06 12:50:49,243 - XplainCrypto - publisher.process_section_content - WARNING - No meaningful content for section 'Technical Analysis'
+2025-04-06 12:50:49,243 - XplainCrypto - publisher.process_section_content - INFO - Completed processing section 'Technical Analysis'
+2025-04-06 12:50:49,244 - XplainCrypto - publisher.process_section_content - INFO - Processing section 'Developer Tools and User Experience' with 7 content lines
+2025-04-06 12:50:49,244 - XplainCrypto - publisher.process_section_content - INFO - Found 1 content blocks in section 'Developer Tools and User Experience'
+2025-04-06 12:50:49,244 - XplainCrypto - publisher.process_section_content - INFO - Completed processing section 'Developer Tools and User Experience'
+2025-04-06 12:50:49,244 - XplainCrypto - publisher.process_section_content - INFO - Processing section 'Security' with 7 content lines
+2025-04-06 12:50:49,244 - XplainCrypto - publisher.process_section_content - INFO - Found 1 content blocks in section 'Security'
+2025-04-06 12:50:49,244 - XplainCrypto - publisher.process_section_content - INFO - Completed processing section 'Security'
+2025-04-06 12:50:49,244 - XplainCrypto - publisher.process_section_content - INFO - Processing section 'Liquidity and Adoption Metrics' with 13 content lines
+2025-04-06 12:50:49,244 - XplainCrypto - publisher.process_section_content - INFO - Found 1 content blocks in section 'Liquidity and Adoption Metrics'
+2025-04-06 12:50:49,245 - XplainCrypto - publisher.process_section_content - INFO - Completed processing section 'Liquidity and Adoption Metrics'
+2025-04-06 12:50:49,245 - XplainCrypto - publisher.process_section_content - INFO - Processing section 'Governance and Community' with 8 content lines
+2025-04-06 12:50:49,245 - XplainCrypto - publisher.process_section_content - INFO - Found 1 content blocks in section 'Governance and Community'
+2025-04-06 12:50:49,245 - XplainCrypto - publisher.process_section_content - INFO - Completed processing section 'Governance and Community'
+2025-04-06 12:50:49,246 - XplainCrypto - publisher.process_section_content - INFO - Processing section 'Ecosystem and Partnerships' with 8 content lines
+2025-04-06 12:50:49,246 - XplainCrypto - publisher.process_section_content - INFO - Found 1 content blocks in section 'Ecosystem and Partnerships'
+2025-04-06 12:50:49,246 - XplainCrypto - publisher.process_section_content - INFO - Completed processing section 'Ecosystem and Partnerships'
+2025-04-06 12:50:49,246 - XplainCrypto - publisher.process_section_content - INFO - Processing section 'Risks and Opportunities' with 10 content lines
+2025-04-06 12:50:49,247 - XplainCrypto - publisher.process_section_content - INFO - Found 1 content blocks in section 'Risks and Opportunities'
+2025-04-06 12:50:49,247 - XplainCrypto - publisher.process_section_content - INFO - Completed processing section 'Risks and Opportunities'
+2025-04-06 12:50:49,247 - XplainCrypto - publisher.process_section_content - INFO - Processing section 'Team and Development Activity' with 8 content lines
+2025-04-06 12:50:49,247 - XplainCrypto - publisher.process_section_content - INFO - Found 1 content blocks in section 'Team and Development Activity'
+2025-04-06 12:50:49,248 - XplainCrypto - publisher.process_section_content - INFO - Completed processing section 'Team and Development Activity'
+2025-04-06 12:50:49,248 - XplainCrypto - publisher.process_section_content - INFO - Processing section 'Conclusion' with 8 content lines
+2025-04-06 12:50:49,248 - XplainCrypto - publisher.process_section_content - INFO - Found 1 content blocks in section 'Conclusion'
+2025-04-06 12:50:49,248 - XplainCrypto - publisher.process_section_content - INFO - Completed processing section 'Conclusion'
+2025-04-06 12:50:49,291 - XplainCrypto - publisher.publisher - INFO - Generated PDF report: docs/ondo/ondo_report.pdf
+2025-04-06 12:50:49,292 - XplainCrypto - workflow_manager.wrapped_agent - ERROR - Error in Publishing: object dict can't be used in 'await' expression
+Traceback (most recent call last):
+  File "/Users/gkavanagh/Development/xplaincrypto/backend/orchestration/workflow_manager.py", line 262, in wrapped_agent
+    updated_state = await agent_function(working_state, llm, logger, config)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: object dict can't be used in 'await' expression
+2025-04-06 12:50:49,292 - XplainCrypto - error_reporter.report_error - ERROR - Error in agent.publishing: object dict can't be used in 'await' expression [ID: err_20250406125049_5528596832]
+Traceback (most recent call last):
+  File "/Users/gkavanagh/Development/xplaincrypto/backend/orchestration/workflow_manager.py", line 262, in wrapped_agent
+    updated_state = await agent_function(working_state, llm, logger, config)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: object dict can't be used in 'await' expression
+2025-04-06 12:50:49,292 - XplainCrypto - progress_tracker._log - INFO - Progress: Publishing - 100% complete: Error in publishing: object dict can't be used in 'await' expression
+2025-04-06 12:50:49,294 - XplainCrypto - progress_tracker._log - INFO - Job ONDO completed in 1301.31 seconds (100.0% complete)
+2025-04-06 12:50:49,294 - XplainCrypto - workflow_manager.execute_workflow - INFO - Completed workflow execution for ONDO in 1301.31s
+2025-04-06 12:50:49,294 - XplainCrypto - server.handle_message - INFO - Workflow completed for project: 'ONDO'

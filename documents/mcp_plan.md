@@ -185,7 +185,7 @@ XplainCrypto/
   vector_store.upsert_endpoint("data://coinmarketcap", "Fetches market cap and supply data from CoinMarketCap")
   vector_store.upsert_endpoint("data://defillama", "Fetches TVL data from DeFiLlama")
   vector_store.upsert_endpoint("research://tavily", "Performs web research using Tavily")
-  vector_store.upsert_endpoint("fallback://huggingface", "Generates synthetic data using Hugging Face models")
+  vector_store.upsert_endpoint("fallback://huggingface", "Generates fallback data using Hugging Face models")
   ```
 - Test the RAG retriever:
   ```python

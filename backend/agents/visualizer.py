@@ -16,7 +16,7 @@ from langchain_openai import ChatOpenAI
 
 logger = logging.getLogger(__name__)
 
-async def visualization_agent(state: Dict, llm: ChatOpenAI, logger: logging.Logger, config=None) -> Dict:
+async def visualizer(state: Dict, llm: ChatOpenAI, logger: logging.Logger, config=None) -> Dict:
     # Get project name
     project_name = state.get("project_name", "Unknown Project")
     
@@ -25,6 +25,32 @@ async def visualization_agent(state: Dict, llm: ChatOpenAI, logger: logging.Logg
         state.update_progress(f"Creating visualizations for {project_name}...")
     else:
         state["progress"] = f"Creating visualizations for {project_name}..."
+    
+    # Diagnostic information
+    logger.info("----------- VISUALIZATION DIAGNOSTIC INFO -----------")
+    logger.info(f"Current working directory: {os.getcwd()}")
+    try:
+        docs_dir = os.path.join(os.getcwd(), "docs")
+        project_dir = os.path.join(docs_dir, project_name.lower().replace(" ", "_"))
+        
+        # Check docs directory
+        if os.path.exists(docs_dir):
+            logger.info(f"Docs directory exists: {docs_dir}")
+            logger.info(f"Docs directory contents: {os.listdir(docs_dir)}")
+        else:
+            logger.warning(f"Docs directory does not exist: {docs_dir}")
+            os.makedirs(docs_dir, exist_ok=True)
+            logger.info(f"Created docs directory: {docs_dir}")
+        
+        # Check project directory
+        if os.path.exists(project_dir):
+            logger.info(f"Project directory exists: {project_dir}")
+            logger.info(f"Project directory contents: {os.listdir(project_dir)}")
+        else:
+            logger.warning(f"Project directory does not exist: {project_dir}")
+    except Exception as e:
+        logger.error(f"Error during directory diagnostics: {str(e)}")
+    logger.info("-----------------------------------------------------")
     
     # Get data for visualization
     hf_fallback = state.get("hf_fallback")
@@ -36,7 +62,7 @@ async def visualization_agent(state: Dict, llm: ChatOpenAI, logger: logging.Logg
         web_research_data = {}
         
     # Create visualization agent
-    agent = VisualizationAgent(
+    agent = Visualizer(
         logger=logger, 
         hf_fallback=hf_fallback, 
         web_data=web_research_data, 
@@ -57,6 +83,24 @@ async def visualization_agent(state: Dict, llm: ChatOpenAI, logger: logging.Logg
         # Copy visualizations back to the dictionary state
         if hasattr(updated_state, "visualizations"):
             state["visualizations"] = updated_state.visualizations
+            
+            # Log visualization results for debugging
+            vis_count = len(state["visualizations"])
+            logger.info(f"Generated {vis_count} visualizations")
+            for viz_type, viz_data in state["visualizations"].items():
+                path = viz_data.get("path", "")
+                if path and os.path.exists(path):
+                    file_size = os.path.getsize(path) / 1024
+                    logger.info(f"  - {viz_type}: {path} ({file_size:.1f} KB)")
+                else:
+                    logger.warning(f"  - {viz_type}: File not found or invalid path")
+        else:
+            logger.error("No visualizations returned from agent")
+            
+        # Copy visualization errors if any
+        if hasattr(updated_state, "visualization_errors"):
+            state["visualization_errors"] = updated_state.visualization_errors
+            logger.warning(f"Visualization errors: {updated_state.visualization_errors}")
         
         # Update progress
         if hasattr(state, 'update_progress'):
@@ -65,10 +109,11 @@ async def visualization_agent(state: Dict, llm: ChatOpenAI, logger: logging.Logg
             state["progress"] = f"Visualizations created for {project_name}"
             
     except Exception as e:
-        logger.error(f"Error in visualization agent: {str(e)}")
+        logger.error(f"Error in visualizer: {str(e)}", exc_info=True)
         
         # Initialize visualizations dict if needed
         state["visualizations"] = state.get("visualizations", {})
+        state["visualization_errors"] = {"global_error": str(e)}
         
         # Update progress with error
         if hasattr(state, 'update_progress'):
@@ -78,7 +123,7 @@ async def visualization_agent(state: Dict, llm: ChatOpenAI, logger: logging.Logg
             
     return state
 
-class VisualizationAgent:
+class Visualizer:
     def __init__(self, hf_fallback=None, web_data=None, logger=None, project_name=None):
         self.hf_fallback = hf_fallback
         self.web_data = web_data or {}
@@ -186,6 +231,24 @@ class VisualizationAgent:
         sections = state.report_config.get("sections", [])
         generated_visuals = {}
         already_generated = set()
+        visualization_errors = {}
+
+        # First, ensure output directory exists
+        try:
+            project_dir = os.path.join("docs", state.project_name.lower().replace(" ", "_"))
+            os.makedirs(project_dir, exist_ok=True)
+            self.logger.info(f"Verified visualization output directory: {project_dir}")
+            
+            # Create a test file to verify write permissions
+            test_file = os.path.join(project_dir, ".test_write")
+            with open(test_file, "w") as f:
+                f.write("test")
+            os.remove(test_file)
+            self.logger.info("Successfully verified file system write access")
+        except Exception as e:
+            self.logger.error(f"Failed to create or verify output directory: {str(e)}")
+            state.visualizations = {"error": f"Visualization directory error: {str(e)}"}
+            return state
 
         for section in sections:
             visual_types = section.get("visualizations", [])
@@ -197,12 +260,14 @@ class VisualizationAgent:
                 viz_config = visuals_config.get(viz_type)
                 if not viz_config:
                     self.logger.warning(f"No config found for visualization type: {viz_type}")
+                    visualization_errors[viz_type] = "Missing configuration"
                     continue
 
                 chart_type = viz_config.get("type")
                 VisualizerCls = self.visualizer_map.get(chart_type)
                 if not VisualizerCls:
                     self.logger.error(f"No visualizer found for type: {chart_type}")
+                    visualization_errors[viz_type] = f"Unknown chart type: {chart_type}"
                     continue
 
                 data_source = viz_config.get("data_source", "multi")
@@ -230,7 +295,9 @@ class VisualizationAgent:
                         self.logger.error(f"Hugging Face fallback failed for {viz_type}: {e}")
 
                 if missing_fields:
-                    self.logger.warning(f"Skipping {viz_type}, missing fields: {missing_fields}")
+                    missing_str = ", ".join(missing_fields)
+                    self.logger.warning(f"Skipping {viz_type}, missing fields: {missing_str}")
+                    visualization_errors[viz_type] = f"Missing required data: {missing_str}"
                     continue
 
                 try:
@@ -238,18 +305,40 @@ class VisualizationAgent:
                     result = visualizer.create(viz_type, viz_config, data)
                     if not result or "file_path" not in result:
                         raise ValueError(f"No file created for {viz_type}")
+                        
+                    # Verify the file exists and is valid
+                    file_path = result["file_path"]
+                    if not os.path.exists(file_path):
+                        raise FileNotFoundError(f"Generated file not found: {file_path}")
+                    
+                    if os.path.getsize(file_path) == 0:
+                        raise ValueError(f"Generated file is empty: {file_path}")
+                        
+                    self.logger.info(f"Successfully generated visualization: {viz_type} ({os.path.getsize(file_path)/1024:.1f} KB)")
 
                     if hasattr(self, "llm"):
                         result["description"] = self._generate_description(viz_type, viz_config, data, result)
 
+                    # Add relative path for frontend use
+                    if os.path.isabs(file_path):
+                        docs_dir = os.path.join(os.getcwd(), "docs")
+                        if file_path.startswith(docs_dir):
+                            result["relative_path"] = os.path.relpath(file_path, os.getcwd())
+                    
                     generated_visuals[viz_type] = {
-                        "path": result["file_path"],
+                        "path": file_path,
+                        "relative_path": result.get("relative_path", file_path),
                         "meta": result,
                         "timestamp": datetime.utcnow().isoformat()
                     }
 
                 except Exception as e:
-                    self.logger.error(f"Failed to generate {viz_type}: {e}")
+                    self.logger.error(f"Failed to generate {viz_type}: {str(e)}", exc_info=True)
+                    visualization_errors[viz_type] = f"Generation error: {str(e)}"
 
+        if visualization_errors:
+            self.logger.warning(f"Encountered {len(visualization_errors)} visualization errors")
+            state.visualization_errors = visualization_errors
+            
         state.visualizations = generated_visuals
-        return state
+        return state 

@@ -75,3 +75,9 @@ mdpdf>=0.0.14
 docx-generator>=0.0.2
 aiohttp>=3.9.0
 pandas>=2.0.0
+
+# MCP Integration Dependencies
+mcp>=0.1.0
+langchain-mcp-adapters>=0.1.0
+pinecone-client>=3.0.0
+sentence-transformers>=2.2.2

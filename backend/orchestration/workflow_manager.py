@@ -67,6 +67,32 @@ class WorkflowManager:
                     
             self.llm = ChatOpenAI(model=model_name, api_key=api_key)
             self.logger.info(f"Initialized LLM with model {model_name}")
+            
+            # Initialize MCP components if enabled
+            use_mcp = os.environ.get("USE_MCP", "false").lower() == "true"
+            if use_mcp:
+                try:
+                    from backend.orchestration.rag.vector_store import get_vector_store
+                    from backend.orchestration.mcp.router import MCPRouter
+                    from backend.agents.researcher import Researcher
+                    
+                    self.logger.info("Initializing RAG and MCP components")
+                    # We'll initialize the researcher in the async method
+                    self.researcher = Researcher(
+                        llm_model=model_name,
+                        use_mcp=True,
+                        logger=self.logger
+                    )
+                    self.logger.info("Created researcher instance - will be initialized asynchronously")
+                    
+                except Exception as e:
+                    self.logger.error(f"Error initializing MCP components: {str(e)}")
+                    if self.error_reporter:
+                        self.error_reporter.report_error(
+                            e, category="system_error", component="workflow_manager",
+                            context={"feature": "mcp_initialization"}
+                        )
+            
             return True
         except Exception as e:
             self.logger.error(f"Error initializing LLM: {str(e)}")
@@ -77,12 +103,37 @@ class WorkflowManager:
                 )
             return False
     
+    async def initialize(self):
+        """Asynchronously initialize all components of the workflow."""
+        try:
+            self.logger.info("Starting asynchronous initialization of workflow components")
+            
+            # Initialize the researcher if it exists
+            if hasattr(self, 'researcher'):
+                self.logger.info("Initializing researcher with MCP endpoints")
+                await self.researcher.initialize()
+                self.logger.info("Researcher initialization complete")
+            
+            # Future: Initialize other async components here
+            
+            self.logger.info("All components initialized successfully")
+            return True
+        except Exception as e:
+            self.logger.error(f"Error during asynchronous initialization: {str(e)}")
+            if self.error_reporter:
+                self.error_reporter.report_error(
+                    e, category="system_error", component="workflow_manager",
+                    context={"feature": "async_initialization"}
+                )
+            return False
+    
     def create_workflow(self) -> StateGraph:
         """Create the LangGraph workflow."""
         try:
-            from backend.agents.enhanced_researcher import enhanced_researcher
+            # Import the new consolidated researcher
+            from backend.agents.researcher import Researcher, researcher
             from backend.agents.writer import writer
-            from backend.agents.visualization_agent import visualization_agent
+            from backend.agents.visualizer import visualizer
             from backend.agents.reviewer import reviewer
             from backend.agents.editor import editor
             from backend.agents.publisher import publisher
@@ -90,10 +141,49 @@ class WorkflowManager:
             # Initialize the workflow using dict as the state type, not ResearchState
             workflow = StateGraph(Dict)
             
-            # Define workflow nodes using dynamic wrappers to include logging and progress tracking
-            workflow.add_node("enhanced_researcher", self._create_node_wrapper(enhanced_researcher, "Research"))
+            # Initialize researcher instance if using MCP
+            use_mcp = os.environ.get("USE_MCP", "false").lower() == "true"
+            
+            if use_mcp:
+                # Create a researcher instance
+                self.researcher = Researcher(
+                    llm_model=self.llm.model_name if self.llm else "gpt-4o-mini", 
+                    use_mcp=True,
+                    logger=self.logger
+                )
+                
+                # Create a specialized wrapper for the researcher's execute_workflow method
+                async def researcher_wrapper(state, llm=None, logger=None, config=None):
+                    """Special wrapper to handle the researcher's different interface in MCP mode."""
+                    # Extract the query from the state
+                    project_name = state.get("project_name", "")
+                    query = f"Provide comprehensive research about {project_name} cryptocurrency"
+                    
+                    # Execute workflow with the query
+                    self.logger.info(f"Executing researcher with MCP for: {project_name}")
+                    result = await self.researcher.execute_workflow(
+                        query_or_state=query, 
+                        context={"project_name": project_name, "report_config": state.get("report_config", {})}
+                    )
+                    
+                    # Merge result with original state to preserve data
+                    for key, value in result.items():
+                        if key not in state or not state[key]:
+                            state[key] = value
+                            
+                    return state
+                
+                # Add the researcher node with our special wrapper
+                workflow.add_node("enhanced_researcher", self._create_node_wrapper(
+                    researcher_wrapper, "Research"))
+                self.logger.info("Using MCP-enabled Researcher")
+            else:
+                # Use standard researcher function in classic mode
+                workflow.add_node("enhanced_researcher", self._create_node_wrapper(
+                    researcher, "Research"))
+            
             workflow.add_node("writer", self._create_node_wrapper(writer, "Writing"))
-            workflow.add_node("visualization_agent", self._create_node_wrapper(visualization_agent, "Visualization"))
+            workflow.add_node("visualizer", self._create_node_wrapper(visualizer, "Visualization"))
             workflow.add_node("reviewer", self._create_node_wrapper(reviewer, "Review"))
             workflow.add_node("editor", self._create_node_wrapper(editor, "Editing"))
             workflow.add_node("publisher", self._create_node_wrapper(publisher, "Publishing"))
@@ -103,8 +193,8 @@ class WorkflowManager:
             
             # Add edges to create sequential flow
             workflow.add_edge("enhanced_researcher", "writer")
-            workflow.add_edge("writer", "visualization_agent")
-            workflow.add_edge("visualization_agent", "reviewer")
+            workflow.add_edge("writer", "visualizer")
+            workflow.add_edge("visualizer", "reviewer")
             workflow.add_edge("reviewer", "editor")
             workflow.add_edge("editor", "publisher")
             workflow.add_edge("publisher", END)
@@ -247,6 +337,13 @@ class WorkflowManager:
             success = self.initialize_llm()
             if not success:
                 return {"error": "Failed to initialize language model"}
+        
+        # Run async initialization if needed
+        if hasattr(self, 'researcher') and not getattr(self.researcher, '_compiled_mcp_workflow', None):
+            self.logger.info("Running async initialization before workflow execution")
+            success = await self.initialize()
+            if not success:
+                return {"error": "Failed to initialize async components"}
         
         # Ensure graph is created
         if not self.graph:
