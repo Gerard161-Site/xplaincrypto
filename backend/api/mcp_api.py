@@ -2,6 +2,11 @@ from typing import Dict, Any, List, Optional
 from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel
 from orchestration.workflow_manager import WorkflowManagerWithMCP
+from orchestration.mcp.initialize_endpoints import initialize_pinecone_endpoints
+import logging
+
+# Set up logging
+logger = logging.getLogger(__name__)
 
 # Initialize the FastAPI app
 app = FastAPI(title="XplainCrypto API with MCP Integration")
@@ -9,10 +14,21 @@ app = FastAPI(title="XplainCrypto API with MCP Integration")
 # Initialize the workflow manager
 workflow_manager = WorkflowManagerWithMCP()
 
-# Initialize the workflow manager on startup
+# Initialize the workflow manager and Pinecone endpoints on startup
 @app.on_event("startup")
 async def startup_event():
+    logger.info("Starting application initialization")
+    
+    # First initialize Pinecone with MCP endpoint metadata
+    logger.info("Initializing Pinecone with MCP endpoint metadata")
+    endpoints_initialized = await initialize_pinecone_endpoints()
+    if not endpoints_initialized:
+        logger.warning("Failed to initialize Pinecone with MCP endpoint metadata")
+    
+    # Then initialize the workflow manager
+    logger.info("Initializing workflow manager")
     await workflow_manager.initialize()
+    logger.info("Application initialization complete")
 
 class ResearchRequest(BaseModel):
     """Request model for research queries."""
@@ -80,6 +96,21 @@ async def execute_tool(request: ToolExecutionRequest):
     try:
         result = await workflow_manager.execute_tool(request.tool_name, **request.arguments)
         return ApiResponse(success=True, data=result)
+    except Exception as e:
+        return ApiResponse(success=False, data=None, error=str(e))
+
+@app.get("/api/initialize-endpoints", response_model=ApiResponse)
+async def reinitialize_endpoints():
+    """
+    Manually reinitialize Pinecone with MCP endpoint metadata.
+    This can be used if the automatic initialization failed or if endpoints were updated.
+    
+    Returns:
+        Success status of the initialization
+    """
+    try:
+        success = await initialize_pinecone_endpoints()
+        return ApiResponse(success=success, data={"message": "Endpoints initialized successfully"})
     except Exception as e:
         return ApiResponse(success=False, data=None, error=str(e))
 

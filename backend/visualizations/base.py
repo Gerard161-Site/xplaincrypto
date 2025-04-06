@@ -1,105 +1,227 @@
 """
-Base visualization class that defines the common interface and functionality
-for all visualization types.
+Enhanced visualization module for XplainCrypto with PDF optimization.
+This module provides base visualization capabilities with specific optimizations
+for PDF output and real-time data integration.
 """
 
 import os
-import logging
-from typing import Dict, Any, Optional
-import matplotlib
-matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+import matplotlib as mpl
+from matplotlib.figure import Figure
+from typing import Dict, Any, List, Optional, Tuple, Union
+import logging
 import numpy as np
-from datetime import datetime
+from datetime import datetime, timedelta
+import io
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 class BaseVisualizer:
-    """
-    Base class for all visualization modules.
+    """Base class for all visualizers with PDF optimization."""
     
-    This defines the interface that all visualization modules should implement
-    and provides common utility methods.
-    """
+    def __init__(self, theme: str = "dark", pdf_optimized: bool = True):
+        """
+        Initialize the base visualizer.
+        
+        Args:
+            theme: Color theme to use ('dark' or 'light')
+            pdf_optimized: Whether to optimize for PDF output
+        """
+        self.theme = theme
+        self.pdf_optimized = pdf_optimized
+        self.fig = None
+        self.ax = None
+        
+        # Define color palettes optimized for PDF output
+        self.color_palettes = {
+            "dark": {
+                "primary": ["#4361ee", "#3a0ca3", "#7209b7", "#f72585", "#4cc9f0"],
+                "accent": "#4cc9f0",
+                "background": "#121212",
+                "text": "#ffffff",
+                "grid": "#333333",
+                "positive": "#00b894",
+                "negative": "#ff7675",
+                "neutral": "#74b9ff"
+            },
+            "light": {
+                "primary": ["#0077b6", "#0096c7", "#00b4d8", "#48cae4", "#90e0ef"],
+                "accent": "#03045e",
+                "background": "#ffffff",
+                "text": "#333333",
+                "grid": "#dddddd",
+                "positive": "#00b894",
+                "negative": "#ff7675",
+                "neutral": "#74b9ff"
+            }
+        }
+        
+        # Set up the style based on theme
+        self._setup_style()
     
-    def __init__(self, project_name: str, logger: logging.Logger):
-        self.project_name = project_name
-        self.logger = logger
+    def _setup_style(self):
+        """Set up matplotlib style based on theme."""
+        plt.style.use('default')
         
-        self.output_dir = os.path.join("docs", self.project_name.lower().replace(" ", "_"))
-        self.logger.info(f"Initializing visualizer with output directory: {self.output_dir}")
+        # Get colors for current theme
+        colors = self.color_palettes[self.theme]
         
-        try:
-            os.makedirs(self.output_dir, exist_ok=True)
-            self.logger.info(f"Created/verified output directory: {self.output_dir}")
-        except Exception as e:
-            self.logger.error(f"Failed to create output directory {self.output_dir}: {str(e)}")
-            raise
+        # Configure matplotlib rcParams for the theme
+        mpl.rcParams['figure.facecolor'] = colors["background"]
+        mpl.rcParams['axes.facecolor'] = colors["background"]
+        mpl.rcParams['axes.edgecolor'] = colors["grid"]
+        mpl.rcParams['axes.labelcolor'] = colors["text"]
+        mpl.rcParams['xtick.color'] = colors["text"]
+        mpl.rcParams['ytick.color'] = colors["text"]
+        mpl.rcParams['text.color'] = colors["text"]
+        mpl.rcParams['grid.color'] = colors["grid"]
         
-        self._verify_matplotlib_backend()
-        
-        self.logger.debug(f"Initialized {self.__class__.__name__} for project: {project_name}")
-        self.logger.debug(f"Output directory: {self.output_dir}")
+        # PDF optimization settings
+        if self.pdf_optimized:
+            mpl.rcParams['figure.dpi'] = 300
+            mpl.rcParams['savefig.dpi'] = 300
+            mpl.rcParams['font.size'] = 12
+            mpl.rcParams['axes.linewidth'] = 1.5
+            mpl.rcParams['lines.linewidth'] = 2.5
+            mpl.rcParams['font.family'] = 'sans-serif'
+            mpl.rcParams['font.sans-serif'] = ['Arial', 'Helvetica', 'DejaVu Sans']
     
-    def _verify_matplotlib_backend(self):
-        current_backend = plt.get_backend()
-        self.logger.debug(f"Matplotlib using backend: {current_backend}")
-        
-        if current_backend in ['TkAgg', 'Qt5Agg', 'MacOSX']:
-            try:
-                self.logger.warning(f"Switching from interactive backend {current_backend} to Agg")
-                plt.switch_backend('Agg')
-                self.logger.info(f"Successfully switched to backend: {plt.get_backend()}")
-            except Exception as e:
-                self.logger.error(f"Failed to switch matplotlib backend: {str(e)}")
+    def create_figure(self, figsize: Tuple[float, float] = (10, 6)):
+        """Create a new figure with the specified size."""
+        self.fig, self.ax = plt.subplots(figsize=figsize)
+        self.fig.patch.set_facecolor(self.color_palettes[self.theme]["background"])
+        self.ax.set_facecolor(self.color_palettes[self.theme]["background"])
+        return self.fig, self.ax
     
-    def create(self, vis_type: str, config: Dict[str, Any], data: Dict[str, Any]) -> Dict[str, Any]:
-        raise NotImplementedError("Child classes must implement the create method")
+    def add_title_and_labels(self, title: str, xlabel: str, ylabel: str):
+        """Add title and axis labels to the figure."""
+        if self.ax:
+            self.ax.set_title(title, fontsize=14, fontweight='bold', color=self.color_palettes[self.theme]["text"])
+            self.ax.set_xlabel(xlabel, fontsize=12, color=self.color_palettes[self.theme]["text"])
+            self.ax.set_ylabel(ylabel, fontsize=12, color=self.color_palettes[self.theme]["text"])
     
-    def validate_output_dir(self) -> bool:
-        try:
-            if not os.path.exists(self.output_dir):
-                os.makedirs(self.output_dir, exist_ok=True)
-                self.logger.info(f"Created output directory: {self.output_dir}")
-            
-            test_file = os.path.join(self.output_dir, ".test_write")
-            with open(test_file, "w") as f:
-                f.write("test")
-            os.remove(test_file)
-            
-            self.logger.info(f"Validated output directory: {self.output_dir}")
+    def add_grid(self, alpha: float = 0.3):
+        """Add a grid to the figure."""
+        if self.ax:
+            self.ax.grid(True, linestyle='--', alpha=alpha, color=self.color_palettes[self.theme]["grid"])
+    
+    def add_legend(self, loc: str = 'best'):
+        """Add a legend to the figure."""
+        if self.ax:
+            self.ax.legend(loc=loc, framealpha=0.8, facecolor=self.color_palettes[self.theme]["background"],
+                          edgecolor=self.color_palettes[self.theme]["grid"], 
+                          labelcolor=self.color_palettes[self.theme]["text"])
+    
+    def add_watermark(self, text: str = "XplainCrypto"):
+        """Add a watermark to the figure."""
+        if self.fig:
+            self.fig.text(0.5, 0.5, text, fontsize=40, color=self.color_palettes[self.theme]["grid"],
+                         ha='center', va='center', alpha=0.1, rotation=30)
+    
+    def add_timestamp(self):
+        """Add a timestamp to the figure."""
+        if self.fig:
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            self.fig.text(0.99, 0.01, f"Generated: {timestamp}", fontsize=8, 
+                         color=self.color_palettes[self.theme]["text"], ha='right', va='bottom', alpha=0.7)
+    
+    def save_figure(self, filename: str, dpi: int = 300):
+        """Save the figure to a file."""
+        if self.fig:
+            self.fig.savefig(filename, dpi=dpi, bbox_inches='tight', 
+                           facecolor=self.color_palettes[self.theme]["background"])
+            logger.info(f"Saved figure to {filename}")
             return True
+        return False
+    
+    def export_to_pdf(self, filename: str):
+        """Export the current chart to PDF."""
+        if self.fig:
+            self.fig.savefig(filename, format='pdf', dpi=300, bbox_inches='tight',
+                           facecolor=self.color_palettes[self.theme]["background"])
+            logger.info(f"Exported figure to PDF: {filename}")
+            return True
+        return False
+    
+    def get_figure_as_bytes(self, format: str = 'png'):
+        """Get the figure as bytes in the specified format."""
+        if self.fig:
+            buf = io.BytesIO()
+            self.fig.savefig(buf, format=format, dpi=300, bbox_inches='tight',
+                           facecolor=self.color_palettes[self.theme]["background"])
+            buf.seek(0)
+            return buf.getvalue()
+        return None
+    
+    def close_figure(self):
+        """Close the current figure."""
+        if self.fig:
+            plt.close(self.fig)
+            self.fig = None
+            self.ax = None
+
+
+class WebSocketDataProvider:
+    """Provider for real-time data via WebSocket connections."""
+    
+    def __init__(self, endpoint: str = None):
+        """
+        Initialize the WebSocket data provider.
+        
+        Args:
+            endpoint: WebSocket endpoint URL
+        """
+        self.endpoint = endpoint
+        self.connected = False
+        self.data_buffer = []
+        
+    async def connect(self, endpoint: str = None):
+        """
+        Connect to the WebSocket endpoint.
+        
+        Args:
+            endpoint: WebSocket endpoint URL (overrides the one set in constructor)
+        """
+        # This is a placeholder for actual WebSocket connection logic
+        # In a real implementation, this would use a library like websockets or socketio
+        self.endpoint = endpoint or self.endpoint
+        logger.info(f"Connecting to WebSocket endpoint: {self.endpoint}")
+        self.connected = True
+        
+    async def disconnect(self):
+        """Disconnect from the WebSocket endpoint."""
+        if self.connected:
+            logger.info(f"Disconnecting from WebSocket endpoint: {self.endpoint}")
+            self.connected = False
             
-        except Exception as e:
-            self.logger.error(f"Output directory validation failed: {str(e)}")
-            return False
-    
-    def get_safe_filename(self, vis_type: str) -> str:
-        safe_name = vis_type.lower().replace(" ", "_")
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"{safe_name}_{timestamp}.png"
-        return filename
-    
-    def verify_file_saved(self, file_path: str) -> bool:
-        self.logger.debug(f"Verifying file was saved: {file_path}")
+    async def get_latest_data(self, symbol: str, limit: int = 100):
+        """
+        Get the latest data for a symbol.
         
-        dir_path = os.path.dirname(file_path)
-        if not os.path.exists(dir_path):
-            self.logger.error(f"Output directory does not exist: {dir_path}")
-            try:
-                os.makedirs(dir_path, exist_ok=True)
-                self.logger.info(f"Created output directory: {dir_path}")
-            except Exception as e:
-                self.logger.error(f"Failed to create output directory: {str(e)}")
-                return False
+        Args:
+            symbol: Symbol to get data for (e.g., 'BTC')
+            limit: Maximum number of data points to return
+            
+        Returns:
+            List of data points
+        """
+        # This is a placeholder for actual WebSocket data retrieval
+        # In a real implementation, this would return data from the WebSocket connection
+        logger.info(f"Getting latest data for {symbol} (limit: {limit})")
         
-        if not os.path.exists(file_path):
-            self.logger.error(f"File does not exist: {file_path}")
-            return False
+        # For now, generate some random data for testing
+        now = datetime.now()
+        data = []
+        for i in range(limit):
+            timestamp = now - timedelta(minutes=i)
+            price = 50000 + np.random.normal(0, 1000)
+            volume = np.random.randint(1, 100)
+            data.append({
+                "timestamp": timestamp.strftime("%Y-%m-%d %H:%M:%S"),
+                "price": price,
+                "volume": volume
+            })
         
-        file_size = os.path.getsize(file_path)
-        if file_size == 0:
-            self.logger.error(f"File exists but is empty: {file_path}")
-            return False
-        
-        file_size_kb = file_size / 1024
-        self.logger.info(f"File saved successfully: {file_path} ({file_size_kb:.1f} KB)")
-        return True
+        # Return data in reverse order (oldest first)
+        return list(reversed(data))

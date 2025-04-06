@@ -1,276 +1,312 @@
 """
-Line chart visualization module.
-
-This module provides the LineChartVisualizer class for creating line chart visualizations
-for price history, volume, TVL, and other time-series data.
+Enhanced line chart visualizer for XplainCrypto with PDF optimization and real-time data support.
+This module provides advanced line chart visualization capabilities specifically optimized for
+cryptocurrency price and metric visualization in PDF reports.
 """
 
-import os
-import logging
-from typing import Dict, Any, List, Optional, Tuple, Union
-from datetime import datetime
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 import numpy as np
+from typing import Dict, Any, List, Optional, Tuple, Union
+import pandas as pd
+from datetime import datetime, timedelta
+from matplotlib.colors import LinearSegmentedColormap
+import logging
+from .base import BaseVisualizer
 
-from backend.visualizations.base import BaseVisualizer
+# Configure logging
+logger = logging.getLogger(__name__)
 
 class LineChartVisualizer(BaseVisualizer):
-    """
-    Specialized visualizer for line charts.
+    """Enhanced line chart visualizer with PDF optimization and real-time data support."""
     
-    Handles creation of line charts for time-series data such as price history,
-    trading volume, TVL, and other metrics over time.
-    """
+    def __init__(self, theme: str = "dark", pdf_optimized: bool = True):
+        """
+        Initialize the line chart visualizer.
+        
+        Args:
+            theme: Color theme to use ('dark' or 'light')
+            pdf_optimized: Whether to optimize for PDF output
+        """
+        super().__init__(theme, pdf_optimized)
     
-    def create(self, vis_type: str, config: Dict[str, Any], data: Dict[str, Any]) -> Dict[str, Any]:
-        self.logger.info(f"Creating line chart: {vis_type}")
+    def plot_price_chart(self, data: List[Dict[str, Any]], title: str = "Price Chart", 
+                        show_volume: bool = True, add_indicators: bool = True,
+                        moving_averages: List[int] = None):
+        """
+        Create a price chart with optional volume and indicators.
         
-        if not self.validate_output_dir():
-            return {"error": "Invalid output directory"}
-        
-        data_field = config.get("data_field", "")
-        series_data, data_field = self._get_chart_data(vis_type, data_field, data)
-        if not series_data:
-            return {"error": f"No data available for {vis_type}"}
-        
-        if not isinstance(series_data, (list, tuple)) or len(series_data) < 2:
-            return {"error": f"Insufficient data points for {vis_type}: {len(series_data)} points"}
-        
-        if not all(isinstance(item, (list, tuple)) and len(item) >= 2 for item in series_data):
-            return {"error": f"Invalid data format for {vis_type}: Expected [timestamp, value] pairs"}
-        
-        try:
-            plt.figure(figsize=(6.5, 3.5))
-            start_value, end_value, min_value, max_value = self._plot_data(series_data)
-            self._set_chart_style(vis_type, config)
-            file_path = self._save_chart(vis_type)
-            if not file_path:
-                return {"error": f"Failed to save chart for {vis_type}"}
+        Args:
+            data: List of data points with 'timestamp', 'price', and optionally 'volume'
+            title: Chart title
+            show_volume: Whether to show volume bars
+            add_indicators: Whether to add technical indicators
+            moving_averages: List of periods for moving averages (e.g., [7, 30, 90])
             
-            percent_change = 0
-            if start_value and end_value and start_value != 0:
-                percent_change = ((end_value - start_value) / start_value) * 100
-            
-            return {
-                "file_path": file_path,
-                "title": config.get("title", vis_type.replace("_", " ").title()),
-                "data_summary": {
-                    "start_value": start_value,
-                    "end_value": end_value,
-                    "min_value": min_value,
-                    "max_value": max_value,
-                    "data_points": len(series_data),
-                    "percent_change": percent_change,
-                    "data_field": data_field
-                }
-            }
-        except Exception as e:
-            self.logger.error(f"Error creating line chart: {str(e)}", exc_info=True)
-            plt.close()
-            return {"error": f"Failed to create line chart: {str(e)}"}
-
-    def _get_chart_data(self, vis_type: str, data_field: str, data: Dict[str, Any]) -> Tuple[List, str]:
-        alternative_fields = []
+        Returns:
+            The created figure
+        """
+        # Convert data to DataFrame for easier manipulation
+        df = pd.DataFrame(data)
+        df['timestamp'] = pd.to_datetime(df['timestamp'])
         
-        if vis_type == "price_history_chart":
-            alternative_fields = ["prices", "price_history", "price_data"]
-        elif vis_type == "volume_chart" or vis_type == "liquidity_trends_chart":
-            alternative_fields = ["total_volumes", "volume_history", "volumes"]
-        elif vis_type == "tvl_chart":
-            alternative_fields = ["tvl_history", "tvl_data"]
-        
-        if data_field in data and data[data_field]:
-            self.logger.info(f"Using data from field '{data_field}' for {vis_type}")
-            return data[data_field], data_field
-        
-        for field in alternative_fields:
-            if field in data and data[field]:
-                self.logger.info(f"Using data from alternative field '{field}' for {vis_type}")
-                return data[field], field
-        
-        self.logger.error(f"No data found for {vis_type} in fields: {[data_field] + alternative_fields}")
-        return [], ""
-    
-    def _plot_data(self, series_data: List) -> Tuple[float, float, float, float]:
-        timestamps = [item[0] for item in series_data]
-        values = [item[1] for item in series_data]
-        
-        if timestamps and timestamps[0] > 1e10:
-            timestamps = [ts/1000 for ts in timestamps]
-        
-        values = [float(v) if v is not None else 0 for v in values]
-        
-        plt.plot(timestamps, values, marker='o', markersize=4, linestyle='-', color='#1f77b4', alpha=0.7)
-        plt.fill_between(timestamps, values, color='#1f77b4', alpha=0.1)
-        
-        start_value = values[0] if values else 0
-        end_value = values[-1] if values else 0
-        min_value = min(values) if values else 0
-        max_value = max(values) if values else 0
-        
-        plt.gca().xaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: 
-            datetime.fromtimestamp(x).strftime('%m/%d') if x > 1e8 else str(int(x))))
-        plt.gca().tick_params(axis='both', which='major', labelsize=10, labelrotation=45, labelright=False, labeltop=False, labelbottom=True, labelleft=True)
-        
-        return start_value, end_value, min_value, max_value
-    
-    def _set_chart_style(self, vis_type: str, config: Dict[str, Any]) -> None:
-        title = config.get("title", vis_type.replace("_", " ").title())
-        plt.title(title, pad=10, fontsize=12, fontfamily='Times New Roman')
-        
-        if vis_type == "price_history_chart":
-            plt.xlabel("Time", labelpad=10, fontfamily='Times New Roman')
-            plt.ylabel("Price (USD)", labelpad=10, fontfamily='Times New Roman')
-        elif vis_type == "volume_chart" or vis_type == "liquidity_trends_chart":
-            plt.xlabel("Time", labelpad=10, fontfamily='Times New Roman')
-            plt.ylabel("Volume (USD)", labelpad=10, fontfamily='Times New Roman')
-        elif vis_type == "tvl_chart":
-            plt.xlabel("Time", labelpad=10, fontfamily='Times New Roman')
-            plt.ylabel("TVL (USD)", labelpad=10, fontfamily='Times New Roman')
+        # Create figure with appropriate size
+        if show_volume:
+            # Create figure with two subplots (price and volume)
+            self.fig, (self.ax, volume_ax) = plt.subplots(2, 1, figsize=(12, 8), 
+                                                         gridspec_kw={'height_ratios': [3, 1]},
+                                                         sharex=True)
+            self.fig.subplots_adjust(hspace=0)
         else:
-            plt.xlabel("Time", labelpad=10, fontfamily='Times New Roman')
-            plt.ylabel("Value", labelpad=10, fontfamily='Times New Roman')
+            # Create figure with just price
+            self.fig, self.ax = plt.subplots(figsize=(12, 6))
         
-        plt.grid(True, alpha=0.3)
+        # Set background colors
+        self.fig.patch.set_facecolor(self.color_palettes[self.theme]["background"])
+        self.ax.set_facecolor(self.color_palettes[self.theme]["background"])
+        
+        # Plot price line with gradient fill
+        line_color = self.color_palettes[self.theme]["primary"][0]
+        fill_color = self.color_palettes[self.theme]["primary"][0]
+        
+        # Plot the price line
+        line = self.ax.plot(df['timestamp'], df['price'], color=line_color, linewidth=2.5, label='Price')
+        
+        # Add gradient fill below the line
+        min_price = df['price'].min()
+        self.ax.fill_between(df['timestamp'], df['price'], min_price, 
+                           color=fill_color, alpha=0.2)
+        
+        # Add moving averages if requested
+        if add_indicators and moving_averages:
+            for period in moving_averages:
+                if len(df) > period:
+                    ma_col = f'MA_{period}'
+                    df[ma_col] = df['price'].rolling(window=period).mean()
+                    color_idx = moving_averages.index(period) % len(self.color_palettes[self.theme]["primary"])
+                    ma_color = self.color_palettes[self.theme]["primary"][color_idx]
+                    self.ax.plot(df['timestamp'], df[ma_col], color=ma_color, 
+                               linewidth=1.5, label=f'{period}-day MA')
+        
+        # Format the price axis
+        self.ax.set_ylabel('Price', fontsize=12, color=self.color_palettes[self.theme]["text"])
+        self.ax.tick_params(axis='y', colors=self.color_palettes[self.theme]["text"])
+        self.ax.grid(True, linestyle='--', alpha=0.3, color=self.color_palettes[self.theme]["grid"])
+        
+        # Add volume subplot if requested
+        if show_volume and 'volume' in df.columns:
+            volume_ax.bar(df['timestamp'], df['volume'], color=self.color_palettes[self.theme]["accent"], 
+                         alpha=0.7, width=0.8)
+            volume_ax.set_ylabel('Volume', fontsize=12, color=self.color_palettes[self.theme]["text"])
+            volume_ax.tick_params(axis='y', colors=self.color_palettes[self.theme]["text"])
+            volume_ax.tick_params(axis='x', colors=self.color_palettes[self.theme]["text"])
+            volume_ax.set_facecolor(self.color_palettes[self.theme]["background"])
+            volume_ax.grid(True, linestyle='--', alpha=0.3, color=self.color_palettes[self.theme]["grid"])
+            
+            # Format x-axis dates
+            volume_ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+            volume_ax.xaxis.set_major_locator(mdates.AutoDateLocator())
+        else:
+            # Format x-axis dates on the main axis
+            self.ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+            self.ax.xaxis.set_major_locator(mdates.AutoDateLocator())
+            self.ax.tick_params(axis='x', colors=self.color_palettes[self.theme]["text"])
+        
+        # Add title and legend
+        self.ax.set_title(title, fontsize=16, fontweight='bold', color=self.color_palettes[self.theme]["text"])
+        self.ax.legend(loc='upper left', framealpha=0.8, facecolor=self.color_palettes[self.theme]["background"],
+                      edgecolor=self.color_palettes[self.theme]["grid"], 
+                      labelcolor=self.color_palettes[self.theme]["text"])
+        
+        # Add timestamp and watermark
+        self.add_timestamp()
+        self.add_watermark()
+        
+        # Adjust layout
         plt.tight_layout()
+        
+        return self.fig
     
-    def _save_chart(self, vis_type: str) -> str:
-        filename = self.get_safe_filename(vis_type)
-        file_path = os.path.join(self.output_dir, filename)
+    def plot_comparison_chart(self, data_sets: List[Dict[str, Any]], title: str = "Comparison Chart",
+                             normalize: bool = True):
+        """
+        Create a comparison chart with multiple data series.
         
-        self.logger.info(f"Saving line chart to: {file_path}")
-        self.logger.debug(f"Output directory: {self.output_dir}")
-        self.logger.debug(f"Current working directory: {os.getcwd()}")
+        Args:
+            data_sets: List of dictionaries with 'name', 'timestamps', and 'values'
+            title: Chart title
+            normalize: Whether to normalize values to percentage change from start
+            
+        Returns:
+            The created figure
+        """
+        # Create figure
+        self.fig, self.ax = plt.subplots(figsize=(12, 6))
+        self.fig.patch.set_facecolor(self.color_palettes[self.theme]["background"])
+        self.ax.set_facecolor(self.color_palettes[self.theme]["background"])
         
-        try:
-            os.makedirs(os.path.dirname(file_path), exist_ok=True)
-            import matplotlib
-            current_backend = plt.get_backend()
-            self.logger.debug(f"Current matplotlib backend: {current_backend}")
-            if current_backend != 'Agg':
-                self.logger.info(f"Switching matplotlib backend from {current_backend} to Agg")
-                matplotlib.use('Agg')
+        # Plot each data series
+        for i, data_set in enumerate(data_sets):
+            name = data_set['name']
+            timestamps = pd.to_datetime(data_set['timestamps'])
+            values = np.array(data_set['values'])
             
-            self.logger.debug(f"Attempting to save figure to {file_path}")
-            plt.savefig(file_path, dpi=300, bbox_inches='tight')
-            self.logger.debug(f"plt.savefig completed for {file_path}")
-            plt.close()
+            # Normalize to percentage change if requested
+            if normalize and len(values) > 0:
+                start_value = values[0]
+                values = [(v / start_value - 1) * 100 for v in values]
             
-            if self.verify_file_saved(file_path):
-                return file_path
-                
-            self.logger.error(f"Failed to verify file was saved: {file_path}")
-            return ""
+            # Get color from palette
+            color_idx = i % len(self.color_palettes[self.theme]["primary"])
+            color = self.color_palettes[self.theme]["primary"][color_idx]
             
-        except Exception as e:
-            self.logger.error(f"Error saving chart: {str(e)}", exc_info=True)
-            plt.close()
-            return ""
-
-    def create_visualization(self, data: Dict[str, Any], title: str) -> str:
-        self.logger.info(f"Creating line chart visualization: {title}")
+            # Plot the line
+            self.ax.plot(timestamps, values, color=color, linewidth=2.5, label=name)
         
-        if not self.validate_output_dir():
-            self.logger.error("Output directory validation failed")
-            return ""
+        # Set labels and title
+        if normalize:
+            self.ax.set_ylabel('Percentage Change (%)', fontsize=12, color=self.color_palettes[self.theme]["text"])
+        else:
+            self.ax.set_ylabel('Value', fontsize=12, color=self.color_palettes[self.theme]["text"])
         
-        series_data = []
-        for data_field in ["prices", "price_history", "price_data", "total_volumes", "volume_history", "tvl_history"]:
-            if data_field in data and data[data_field]:
-                series_data = data[data_field]
-                self.logger.info(f"Using data from field '{data_field}' for line chart")
-                break
+        self.ax.set_xlabel('Date', fontsize=12, color=self.color_palettes[self.theme]["text"])
+        self.ax.set_title(title, fontsize=16, fontweight='bold', color=self.color_palettes[self.theme]["text"])
         
-        if not series_data:
-            if "current_price" in data or "market_cap" in data or "24h_volume" in data or "tvl" in data:
-                basic_data = []
-                if "current_price" in data:
-                    basic_data.append(("Price", data["current_price"]))
-                if "market_cap" in data:
-                    basic_data.append(("Market Cap (B)", data["market_cap"] / 1000000000))
-                if "24h_volume" in data:
-                    basic_data.append(("24h Volume (M)", data["24h_volume"] / 1000000))
-                if "tvl" in data:
-                    basic_data.append(("TVL (M)", data["tvl"] / 1000000))
-                    
-                series_data = basic_data
-                self.logger.info(f"Created basic metrics series with {len(basic_data)} data points")
+        # Format axes
+        self.ax.tick_params(axis='both', colors=self.color_palettes[self.theme]["text"])
+        self.ax.grid(True, linestyle='--', alpha=0.3, color=self.color_palettes[self.theme]["grid"])
         
-        if not series_data and isinstance(data, list) and len(data) > 0:
-            series_data = data
-            self.logger.info("Using direct list data for line chart")
+        # Format x-axis dates
+        self.ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+        self.ax.xaxis.set_major_locator(mdates.AutoDateLocator())
         
-        if not series_data or not isinstance(series_data, (list, tuple)) or len(series_data) < 2:
-            self.logger.error(f"Insufficient data points for line chart: {len(series_data) if series_data else 0} points")
-            return ""
+        # Add legend, timestamp, and watermark
+        self.ax.legend(loc='best', framealpha=0.8, facecolor=self.color_palettes[self.theme]["background"],
+                      edgecolor=self.color_palettes[self.theme]["grid"], 
+                      labelcolor=self.color_palettes[self.theme]["text"])
+        self.add_timestamp()
+        self.add_watermark()
         
-        try:
-            plt.figure(figsize=(6.5, 3.5))
-            x_values = []
-            y_values = []
+        # Add zero line for normalized charts
+        if normalize:
+            self.ax.axhline(y=0, color=self.color_palettes[self.theme]["grid"], linestyle='-', alpha=0.5)
+        
+        # Adjust layout
+        plt.tight_layout()
+        
+        return self.fig
+    
+    def plot_correlation_chart(self, data: Dict[str, List[float]], title: str = "Correlation Matrix"):
+        """
+        Create a correlation matrix heatmap.
+        
+        Args:
+            data: Dictionary mapping asset names to price lists (all lists must be same length)
+            title: Chart title
             
-            if all(isinstance(item, tuple) and len(item) == 2 for item in series_data):
-                x_values = [item[0] for item in series_data]
-                y_values = [item[1] for item in series_data]
-                plt.bar(x_values, y_values, color='#1f77b4', alpha=0.7)
-                plt.xticks(rotation=45)
-                plt.grid(True, alpha=0.3)
-                
-            elif isinstance(series_data[0], (int, float)):
-                x_values = list(range(len(series_data)))
-                y_values = series_data
-                plt.plot(x_values, y_values, marker='o', markersize=4, linestyle='-', color='#1f77b4', alpha=0.7)
-                plt.fill_between(x_values, y_values, color='#1f77b4', alpha=0.1)
-                
-            elif isinstance(series_data[0], dict) and 'timestamp' in series_data[0] and 'value' in series_data[0]:
-                x_values = [item.get('timestamp') for item in series_data]
-                y_values = [item.get('value', 0) for item in series_data]
-                plt.plot(x_values, y_values, marker='o', markersize=4, linestyle='-', color='#1f77b4', alpha=0.7)
-                plt.fill_between(x_values, y_values, color='#1f77b4', alpha=0.1)
-                
-            elif isinstance(series_data[0], (list, tuple)) and len(series_data[0]) >= 2:
-                x_values = [item[0] for item in series_data]
-                y_values = [item[1] for item in series_data]
-                
-                if x_values and isinstance(x_values[0], (int, float)) and x_values[0] > 1e10:
-                    x_values = [ts/1000 for ts in x_values]
-                
-                plt.plot(x_values, y_values, marker='o', markersize=4, linestyle='-', color='#1f77b4', alpha=0.7)
-                plt.fill_between(x_values, y_values, color='#1f77b4', alpha=0.1)
+        Returns:
+            The created figure
+        """
+        # Convert data to DataFrame
+        df = pd.DataFrame(data)
+        
+        # Calculate correlation matrix
+        corr_matrix = df.corr()
+        
+        # Create figure
+        self.fig, self.ax = plt.subplots(figsize=(10, 8))
+        self.fig.patch.set_facecolor(self.color_palettes[self.theme]["background"])
+        self.ax.set_facecolor(self.color_palettes[self.theme]["background"])
+        
+        # Create custom colormap for correlation values
+        colors = [self.color_palettes[self.theme]["negative"], 
+                 self.color_palettes[self.theme]["background"], 
+                 self.color_palettes[self.theme]["positive"]]
+        cmap = LinearSegmentedColormap.from_list("correlation_cmap", colors, N=100)
+        
+        # Plot heatmap
+        im = self.ax.imshow(corr_matrix, cmap=cmap, vmin=-1, vmax=1)
+        
+        # Add colorbar
+        cbar = self.fig.colorbar(im, ax=self.ax)
+        cbar.ax.tick_params(colors=self.color_palettes[self.theme]["text"])
+        
+        # Set ticks and labels
+        tick_labels = list(data.keys())
+        self.ax.set_xticks(np.arange(len(tick_labels)))
+        self.ax.set_yticks(np.arange(len(tick_labels)))
+        self.ax.set_xticklabels(tick_labels, rotation=45, ha="right", 
+                              color=self.color_palettes[self.theme]["text"])
+        self.ax.set_yticklabels(tick_labels, color=self.color_palettes[self.theme]["text"])
+        
+        # Add correlation values in cells
+        for i in range(len(tick_labels)):
+            for j in range(len(tick_labels)):
+                value = corr_matrix.iloc[i, j]
+                text_color = "white" if abs(value) > 0.5 else "black"
+                self.ax.text(j, i, f"{value:.2f}", ha="center", va="center", 
+                           color=text_color, fontweight="bold")
+        
+        # Add title
+        self.ax.set_title(title, fontsize=16, fontweight='bold', color=self.color_palettes[self.theme]["text"])
+        
+        # Add timestamp and watermark
+        self.add_timestamp()
+        self.add_watermark()
+        
+        # Adjust layout
+        plt.tight_layout()
+        
+        return self.fig
+    
+    def plot_token_metrics(self, timestamps: List[datetime], metrics: Dict[str, List[float]], 
+                          title: str = "Token Metrics"):
+        """
+        Create a multi-line chart for token metrics.
+        
+        Args:
+            timestamps: List of datetime objects
+            metrics: Dictionary mapping metric names to value lists
+            title: Chart title
             
-            if x_values and isinstance(x_values[0], (int, float)) and x_values[0] > 1e8:
-                plt.gca().xaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: 
-                    datetime.fromtimestamp(x).strftime('%m/%d')))
+        Returns:
+            The created figure
+        """
+        # Create figure
+        self.fig, self.ax = plt.subplots(figsize=(12, 6))
+        self.fig.patch.set_facecolor(self.color_palettes[self.theme]["background"])
+        self.ax.set_facecolor(self.color_palettes[self.theme]["background"])
+        
+        # Plot each metric
+        for i, (metric_name, values) in enumerate(metrics.items()):
+            # Get color from palette
+            color_idx = i % len(self.color_palettes[self.theme]["primary"])
+            color = self.color_palettes[self.theme]["primary"][color_idx]
             
-            plt.title(title, pad=10, fontsize=12, fontfamily='Times New Roman')
-            plt.xlabel("Time", labelpad=10, fontfamily='Times New Roman')
-            plt.ylabel("Value", labelpad=10, fontfamily='Times New Roman')
-            
-            plt.grid(True, alpha=0.3)
-            plt.tight_layout()
-            
-            filename = self.get_safe_filename(title)
-            file_path = os.path.join(self.output_dir, filename)
-            
-            os.makedirs(os.path.dirname(file_path), exist_ok=True)
-            
-            import matplotlib
-            current_backend = plt.get_backend()
-            self.logger.debug(f"Current matplotlib backend: {current_backend}")
-            if current_backend != 'Agg':
-                self.logger.info(f"Switching matplotlib backend from {current_backend} to Agg")
-                matplotlib.use('Agg')
-                
-            plt.savefig(file_path, dpi=300, bbox_inches='tight')
-            plt.close()
-            
-            if self.verify_file_saved(file_path):
-                return file_path
-            
-            self.logger.error(f"Failed to verify file was saved: {file_path}")
-            return ""
-            
-        except Exception as e:
-            self.logger.error(f"Error creating line chart: {str(e)}", exc_info=True)
-            plt.close()
-            return ""
+            # Plot the line
+            self.ax.plot(timestamps, values, color=color, linewidth=2.5, label=metric_name)
+        
+        # Set labels and title
+        self.ax.set_ylabel('Value', fontsize=12, color=self.color_palettes[self.theme]["text"])
+        self.ax.set_xlabel('Date', fontsize=12, color=self.color_palettes[self.theme]["text"])
+        self.ax.set_title(title, fontsize=16, fontweight='bold', color=self.color_palettes[self.theme]["text"])
+        
+        # Format axes
+        self.ax.tick_params(axis='both', colors=self.color_palettes[self.theme]["text"])
+        self.ax.grid(True, linestyle='--', alpha=0.3, color=self.color_palettes[self.theme]["grid"])
+        
+        # Format x-axis dates
+        self.ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+        self.ax.xaxis.set_major_locator(mdates.AutoDateLocator())
+        
+        # Add legend, timestamp, and watermark
+        self.ax.legend(loc='best', framealpha=0.8, facecolor=self.color_palettes[self.theme]["background"],
+                      edgecolor=self.color_palettes[self.theme]["grid"], 
+                      labelcolor=self.color_palettes[self.theme]["text"])
+        self.add_timestamp()
+        self.add_watermark()
+        
+        # Adjust layout
+        plt.tight_layout()
+        
+        return self.fig

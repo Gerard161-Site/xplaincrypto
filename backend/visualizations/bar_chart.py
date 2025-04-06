@@ -1,283 +1,317 @@
 """
-Bar chart visualization module.
-
-This module provides the BarChartVisualizer class for creating bar chart visualizations
-for competitor comparisons, rankings, and other categorical data.
+Enhanced bar chart visualizer for XplainCrypto with PDF optimization.
+This module provides advanced bar chart visualization capabilities specifically optimized for
+cryptocurrency metrics visualization in PDF reports.
 """
 
-import os
-import logging
-from typing import Dict, Any, List, Optional, Tuple, Union
 import matplotlib.pyplot as plt
 import numpy as np
+from typing import Dict, Any, List, Optional, Tuple, Union
+import pandas as pd
+from datetime import datetime
+from matplotlib.colors import LinearSegmentedColormap
+import logging
+from .base import BaseVisualizer
 
-from backend.visualizations.base import BaseVisualizer
+# Configure logging
+logger = logging.getLogger(__name__)
 
 class BarChartVisualizer(BaseVisualizer):
-    """
-    Specialized visualizer for bar charts.
+    """Enhanced bar chart visualizer with PDF optimization."""
     
-    Handles creation of bar chart visualizations for competitor comparisons,
-    rankings, and other categorical data.
-    """
+    def __init__(self, theme: str = "dark", pdf_optimized: bool = True):
+        """
+        Initialize the bar chart visualizer.
+        
+        Args:
+            theme: Color theme to use ('dark' or 'light')
+            pdf_optimized: Whether to optimize for PDF output
+        """
+        super().__init__(theme, pdf_optimized)
     
-    def create(self, vis_type: str, config: Dict[str, Any], data: Dict[str, Any]) -> Dict[str, Any]:
-        self.logger.info(f"Creating bar chart: {vis_type}")
+    def plot_market_dominance(self, data: Dict[str, float], title: str = "Market Dominance"):
+        """
+        Create a bar chart showing market dominance of different cryptocurrencies.
         
-        if not self.validate_output_dir():
-            return {"error": "Invalid output directory"}
+        Args:
+            data: Dictionary mapping cryptocurrency names to market dominance percentages
+            title: Chart title
+            
+        Returns:
+            The created figure
+        """
+        # Sort data by value in descending order
+        sorted_data = dict(sorted(data.items(), key=lambda item: item[1], reverse=True))
         
-        if "competitor" in vis_type.lower():
-            return self._create_competitor_chart(vis_type, config, data)
-        else:
-            return self._create_standard_bar_chart(vis_type, config, data)
+        # Create figure
+        self.fig, self.ax = plt.subplots(figsize=(12, 8))
+        self.fig.patch.set_facecolor(self.color_palettes[self.theme]["background"])
+        self.ax.set_facecolor(self.color_palettes[self.theme]["background"])
+        
+        # Get colors from palette
+        colors = self.color_palettes[self.theme]["primary"]
+        
+        # Plot horizontal bars
+        bars = self.ax.barh(list(sorted_data.keys()), list(sorted_data.values()), 
+                           color=[colors[i % len(colors)] for i in range(len(sorted_data))])
+        
+        # Add value labels to the bars
+        for bar in bars:
+            width = bar.get_width()
+            label_x_pos = width + 0.5
+            self.ax.text(label_x_pos, bar.get_y() + bar.get_height()/2, f'{width:.1f}%',
+                       va='center', color=self.color_palettes[self.theme]["text"])
+        
+        # Set labels and title
+        self.ax.set_xlabel('Market Dominance (%)', fontsize=12, color=self.color_palettes[self.theme]["text"])
+        self.ax.set_title(title, fontsize=16, fontweight='bold', color=self.color_palettes[self.theme]["text"])
+        
+        # Format axes
+        self.ax.tick_params(axis='both', colors=self.color_palettes[self.theme]["text"])
+        self.ax.grid(True, linestyle='--', alpha=0.3, color=self.color_palettes[self.theme]["grid"])
+        
+        # Add timestamp and watermark
+        self.add_timestamp()
+        self.add_watermark()
+        
+        # Adjust layout
+        plt.tight_layout()
+        
+        return self.fig
     
-    def _create_competitor_chart(self, vis_type: str, config: Dict[str, Any], data: Dict[str, Any]) -> Dict[str, Any]:
-        competitors_data = None
-        data_field = config.get("data_field", "competitors")
+    def plot_token_distribution(self, data: Dict[str, float], title: str = "Token Distribution"):
+        """
+        Create a horizontal stacked bar chart showing token distribution.
         
-        if data_field in data and data[data_field]:
-            competitors_data = data[data_field]
-            self.logger.info(f"Using competitor data from '{data_field}'")
-        elif "competitors" in data and data["competitors"]:
-            competitors_data = data["competitors"]
-            self.logger.info("Using competitor data from 'competitors' field")
-        elif "similar_projects" in data and data["similar_projects"]:
-            competitors_data = data["similar_projects"]
-            self.logger.info("Using competitor data from 'similar_projects' field")
+        Args:
+            data: Dictionary mapping category names to percentages
+            title: Chart title
+            
+        Returns:
+            The created figure
+        """
+        # Create figure
+        self.fig, self.ax = plt.subplots(figsize=(12, 4))
+        self.fig.patch.set_facecolor(self.color_palettes[self.theme]["background"])
+        self.ax.set_facecolor(self.color_palettes[self.theme]["background"])
         
-        if not competitors_data:
-            self.logger.warning(f"No competitor data found for {vis_type}")
-            return {"error": "No competitor data available"}
+        # Get colors from palette
+        colors = self.color_palettes[self.theme]["primary"]
         
-        competitors, metrics = self._extract_competitor_data(competitors_data)
-        if not competitors or not metrics:
-            self.logger.warning(f"Failed to extract valid competitor data for {vis_type}")
-            return {"error": "Invalid competitor data format"}
+        # Plot horizontal stacked bar
+        categories = list(data.keys())
+        values = list(data.values())
         
-        try:
-            plt.figure(figsize=(8, 5))
-            bar_width = 0.8 / len(metrics) if len(metrics) > 1 else 0.4
-            bar_positions = np.arange(len(competitors))
+        # Calculate positions for the stacked bars
+        positions = [0]
+        for value in values[:-1]:
+            positions.append(positions[-1] + value)
+        
+        # Plot each segment
+        for i, (category, value) in enumerate(zip(categories, values)):
+            color_idx = i % len(colors)
+            self.ax.barh(["Token Distribution"], [value], left=positions[i], 
+                        color=colors[color_idx], label=category)
             
-            for i, (metric_name, metric_values) in enumerate(metrics.items()):
-                offset = (i - len(metrics)/2 + 0.5) * bar_width
-                plt.bar(
-                    bar_positions + offset, 
-                    metric_values, 
-                    width=bar_width, 
-                    label=metric_name.replace("_", " ").title(), 
-                    alpha=0.7,
-                    color=plt.cm.tab10(i % 10)
-                )
-            
-            plt.xticks(bar_positions, competitors, rotation=45, ha='right', fontfamily='Times New Roman')
-            if len(metrics) > 1:
-                plt.legend(loc='best', frameon=True, fontfamily='Times New Roman')
-            
-            title = config.get("title", f"{self.project_name} Competitor Comparison")
-            plt.title(title, pad=20, fontsize=14, fontfamily='Times New Roman')
-            plt.ylabel("Value", labelpad=10, fontfamily='Times New Roman')
-            
-            plt.tight_layout()
-            plt.subplots_adjust(bottom=0.25)
-            
-            file_path = self._save_chart(vis_type)
-            if not file_path:
-                return {"error": f"Failed to save chart for {vis_type}"}
-            
-            return {
-                "file_path": file_path,
-                "title": title,
-                "data_summary": {
-                    "competitors": competitors,
-                    "metrics": list(metrics.keys()),
-                    "data_field": data_field
-                }
-            }
-        except Exception as e:
-            self.logger.error(f"Error creating competitor chart: {str(e)}", exc_info=True)
-            plt.close()
-            return {"error": f"Failed to create competitor chart: {str(e)}"}
+            # Add percentage labels in the middle of each segment
+            if value >= 5:  # Only add label if segment is large enough
+                label_x_pos = positions[i] + value/2
+                self.ax.text(label_x_pos, 0, f'{category}\n{value:.1f}%',
+                           ha='center', va='center', color='white', fontweight='bold')
+        
+        # Remove y-axis labels and ticks
+        self.ax.set_yticks([])
+        self.ax.set_yticklabels([])
+        
+        # Set labels and title
+        self.ax.set_xlabel('Percentage (%)', fontsize=12, color=self.color_palettes[self.theme]["text"])
+        self.ax.set_title(title, fontsize=16, fontweight='bold', color=self.color_palettes[self.theme]["text"])
+        
+        # Format axes
+        self.ax.tick_params(axis='x', colors=self.color_palettes[self.theme]["text"])
+        self.ax.grid(True, linestyle='--', alpha=0.3, color=self.color_palettes[self.theme]["grid"])
+        
+        # Add legend, timestamp, and watermark
+        self.ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=len(categories),
+                      framealpha=0.8, facecolor=self.color_palettes[self.theme]["background"],
+                      edgecolor=self.color_palettes[self.theme]["grid"], 
+                      labelcolor=self.color_palettes[self.theme]["text"])
+        self.add_timestamp()
+        self.add_watermark()
+        
+        # Adjust layout
+        plt.tight_layout()
+        
+        return self.fig
     
-    def _create_standard_bar_chart(self, vis_type: str, config: Dict[str, Any], data: Dict[str, Any]) -> Dict[str, Any]:
-        data_field = config.get("data_field", "")
-        categories, values, field_used = self._get_chart_data(vis_type, data_field, data)
-        if not categories or not values:
-            self.logger.warning(f"No valid data found for {vis_type}")
-            return {"error": f"No valid data available for {vis_type}"}
+    def plot_comparison_bars(self, categories: List[str], data_sets: List[Dict[str, Any]], 
+                            title: str = "Comparison"):
+        """
+        Create a grouped bar chart for comparing multiple data sets across categories.
         
-        try:
-            plt.figure(figsize=(7, 5))
-            bars = plt.bar(
-                range(len(categories)), 
-                values, 
-                width=0.6, 
-                align='center',
-                alpha=0.7,
-                color=plt.cm.tab10(np.linspace(0, 1, len(categories)))
-            )
+        Args:
+            categories: List of category names
+            data_sets: List of dictionaries with 'name' and 'values' (list matching categories)
+            title: Chart title
             
-            plt.xticks(range(len(categories)), categories, rotation=45, ha='right', fontfamily='Times New Roman')
+        Returns:
+            The created figure
+        """
+        # Create figure
+        self.fig, self.ax = plt.subplots(figsize=(12, 8))
+        self.fig.patch.set_facecolor(self.color_palettes[self.theme]["background"])
+        self.ax.set_facecolor(self.color_palettes[self.theme]["background"])
+        
+        # Calculate positions for the grouped bars
+        n_datasets = len(data_sets)
+        bar_width = 0.8 / n_datasets
+        
+        # Plot each data set as a group of bars
+        for i, data_set in enumerate(data_sets):
+            name = data_set['name']
+            values = data_set['values']
             
+            # Calculate positions for this group
+            positions = np.arange(len(categories)) - 0.4 + (i + 0.5) * bar_width
+            
+            # Get color from palette
+            color_idx = i % len(self.color_palettes[self.theme]["primary"])
+            color = self.color_palettes[self.theme]["primary"][color_idx]
+            
+            # Plot the bars
+            bars = self.ax.bar(positions, values, bar_width, label=name, color=color)
+            
+            # Add value labels to the bars
             for bar in bars:
                 height = bar.get_height()
-                plt.text(
-                    bar.get_x() + bar.get_width()/2., 
-                    height + 0.02 * max(values),
-                    f'{height:.1f}' if isinstance(height, float) else f'{height}',
-                    ha='center', va='bottom', fontsize=10, rotation=0, fontfamily='Times New Roman'
-                )
-            
-            title = config.get("title", vis_type.replace("_", " ").title())
-            plt.title(title, pad=20, fontsize=14, fontfamily='Times New Roman')
-            plt.ylabel("Value", labelpad=10, fontfamily='Times New Roman')
-            
-            plt.tight_layout()
-            plt.subplots_adjust(bottom=0.25)
-            
-            file_path = self._save_chart(vis_type)
-            if not file_path:
-                return {"error": f"Failed to save chart for {vis_type}"}
-            
-            return {
-                "file_path": file_path,
-                "title": title,
-                "data_summary": {
-                    "categories": categories,
-                    "values": values,
-                    "data_field": field_used
-                }
-            }
-        except Exception as e:
-            self.logger.error(f"Error creating bar chart: {str(e)}", exc_info=True)
-            plt.close()
-            return {"error": f"Failed to create bar chart: {str(e)}"}
+                self.ax.text(bar.get_x() + bar.get_width()/2, height + 0.1,
+                           f'{height:.1f}', ha='center', va='bottom',
+                           color=self.color_palettes[self.theme]["text"], fontsize=9)
+        
+        # Set x-axis ticks and labels
+        self.ax.set_xticks(np.arange(len(categories)))
+        self.ax.set_xticklabels(categories, rotation=45, ha='right',
+                              color=self.color_palettes[self.theme]["text"])
+        
+        # Set labels and title
+        self.ax.set_ylabel('Value', fontsize=12, color=self.color_palettes[self.theme]["text"])
+        self.ax.set_title(title, fontsize=16, fontweight='bold', color=self.color_palettes[self.theme]["text"])
+        
+        # Format axes
+        self.ax.tick_params(axis='both', colors=self.color_palettes[self.theme]["text"])
+        self.ax.grid(True, linestyle='--', alpha=0.3, color=self.color_palettes[self.theme]["grid"])
+        
+        # Add legend, timestamp, and watermark
+        self.ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=n_datasets,
+                      framealpha=0.8, facecolor=self.color_palettes[self.theme]["background"],
+                      edgecolor=self.color_palettes[self.theme]["grid"], 
+                      labelcolor=self.color_palettes[self.theme]["text"])
+        self.add_timestamp()
+        self.add_watermark()
+        
+        # Adjust layout
+        plt.tight_layout()
+        
+        return self.fig
     
-    def _extract_competitor_data(self, competitors_data: Any) -> Tuple[List[str], Dict[str, List[float]]]:
-        competitor_names = []
-        metrics = {}
+    def plot_risk_matrix(self, risks: List[Dict[str, Any]], title: str = "Risk Assessment Matrix"):
+        """
+        Create a risk assessment matrix visualization.
         
-        try:
-            if isinstance(competitors_data, list):
-                if all(isinstance(comp, dict) and "name" in comp for comp in competitors_data):
-                    competitor_names = [comp.get("name", f"Competitor {i+1}") for i, comp in enumerate(competitors_data)]
-                    all_keys = set()
-                    for comp in competitors_data:
-                        all_keys.update(comp.keys())
-                    non_metric_keys = {"name", "description", "url", "logo", "id"}
-                    metric_keys = [k for k in all_keys if k not in non_metric_keys]
-                    for metric in metric_keys:
-                        metrics[metric] = [float(comp.get(metric, 0)) for comp in competitors_data]
-                elif all(isinstance(comp, (list, tuple)) for comp in competitors_data):
-                    competitor_names = [comp[0] if len(comp) > 0 else f"Competitor {i+1}" 
-                                       for i, comp in enumerate(competitors_data)]
-                    if all(len(comp) > 1 for comp in competitors_data):
-                        for i in range(1, len(competitors_data[0])):
-                            metric_name = f"Metric {i}"
-                            metrics[metric_name] = [float(comp[i]) if len(comp) > i else 0 
-                                                  for comp in competitors_data]
-            elif isinstance(competitors_data, dict):
-                competitor_names = list(competitors_data.keys())
-                first_comp = list(competitors_data.values())[0] if competitors_data else {}
-                if isinstance(first_comp, dict):
-                    for metric in first_comp.keys():
-                        metrics[metric] = [comp.get(metric, 0) if isinstance(comp, dict) else 0 
-                                           for comp in competitors_data.values()]
-        
-        except Exception as e:
-            self.logger.error(f"Error extracting competitor data: {str(e)}", exc_info=True)
-            return [], {}
-        
-        if self.project_name and self.project_name not in competitor_names:
-            competitor_names.insert(0, self.project_name)
-            for metric in metrics:
-                if metrics[metric]:
-                    metrics[metric].insert(0, sum(metrics[metric]) / len(metrics[metric]))
-                else:
-                    metrics[metric].insert(0, 0)
-        
-        return competitor_names, metrics
-    
-    def _get_chart_data(self, vis_type: str, data_field: str, data: Dict[str, Any]) -> Tuple[List[str], List[float], str]:
-        categories = []
-        values = []
-        field_used = data_field
-        
-        if data_field in data and data[data_field]:
-            field_data = data[data_field]
-            field_used = data_field
+        Args:
+            risks: List of dictionaries with 'name', 'impact' (1-5), and 'likelihood' (1-5)
+            title: Chart title
             
-            if isinstance(field_data, dict):
-                categories = list(field_data.keys())
-                values = list(field_data.values())
-            elif isinstance(field_data, list):
-                if all(isinstance(item, dict) for item in field_data):
-                    if all("name" in item and "value" in item for item in field_data):
-                        categories = [item["name"] for item in field_data]
-                        values = [item["value"] for item in field_data]
-                    elif all("label" in item and "value" in item for item in field_data):
-                        categories = [item["label"] for item in field_data]
-                        values = [item["value"] for item in field_data]
-                elif all(isinstance(item, (list, tuple)) and len(item) == 2 for item in field_data):
-                    categories = [item[0] for item in field_data]
-                    values = [item[1] for item in field_data]
+        Returns:
+            The created figure
+        """
+        # Create figure
+        self.fig, self.ax = plt.subplots(figsize=(10, 10))
+        self.fig.patch.set_facecolor(self.color_palettes[self.theme]["background"])
+        self.ax.set_facecolor(self.color_palettes[self.theme]["background"])
         
-        if not categories or not values:
-            potential_fields = [
-                "rankings",
-                "comparison",
-                "metrics_comparison",
-                "market_position"
-            ]
+        # Define risk zones
+        risk_zones = np.zeros((5, 5))
+        
+        # Low risk (green)
+        risk_zones[0, 0:2] = 1
+        risk_zones[1, 0] = 1
+        
+        # Medium risk (yellow)
+        risk_zones[0, 2:5] = 2
+        risk_zones[1, 1:3] = 2
+        risk_zones[2, 0:2] = 2
+        risk_zones[3, 0] = 2
+        
+        # High risk (orange)
+        risk_zones[1, 3:5] = 3
+        risk_zones[2, 2:4] = 3
+        risk_zones[3, 1:3] = 3
+        risk_zones[4, 0:2] = 3
+        
+        # Critical risk (red)
+        risk_zones[2, 4] = 4
+        risk_zones[3, 3:5] = 4
+        risk_zones[4, 2:5] = 4
+        
+        # Create custom colormap for risk zones
+        colors = [self.color_palettes[self.theme]["positive"],  # Low risk
+                 self.color_palettes[self.theme]["neutral"],   # Medium risk
+                 "#ff9f43",                                    # High risk
+                 self.color_palettes[self.theme]["negative"]]  # Critical risk
+        cmap = LinearSegmentedColormap.from_list("risk_cmap", colors, N=4)
+        
+        # Plot risk zones
+        im = self.ax.imshow(risk_zones, cmap=cmap, origin='lower', extent=[0.5, 5.5, 0.5, 5.5])
+        
+        # Plot risk points
+        for risk in risks:
+            name = risk['name']
+            impact = risk['impact']
+            likelihood = risk['likelihood']
             
-            for field in potential_fields:
-                if field in data and data[field]:
-                    field_data = data[field]
-                    field_used = field
-                    
-                    if isinstance(field_data, dict):
-                        categories = list(field_data.keys())
-                        values = list(field_data.values())
-                    elif isinstance(field_data, list):
-                        if all(isinstance(item, dict) for item in field_data):
-                            if all("name" in item and "value" in item for item in field_data):
-                                categories = [item["name"] for item in field_data]
-                                values = [item["value"] for item in field_data]
-                            elif all("label" in item and "value" in item for item in field_data):
-                                categories = [item["label"] for item in field_data]
-                                values = [item["value"] for item in field_data]
-                        elif all(isinstance(item, (list, tuple)) and len(item) == 2 for item in field_data):
-                            categories = [item[0] for item in field_data]
-                            values = [item[1] for item in field_data]
-                    
-                    if categories and values:
-                        self.logger.info(f"Using alternative field '{field}' for bar chart")
-                        break
-        
-        if categories and values:
-            try:
-                values = [float(val) if isinstance(val, (int, float, str)) else 0 for val in values]
-            except (ValueError, TypeError):
-                self.logger.warning(f"Non-numeric values found in bar chart data")
-                values = [0] * len(categories)
-        
-        return categories, values, field_used
-    
-    def _save_chart(self, vis_type: str) -> str:
-        filename = self.get_safe_filename(vis_type)
-        file_path = os.path.join(self.output_dir, filename)
-        
-        self.logger.info(f"Saving bar chart to: {file_path}")
-        
-        try:
-            plt.savefig(file_path, dpi=300, bbox_inches='tight')
-            plt.close()
+            # Add some jitter to prevent overlapping
+            jitter_x = np.random.uniform(-0.1, 0.1)
+            jitter_y = np.random.uniform(-0.1, 0.1)
             
-            if self.verify_file_saved(file_path):
-                return file_path
-            return ""
-        except Exception as e:
-            self.logger.error(f"Error saving chart: {str(e)}")
-            plt.close()
-            return ""
+            # Plot point
+            self.ax.plot(likelihood + jitter_x, impact + jitter_y, 'o', 
+                       markersize=12, color='white', markeredgecolor='black')
+            
+            # Add label
+            self.ax.annotate(name, (likelihood + jitter_x, impact + jitter_y),
+                           xytext=(5, 5), textcoords='offset points',
+                           color=self.color_palettes[self.theme]["text"],
+                           fontsize=9, fontweight='bold')
+        
+        # Set axis limits and labels
+        self.ax.set_xlim(0.5, 5.5)
+        self.ax.set_ylim(0.5, 5.5)
+        self.ax.set_xlabel('Likelihood', fontsize=12, color=self.color_palettes[self.theme]["text"])
+        self.ax.set_ylabel('Impact', fontsize=12, color=self.color_palettes[self.theme]["text"])
+        
+        # Set ticks
+        self.ax.set_xticks(np.arange(1, 6))
+        self.ax.set_yticks(np.arange(1, 6))
+        self.ax.tick_params(axis='both', colors=self.color_palettes[self.theme]["text"])
+        
+        # Add grid
+        self.ax.grid(True, linestyle='-', alpha=0.3, color=self.color_palettes[self.theme]["grid"])
+        
+        # Add risk zone labels
+        self.ax.text(1.5, 1, "LOW", ha='center', va='center', color='black', fontweight='bold')
+        self.ax.text(2.5, 2, "MEDIUM", ha='center', va='center', color='black', fontweight='bold')
+        self.ax.text(3.5, 3, "HIGH", ha='center', va='center', color='black', fontweight='bold')
+        self.ax.text(4.5, 4.5, "CRITICAL", ha='center', va='center', color='black', fontweight='bold')
+        
+        # Set title
+        self.ax.set_title(title, fontsize=16, fontweight='bold', color=self.color_palettes[self.theme]["text"])
+        
+        # Add timestamp and watermark
+        self.add_timestamp()
+        self.add_watermark()
+        
+        # Adjust layout
+        plt.tight_layout()
+        
+        return self.fig
