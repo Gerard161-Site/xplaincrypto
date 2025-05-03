@@ -1,18 +1,22 @@
 from typing import Dict, Any, List, Optional
 from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel
-from orchestration.workflow_manager import WorkflowManagerWithMCP
-from orchestration.mcp.initialize_endpoints import initialize_pinecone_endpoints
+from backend.orchestration.workflow_manager import WorkflowManager
+from backend.orchestration.mcp.initialize_endpoints import initialize_pinecone_endpoints
 import logging
+import os
 
 # Set up logging
 logger = logging.getLogger(__name__)
+
+# Set MCP environment variable
+os.environ["USE_MCP"] = "true"
 
 # Initialize the FastAPI app
 app = FastAPI(title="XplainCrypto API with MCP Integration")
 
 # Initialize the workflow manager
-workflow_manager = WorkflowManagerWithMCP()
+workflow_manager = WorkflowManager(logger=logger)
 
 # Initialize the workflow manager and Pinecone endpoints on startup
 @app.on_event("startup")

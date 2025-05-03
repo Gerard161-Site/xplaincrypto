@@ -106,7 +106,7 @@ The system employs a hierarchical approach similar to GPT-Researcher, but with s
 xplaincrypto/
 ├── backend/              # FastAPI server
 │   ├── agents/           # AI agents for different tasks
-│   │   ├── enhanced_researcher.py # Main research agent
+│   │   ├── researcher.py # Main research agent
 │   │   ├── visualization_agent.py # Data visualization agent
 │   │   ├── writer.py     # Report writing agent
 │   │   ├── editor.py     # Report editing agent
@@ -186,3 +186,99 @@ xplaincrypto/
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+
+# XplainCrypto Visualization System
+
+This repository contains a professional cryptocurrency research report visualization system built with Plotly. The system is designed to create high-quality, consistent visualizations for cryptocurrency research reports.
+
+## Overview
+
+The visualization system includes:
+
+1. **Plotly-based Visualizers**: All visualizations are built using Plotly for consistent styling and interactivity
+2. **Flexible Data Loading**: Loads data from cache or state, with fallbacks for missing data
+3. **Consistent Styling**: Uses a StyleManager and PlotlyStyler for unified appearance
+4. **Modular Design**: Each visualization type has its own specialized class
+5. **Comprehensive Coverage**: Supports all required visualization types:
+   - `key_metrics_table`: Key metrics about the token in table format
+   - `tokenomics_pie_chart`: Token distribution visualization
+   - `chain_distribution_chart`: Distribution of TVL across chains
+   - `candlestick_chart`: Price chart with OHLCV data
+   - `volume_chart`: Trading volume visualization
+   - `competitor_comparison_chart`: Comparison with competitor tokens
+   - `liquidity_trends_chart`: Liquidity over time
+   - `adoption_metrics_table`: Adoption metrics in table format
+   - `tvl_milestone_chart`: TVL milestones chart
+   - `tvl_phases_chart`: TVL growth phases
+   - `monthly_growth_chart`: Monthly growth metrics
+
+## Files and Structure
+
+- `backend/visualizations/`: Visualization classes
+  - `plotly_visualizer.py`: Base class for all Plotly visualizers
+  - `api.py`: API for creating visualizations
+  - `candlestick_chart_visualizer.py`: Candlestick chart (preserved from original)
+  - `chain_distribution_visualizer.py`: Chain distribution visualizer
+  - `line_chart_visualizer.py`: Line chart visualizer for time series data
+  - `pie_chart_visualizer.py`: Pie chart visualizer for tokenomics
+  - `table_visualizer.py`: Table visualizer for metrics
+- `backend/utils/`: Utility classes
+  - `cache_utils.py`: Cache management utilities
+  - `style_utils.py`: Style management utilities
+  - `plotly_styler.py`: Plotly-specific styling utilities
+- `examples/`: Example scripts
+  - `generate_visualizations.py`: Example script showing how to generate all visualizations
+
+## How to Use
+
+```python
+from backend.agents.visualizer import Visualizer
+
+# Initialize visualizer
+visualizer = Visualizer(project_name="ONDO")
+
+# Create report config with visualization specifications
+report_config = {
+    "sections": [
+        {
+            "title": "Market",
+            "visualizations": ["candlestick_chart", "volume_chart"]
+        }
+    ],
+    "visualization_types": {
+        "candlestick_chart": {
+            "type": "candlestick_chart",
+            "data_source": "coingecko",
+            "data_field": "price"
+        },
+        "volume_chart": {
+            "type": "volume_chart",
+            "data_source": "coingecko",
+            "data_field": "volume"
+        }
+    }
+}
+
+# Create state with the report config
+state = {
+    "project_name": "ONDO",
+    "report_config": report_config
+}
+
+# Run the visualizer
+result_state = visualizer.run(state)
+
+# Access the visualizations
+for vis in result_state.get('visualization_list', []):
+    print(f"{vis['type']}: {vis['path']}")
+```
+
+## Testing
+
+Run the example script to generate all visualizations:
+
+```bash
+python examples/generate_visualizations.py
+```
+
+This will create all 11 visualization types in the `docs/ONDO/` directory.

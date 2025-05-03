@@ -5,6 +5,7 @@ import re
 from backend.state import ResearchState
 from backend.utils.inference import openai_retry_decorator
 from typing import Dict
+from datetime import datetime
 
 @openai_retry_decorator
 def editor(state: Dict, llm: ChatOpenAI, logger: logging.Logger, config=None) -> Dict:
@@ -19,7 +20,22 @@ def editor(state: Dict, llm: ChatOpenAI, logger: logging.Logger, config=None) ->
         draft = state.get("draft", "")
         if not draft:
             logger.error("No draft found in state")
-            raise ValueError("Draft missing from state")
+            # Instead of raising an error, create a minimal draft
+            draft = f"# {project_name} Research Report\n\n"
+            draft += f"*Generated on {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*\n\n"
+            draft += "## Executive Summary\n\n"
+            draft += f"{project_name} is a cryptocurrency project. Due to technical limitations, a full analysis could not be generated.\n\n"
+            draft += "## Tokenomics\n\n"
+            draft += f"Tokenomics data for {project_name} is not available in this report.\n\n"
+            draft += "## Disclaimer\n\nThis report was generated with limited data. Please consult additional sources for investment decisions."
+            
+            # Update state with the minimal draft
+            state["draft"] = draft
+            state["edited_draft"] = draft
+            state["final_report"] = draft
+            
+            logger.info(f"Created minimal draft with {len(draft.split())} words")
+            return state
 
         logger.info(f"Performing comprehensive editing for {project_name}")
         

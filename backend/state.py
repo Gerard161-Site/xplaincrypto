@@ -1,127 +1,160 @@
-# backend/state.py
-from typing import Dict, List, Optional, Any, Union
+from typing import Dict, Any, List, Optional, Union
 import os
+import logging
+import json
+from datetime import datetime
 
-class ResearchState(dict):
-    def __init__(self, project_name: str):
-        # Initialize the dict base class
-        super().__init__()
+logger = logging.getLogger(__name__)
+
+class ResearchState:
+    """State object for research workflow, holding project info and generated data."""
+    
+    # Define allowed keys that can be set using __setitem__
+    _ALLOWED_KEYS = {
+        'project_name', 'query', 'errors', 'data', 'visualizations',
+        'visualization_list', 'visualization_data', 'sections',
+        'draft', 'final_report', 'report_path', 'progress',
+        'timestamp', 'report_config'
+    }
+    
+    def __init__(self, project_name: str = "Unknown Project"):
+        """
+        Initialize a new research state.
         
-        # Initialize attributes
-        self["project_name"] = project_name
-        self["research_summary"] = ""
-        self["key_features"] = ""
-        self["tokenomics"] = ""
-        self["price_analysis"] = ""
-        self["governance"] = ""
-        self["draft"] = ""
-        self["final_report"] = ""
-        self["references"] = []  # List of dicts with 'title' and 'url'
-        self["progress"] = "Starting research..."
-        self["queries"] = []  # Added for storing generated queries
-        
-        # Data from API sources
-        self["data"] = {}  # All data combined (deprecated, use research_data instead)
-        self["coingecko_data"] = {}  # CoinGecko-specific data
-        self["coinmarketcap_data"] = {}  # CoinMarketCap-specific data
-        self["defillama_data"] = {}  # DeFiLlama-specific data
-        
-        # Research data from web and other sources
-        self["web_research"] = {}  # Raw web research summaries
-        self["structured_data"] = {}  # Parsed data from web research
-        self["research_data"] = {}  # Combined data after extraction/inference
-        
-        # Source information for data points
-        self["data_sources"] = {}  # Format: {data_key: {"value": value, "source": source}}
-        
-        # Visualizations generated
-        self["visualizations"] = {}
-        
-        # Report configuration
-        self["report_config"] = {}
-        
-        # Missing attributes needed for compatibility with research orchestrator
-        self["root_node"] = None
-        self["errors"] = []
-        self["query"] = ""
-        self["current_node_id"] = None
-        self["tree_generated"] = False
-        self["research_complete"] = False
-        self["data_gathered"] = False
-        self["synthesis_complete"] = False
-        self["team_and_development"] = ""
-        self["missing_data_fields"] = []
-        self["outputDir"] = os.path.join("docs", project_name.lower().replace(" ", "_"))
-        
-        # Create output directory if it doesn't exist
-        os.makedirs(self["outputDir"], exist_ok=True)
-        
-        # Also set attributes for easy access as properties
-        self.project_name = project_name
-        self.research_summary = ""
-        self.key_features = ""
-        self.tokenomics = ""
-        self.price_analysis = ""
-        self.governance = ""
+        Args:
+            project_name: Name of the project being researched
+            
+        Raises:
+            ValueError: If project_name is empty or not a string
+        """
+        if not isinstance(project_name, str) or not project_name.strip():
+            logger.error("Invalid project_name provided")
+            raise ValueError("project_name must be a non-empty string")
+            
+        self.project_name = project_name.strip()
+        self.query = ""
+        self.errors = []
+        self.data = {}
+        self.visualizations = {}
+        self.visualization_list = []
+        self.visualization_data = {}
+        self.sections = {}
         self.draft = ""
         self.final_report = ""
-        self.references = []
-        self.progress = "Starting research..."
-        self.queries = []
-        self.data = {}
-        self.coingecko_data = {}
-        self.coinmarketcap_data = {}
-        self.defillama_data = {}
-        self.web_research = {}
-        self.structured_data = {}
-        self.research_data = {}
-        self.data_sources = {}
-        self.visualizations = {}
+        self.report_path = ""
+        self.progress = "Initialized"
+        self.timestamp = datetime.now().isoformat()
         self.report_config = {}
-        self.root_node = None
-        self.errors = []
-        self.query = ""
-        self.current_node_id = None
-        self.tree_generated = False
-        self.research_complete = False
-        self.data_gathered = False
-        self.synthesis_complete = False
-        self.team_and_development = ""
-        self.missing_data_fields = []
-        self.outputDir = os.path.join("docs", project_name.lower().replace(" ", "_"))
-
-    def update_progress(self, message: str):
+        
+    def update_progress(self, message: str) -> None:
+        """
+        Update the progress message.
+        
+        Args:
+            message: The progress message to set
+        """
         self.progress = message
-        self["progress"] = message
+        logger.info(f"Progress: {message}")
         
-    def add_data_with_source(self, key: str, value: Any, source: str):
-        """Add a data point with its source information"""
-        self.research_data[key] = value
-        self["research_data"][key] = value
-        self.data_sources[key] = {"value": value, "source": source}
-        self["data_sources"][key] = {"value": value, "source": source}
+    def get(self, key: str, default: Any = None) -> Any:
+        """
+        Get a value from the state by key, with fallback to default.
         
-    def get_data_with_source(self, key: str) -> Optional[Dict[str, Union[Any, str]]]:
-        """Get a data point with its source information if available"""
-        if key in self.data_sources:
-            return self.data_sources[key]
-        elif key in self.research_data:
-            return {"value": self.research_data[key], "source": "Unknown"}
-        return None
-
-    def to_dict(self) -> Dict:
-        """Convert state to dictionary."""
-        # Since we're already a dict, just return a copy of ourselves
-        return dict(self)
+        Args:
+            key: The key to lookup
+            default: Default value if key not found
+            
+        Returns:
+            The value if found, otherwise the default
+        """
+        if hasattr(self, key):
+            return getattr(self, key)
+        return default
+    
+    def __getitem__(self, key: str) -> Any:
+        """
+        Dictionary-style access to state attributes.
         
-    def __setattr__(self, key, value):
-        """Override to set both attribute and dictionary key when an attribute is set."""
-        super().__setattr__(key, value)
-        if key != "__dict__" and not key.startswith("_"):
-            self[key] = value
-
-    def __getattr__(self, key):
-        """Override to get from dictionary if attribute doesn't exist."""
-        if key in self:
-            return self[key]
-        raise AttributeError(f"'ResearchState' object has no attribute '{key}'")
+        Args:
+            key: The attribute name to access
+            
+        Returns:
+            The attribute value
+            
+        Raises:
+            KeyError: If the attribute doesn't exist
+        """
+        if hasattr(self, key):
+            return getattr(self, key)
+        raise KeyError(f"'{key}' not found in ResearchState")
+    
+    def __setitem__(self, key: str, value: Any) -> None:
+        """
+        Dictionary-style setting of state attributes.
+        Only allows setting predefined attributes to prevent accidental overwrites.
+        
+        Args:
+            key: The attribute name to set
+            value: The value to set
+            
+        Raises:
+            KeyError: If key is not in allowed_keys
+        """
+        if key in self._ALLOWED_KEYS:
+            setattr(self, key, value)
+        else:
+            logger.warning(f"Attempted to set invalid state key: {key}")
+            raise KeyError(f"Cannot set '{key}' in ResearchState")
+        
+    def items(self):
+        """
+        Return state attributes as (key, value) pairs for dict-like access.
+        
+        Returns:
+            Iterator of (key, value) pairs of attributes
+        """
+        # Return only the attributes that aren't methods or private
+        return {k: v for k, v in self.__dict__.items() 
+                if not k.startswith('_') and not callable(v)}.items()
+    
+    def _serialize_value(self, value: Any) -> Any:
+        """
+        Recursively serialize a value for dictionary conversion.
+        
+        Args:
+            value: The value to serialize
+            
+        Returns:
+            A serialized version of the value that is JSON compatible
+        """
+        if isinstance(value, (dict, list)):
+            if isinstance(value, dict):
+                return {k: self._serialize_value(v) for k, v in value.items()}
+            return [self._serialize_value(item) for item in value]
+        elif isinstance(value, (str, int, float, bool, type(None))):
+            return value
+        else:
+            return str(value)
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """
+        Convert state to a dictionary.
+        Recursively serializes all values to ensure they're JSON-compatible.
+        
+        Returns:
+            Dictionary representation of the state
+        """
+        return {
+            k: self._serialize_value(v)
+            for k, v in self.__dict__.items()
+            if not k.startswith('_') and not callable(v)
+        }
+    
+    def __repr__(self) -> str:
+        """
+        String representation of the state.
+        
+        Returns:
+            String representation
+        """
+        return f"ResearchState(project_name='{self.project_name}', progress='{self.progress}')" 

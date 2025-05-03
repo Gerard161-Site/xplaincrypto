@@ -2,97 +2,72 @@ import logging
 import json
 import os
 import time
-from typing import Dict, Any, Optional, List
-from langgraph.graph import StateGraph, END
-from backend.state import ResearchState
-from backend.services.reporting.progress_tracker import ProgressTracker
-from backend.services.reporting.error_reporter import ErrorReporter
-from langchain_openai import ChatOpenAI
+import asyncio
+from typing import Dict, Any, Optional, List, TypedDict
 from copy import deepcopy
 
+class WorkflowState(TypedDict):
+    project_name: str
+    report_config: Dict[str, Any]
+    fast_mode: bool
+    mode: str
+    visualization_request: List[Dict[str, Any]]
+    errors: Dict[str, Any]
+    review_status: Dict[str, Any]
+    writer_output: Dict[str, Any]
+    visualizer_output: Dict[str, Any]
+    merged_output: Dict[str, Any]
+    final_report: str
+    report_path: str
+    visualization_list: List[Dict[str, Any]]
+
 class WorkflowManager:
-    """Manages LangGraph workflow execution and state management."""
-    
-    def __init__(self, logger: logging.Logger, 
-                 progress_tracker: Optional[ProgressTracker] = None,
-                 error_reporter: Optional[ErrorReporter] = None,
-                 config_path: str = "backend/config/report_config.json"):
+    def __init__(
+        self,
+        logger: logging.Logger,
+        config_path: str = "backend/config/report_config.json",
+        progress_tracker=None,
+        error_reporter=None
+    ):
         self.logger = logger
-        self.progress_tracker = progress_tracker
-        self.error_reporter = error_reporter
         self.config_path = config_path
         self.report_config = self._load_report_config()
-        self.active_workflows = {}
-        self.completed_workflows = {}
-        
-        # Will be set when LLM is initialized
         self.llm = None
-        
-        # Will be set when graph is compiled
-        self.graph = None
-    
+        self.llm_model = None
+        self.progress_tracker = progress_tracker
+        self.error_reporter = error_reporter
+        if progress_tracker:
+            self.logger.info("ProgressTracker initialized in WorkflowManager")
+        if error_reporter:
+            self.logger.info("ErrorReporter initialized in WorkflowManager")
+
     def _load_report_config(self) -> Dict[str, Any]:
-        """Load report configuration from file."""
         try:
-            if os.path.exists(self.config_path):
-                with open(self.config_path, "r") as f:
-                    config = json.load(f)
-                self.logger.info(f"Loaded report configuration from {self.config_path} with {len(config.get('sections', []))} sections")
+            with open(self.config_path, 'r') as f:
+                config = json.load(f)
+                if "sections" not in config or not isinstance(config["sections"], list):
+                    self.logger.error("Invalid report_config.json: 'sections' must be a list")
+                    return {}
+                self.logger.info(f"Loaded report configuration with {len(config.get('sections', []))} sections")
                 return config
-            else:
-                self.logger.error(f"Report configuration file not found at {self.config_path}")
-                if self.error_reporter:
-                    self.error_reporter.report_error(
-                        FileNotFoundError(f"Report config not found at {self.config_path}"),
-                        category="system_error",
-                        component="workflow_manager"
-                    )
-                return {}
         except Exception as e:
-            self.logger.error(f"Error loading report configuration: {str(e)}")
+            self.logger.error(f"Error loading report_config: {str(e)}")
             if self.error_reporter:
                 self.error_reporter.report_error(
                     e, category="system_error", component="workflow_manager",
                     context={"config_path": self.config_path}
                 )
             return {}
-    
+
     def initialize_llm(self, model_name: str = "gpt-4o-mini", api_key: Optional[str] = None):
-        """Initialize the language model."""
+        from langchain_openai import ChatOpenAI
         try:
+            api_key = api_key or os.getenv("OPENAI_API_KEY")
             if not api_key:
-                api_key = os.getenv("OPENAI_API_KEY")
-                if not api_key:
-                    raise ValueError("OPENAI_API_KEY environment variable not set")
-                    
+                raise ValueError("OPENAI_API_KEY environment variable not set")
             self.llm = ChatOpenAI(model=model_name, api_key=api_key)
+            self.llm_model = model_name
             self.logger.info(f"Initialized LLM with model {model_name}")
-            
-            # Initialize MCP components if enabled
-            use_mcp = os.environ.get("USE_MCP", "false").lower() == "true"
-            if use_mcp:
-                try:
-                    from backend.orchestration.rag.vector_store import get_vector_store
-                    from backend.orchestration.mcp.router import MCPRouter
-                    from backend.agents.researcher import Researcher
-                    
-                    self.logger.info("Initializing RAG and MCP components")
-                    # We'll initialize the researcher in the async method
-                    self.researcher = Researcher(
-                        llm_model=model_name,
-                        use_mcp=True,
-                        logger=self.logger
-                    )
-                    self.logger.info("Created researcher instance - will be initialized asynchronously")
-                    
-                except Exception as e:
-                    self.logger.error(f"Error initializing MCP components: {str(e)}")
-                    if self.error_reporter:
-                        self.error_reporter.report_error(
-                            e, category="system_error", component="workflow_manager",
-                            context={"feature": "mcp_initialization"}
-                        )
-            
             return True
         except Exception as e:
             self.logger.error(f"Error initializing LLM: {str(e)}")
@@ -102,388 +77,140 @@ class WorkflowManager:
                     context={"model_name": model_name}
                 )
             return False
-    
+
     async def initialize(self):
-        """Asynchronously initialize all components of the workflow."""
+        """Asynchronously initialize the WorkflowManager components."""
+        self.logger.info("Starting asynchronous initialization of WorkflowManager")
         try:
-            self.logger.info("Starting asynchronous initialization of workflow components")
-            
-            # Initialize the researcher if it exists
-            if hasattr(self, 'researcher'):
-                self.logger.info("Initializing researcher with MCP endpoints")
-                await self.researcher.initialize()
-                self.logger.info("Researcher initialization complete")
-            
-            # Future: Initialize other async components here
-            
-            self.logger.info("All components initialized successfully")
+            if not self.llm:
+                success = self.initialize_llm()
+                if not success:
+                    self.logger.error("Failed to initialize LLM in WorkflowManager")
+                    if self.error_reporter:
+                        self.error_reporter.report_error(
+                            Exception("LLM initialization failed"),
+                            category="system_error",
+                            component="workflow_manager",
+                            context={"feature": "llm_initialization"}
+                        )
+                    return False
+            self.logger.info("WorkflowManager initialized successfully")
             return True
         except Exception as e:
-            self.logger.error(f"Error during asynchronous initialization: {str(e)}")
+            self.logger.error(f"Error during WorkflowManager initialization: {str(e)}")
             if self.error_reporter:
                 self.error_reporter.report_error(
                     e, category="system_error", component="workflow_manager",
                     context={"feature": "async_initialization"}
                 )
             return False
-    
-    def create_workflow(self) -> StateGraph:
-        """Create the LangGraph workflow."""
-        try:
-            # Import the new consolidated researcher
-            from backend.agents.researcher import Researcher, researcher
-            from backend.agents.writer import writer
-            from backend.agents.visualizer import visualizer
-            from backend.agents.reviewer import reviewer
-            from backend.agents.editor import editor
-            from backend.agents.publisher import publisher
-            
-            # Initialize the workflow using dict as the state type, not ResearchState
-            workflow = StateGraph(Dict)
-            
-            # Initialize researcher instance if using MCP
-            use_mcp = os.environ.get("USE_MCP", "false").lower() == "true"
-            
-            if use_mcp:
-                # Create a researcher instance
-                self.researcher = Researcher(
-                    llm_model=self.llm.model_name if self.llm else "gpt-4o-mini", 
-                    use_mcp=True,
-                    logger=self.logger
-                )
-                
-                # Create a specialized wrapper for the researcher's execute_workflow method
-                async def researcher_wrapper(state, llm=None, logger=None, config=None):
-                    """Special wrapper to handle the researcher's different interface in MCP mode."""
-                    # Extract the query from the state
-                    project_name = state.get("project_name", "")
-                    query = f"Provide comprehensive research about {project_name} cryptocurrency"
-                    
-                    # Execute workflow with the query
-                    self.logger.info(f"Executing researcher with MCP for: {project_name}")
-                    result = await self.researcher.execute_workflow(
-                        query_or_state=query, 
-                        context={"project_name": project_name, "report_config": state.get("report_config", {})}
-                    )
-                    
-                    # Merge result with original state to preserve data
-                    for key, value in result.items():
-                        if key not in state or not state[key]:
-                            state[key] = value
-                            
-                    return state
-                
-                # Add the researcher node with our special wrapper
-                workflow.add_node("enhanced_researcher", self._create_node_wrapper(
-                    researcher_wrapper, "Research"))
-                self.logger.info("Using MCP-enabled Researcher")
-            else:
-                # Use standard researcher function in classic mode
-                workflow.add_node("enhanced_researcher", self._create_node_wrapper(
-                    researcher, "Research"))
-            
-            workflow.add_node("writer", self._create_node_wrapper(writer, "Writing"))
-            workflow.add_node("visualizer", self._create_node_wrapper(visualizer, "Visualization"))
-            workflow.add_node("reviewer", self._create_node_wrapper(reviewer, "Review"))
-            workflow.add_node("editor", self._create_node_wrapper(editor, "Editing"))
-            workflow.add_node("publisher", self._create_node_wrapper(publisher, "Publishing"))
-            
-            # Set entry point
-            workflow.set_entry_point("enhanced_researcher")
-            
-            # Add edges to create sequential flow
-            workflow.add_edge("enhanced_researcher", "writer")
-            workflow.add_edge("writer", "visualizer")
-            workflow.add_edge("visualizer", "reviewer")
-            workflow.add_edge("reviewer", "editor")
-            workflow.add_edge("editor", "publisher")
-            workflow.add_edge("publisher", END)
-            
-            # Compile the graph
-            self.graph = workflow.compile()
-            self.logger.info("Successfully created and compiled workflow graph")
-            return workflow
-        except Exception as e:
-            self.logger.error(f"Error creating workflow: {str(e)}")
-            if self.error_reporter:
-                self.error_reporter.report_error(
-                    e, category="system_error", component="workflow_manager"
-                )
-            return None
-    
-    def _create_node_wrapper(self, agent_function, step_name: str):
-        """Create a wrapper for an agent node that includes progress tracking and error handling."""
-        llm = self.llm
-        logger = self.logger
-        progress_tracker = self.progress_tracker
-        error_reporter = self.error_reporter
-        
-        async def wrapped_agent(state, config=None):
-            try:
-                # Deep copy state to avoid modifying the original if there's an error
-                working_state = deepcopy(state)
-                
-                # Get project name safely - use actual value or empty string, never "Unknown Project"
-                project_name = working_state.get("project_name", "")
-                if not project_name:
-                    logger.warning("Project name missing in state - check workflow setup")
-                    if isinstance(state, dict):
-                        # Use the workflow_id if available as a fallback
-                        for workflow_id, workflow in self.active_workflows.items():
-                            if workflow.get("state") == state:
-                                project_name = workflow.get("project_name", "")
-                                logger.info(f"Recovered project name '{project_name}' from active workflows")
-                                working_state["project_name"] = project_name
-                                break
-                    
-                    # Final fallback - but should never reach here if things are working properly
-                    if not project_name:
-                        project_name = "Unknown Project"
-                
-                # Store original project name for verification after agent call
-                original_project_name = project_name
-                
-                # Track progress start
-                if progress_tracker:
-                    progress_tracker.update_progress(
-                        step=step_name, 
-                        percentage=0, 
-                        message=f"Starting {step_name.lower()} for {project_name}",
-                        job_id=project_name  # Add job_id to ensure tracking is associated with the right project
-                    )
-                
-                # Set start time for metrics
-                start_time = time.time()
-                
-                # Run the agent - log the actual values for debugging
-                logger.info(f"Starting agent: {step_name} for '{project_name}'")
-                
-                # Run the agent with explicit injected parameters
-                updated_state = await agent_function(working_state, llm, logger, config)
-                
-                # Calculate metrics
-                duration = time.time() - start_time
-                
-                # Ensure project_name is preserved in the updated state
-                if isinstance(updated_state, dict):
-                    if "project_name" not in updated_state:
-                        logger.warning(f"Project name missing in updated state - restoring '{original_project_name}'")
-                        updated_state["project_name"] = original_project_name
-                    elif updated_state["project_name"] != original_project_name and original_project_name != "Unknown Project":
-                        logger.warning(f"Project name changed from '{original_project_name}' to '{updated_state['project_name']}' - restoring original")
-                        updated_state["project_name"] = original_project_name
-                
-                # Track progress completion
-                if progress_tracker:
-                    progress_tracker.update_progress(
-                        step=step_name, 
-                        percentage=100, 
-                        message=f"Completed {step_name.lower()} for {project_name} in {duration:.2f}s",
-                        job_id=project_name  # Add job_id to ensure tracking is associated with the right project
-                    )
-                
-                logger.info(f"Completed agent: {step_name} for '{project_name}' in {duration:.2f}s")
-                return updated_state
-            except Exception as e:
-                logger.error(f"Error in {step_name}: {str(e)}", exc_info=True)
-                
-                # Get project name for error reporting
-                error_project_name = "Unknown Project"
-                if isinstance(state, dict) and "project_name" in state:
-                    error_project_name = state["project_name"]
-                
-                # Report error
-                if error_reporter:
-                    error_id = error_reporter.report_error(
-                        e, 
-                        category="processing_error", 
-                        component=f"agent.{step_name.lower()}", 
-                        context={
-                            "project_name": error_project_name,
-                            "step": step_name
-                        }
-                    )
-                
-                # Update progress to show error
-                if progress_tracker:
-                    progress_tracker.update_progress(
-                        step=step_name, 
-                        percentage=100,  # Mark as complete even though it failed
-                        message=f"Error in {step_name.lower()}: {str(e)}",
-                        job_id=error_project_name  # Add job_id with project name
-                    )
-                
-                # Return a state with the error information and preserved project name
-                if isinstance(state, dict):
-                    # Add error to the state as dict
-                    errors = state.get("errors", [])
-                    state["errors"] = errors + [str(e)]
-                    
-                    # Update progress in state as dict
-                    state["progress"] = f"Error in {step_name}: {str(e)}"
-                    
-                    # Preserve project name if it's missing
-                    if "project_name" not in state and error_project_name != "Unknown Project":
-                        state["project_name"] = error_project_name
-                
-                return state
-        
-        return wrapped_agent
-    
-    async def execute_workflow(self, project_name: str, fast_mode: bool = False) -> Dict[str, Any]:
-        """Execute the workflow for a given project."""
-        # Ensure LLM is initialized
+
+    async def execute_workflow(self, project_name: str, fast_mode: bool = False, mode: str = "report", visualization_request: Optional[Dict] = None) -> Dict[str, Any]:
+        from backend.agents.researcher import researcher
+        from backend.agents.writer import writer
+        from backend.agents.visualizer import visualizer_async
+        from backend.agents.reviewer import reviewer
+        from backend.agents.editor import editor
+        from backend.agents.publisher import publisher
+
+        self.logger.info(f"Starting asynchronous workflow execution for {project_name}")
+        start_time = time.time()
+
         if not self.llm:
             success = self.initialize_llm()
             if not success:
                 return {"error": "Failed to initialize language model"}
-        
-        # Run async initialization if needed
-        if hasattr(self, 'researcher') and not getattr(self.researcher, '_compiled_mcp_workflow', None):
-            self.logger.info("Running async initialization before workflow execution")
-            success = await self.initialize()
-            if not success:
-                return {"error": "Failed to initialize async components"}
-        
-        # Ensure graph is created
-        if not self.graph:
-            workflow = self.create_workflow()
-            if not workflow:
-                return {"error": "Failed to create workflow"}
+
+        state = {
+            "project_name": project_name,
+            "report_config": deepcopy(self.report_config),
+            "fast_mode": fast_mode,
+            "mode": mode,
+            "visualization_request": [visualization_request] if visualization_request else [],
+            "errors": {},
+            "review_status": {},
+            "writer_output": {},
+            "visualizer_output": {},
+            "merged_output": {},
+            "final_report": "",
+            "report_path": "",
+            "visualization_list": []
+        }
         
         try:
-            # Print the actual project name for debugging
-            self.logger.info(f"Creating initial state with project_name: '{project_name}'")
+            # Run each agent asynchronously with longer timeout for researcher
+            self.logger.info("Running Researcher")
+            # Give researcher more time to complete all sections
+            state = await asyncio.wait_for(
+                researcher(state, llm=self.llm, logger=self.logger),
+                timeout=600  # 10 minutes timeout for researcher
+            )
+            self.logger.info("Researcher completed")
             
-            # CRITICAL: Ensure project_name is a string and not None or empty
-            if not project_name or not isinstance(project_name, str):
-                self.logger.error(f"Invalid project name: {project_name}")
-                return {"error": "Invalid project name"}
+            if mode != "query":
+                self.logger.info("Running Writer")
+                state = await writer(state, llm=self.llm, logger=self.logger)
+                self.logger.info("Writer completed")
             
-            # Create initial state as a simple dictionary
-            state = {
-                "project_name": project_name,  # Explicitly set the project name
-                "report_config": deepcopy(self.report_config),
-                "fast_mode": fast_mode,
-                "errors": []
-            }
+            self.logger.info("Running Visualizer")
+            state = await visualizer_async(state, llm=self.llm, logger=self.logger)
+            self.logger.info("Visualizer completed")
             
-            # Generate workflow key
-            workflow_id = f"{project_name}_{int(time.time())}"
+            self.logger.info("Merging results")
+            state = self._merge_results(state)
+            self.logger.info("Merge completed")
             
-            # Start progress tracking
-            if self.progress_tracker:
-                self.progress_tracker.start_tracking(project_name, 6)  # 6 total steps
+            self.logger.info("Running Reviewer")
+            state = await reviewer(state, llm=self.llm, logger=self.logger)
+            self.logger.info("Reviewer completed")
             
-            # Store active workflow
-            self.active_workflows[workflow_id] = {
-                "project_name": project_name,
-                "start_time": time.time(),
-                "state": state,  # Use a reference to the state so we can look it up later
-                "status": "running"
-            }
+            self.logger.info("Running Editor")
+            state = await editor(state, llm=self.llm, logger=self.logger)
+            self.logger.info("Editor completed")
             
-            # Execute workflow - use the dictionary state directly
-            self.logger.info(f"Starting workflow execution for {project_name} (fast_mode: {fast_mode})")
+            self.logger.info("Running Publisher")
+            state = await publisher(state, llm=self.llm, logger=self.logger)
+            self.logger.info("Publisher completed")
             
-            # Debug: Log the state before passing to LangGraph
-            self.logger.info(f"Executing with state keys: {list(state.keys())}")
-            self.logger.info(f"State project_name: '{state.get('project_name')}'")
-            
-            # Pass the state directly to the graph
-            result = await self.graph.ainvoke(state)
-            
-            # Calculate metrics
-            duration = time.time() - self.active_workflows[workflow_id]["start_time"]
-            
-            # Store completed workflow
-            self.completed_workflows[workflow_id] = {
-                "project_name": project_name,
-                "start_time": self.active_workflows[workflow_id]["start_time"],
-                "end_time": time.time(),
-                "duration": duration,
-                "result": result
-            }
-            
-            # Remove from active workflows
-            self.active_workflows.pop(workflow_id, None)
-            
-            # Complete progress tracking
-            if self.progress_tracker:
-                self.progress_tracker.complete()
-            
+            duration = time.time() - start_time
             self.logger.info(f"Completed workflow execution for {project_name} in {duration:.2f}s")
-            
-            # Access result data, handling None result
-            if result is None:
-                self.logger.error("Workflow returned None result")
-                return {
-                    "workflow_id": workflow_id,
-                    "project_name": project_name,
-                    "duration": duration,
-                    "error": "Workflow execution failed with None result",
-                    "report_path": None,
-                    "errors": ["Workflow execution failed with None result"]
-                }
-                
             return {
-                "workflow_id": workflow_id,
                 "project_name": project_name,
-                "duration": duration,
-                "result": result,
-                "report_path": result.get("final_report"),
-                "errors": result.get("errors", [])
+                "result": state,
+                "report_path": state.get("report_path"),
+                "visualization_list": state.get("visualization_list", []),
+                "mode": mode,
+                "errors": state.get("errors", {})
             }
-            
         except Exception as e:
-            self.logger.error(f"Error executing workflow: {str(e)}", exc_info=True)
-            
-            # Report error
+            self.logger.error(f"Error executing workflow: {str(e)}")
             if self.error_reporter:
-                error_id = self.error_reporter.report_error(
-                    e, 
-                    category="system_error", 
-                    component="workflow_manager",
-                    context={"project_name": project_name, "fast_mode": fast_mode}
+                self.error_reporter.report_error(
+                    e, category="system_error", component="workflow_manager",
+                    context={"project_name": project_name, "mode": mode}
                 )
-            
             return {
                 "error": str(e),
-                "project_name": project_name
+                "project_name": project_name,
+                "mode": mode
             }
-    
-    def get_active_workflows(self) -> List[Dict[str, Any]]:
-        """Get information about active workflows."""
-        active_list = []
-        current_time = time.time()
         
-        for workflow_id, workflow in self.active_workflows.items():
-            active_list.append({
-                "workflow_id": workflow_id,
-                "project_name": workflow["project_name"],
-                "running_time": current_time - workflow["start_time"],
-                "status": workflow["status"]
-            })
-            
-        return active_list
-    
-    def get_completed_workflows(self, limit: int = 10) -> List[Dict[str, Any]]:
-        """Get information about completed workflows."""
-        completed_list = []
-        
-        # Sort by completion time (most recent first)
-        sorted_workflows = sorted(
-            self.completed_workflows.items(),
-            key=lambda x: x[1]["end_time"],
-            reverse=True
-        )
-        
-        for workflow_id, workflow in sorted_workflows[:limit]:
-            completed_list.append({
-                "workflow_id": workflow_id,
-                "project_name": workflow["project_name"],
-                "duration": workflow["duration"],
-                "completed_at": workflow["end_time"]
-            })
-            
-        return completed_list 
+    def _merge_results(self, state: WorkflowState) -> Dict[str, Any]:
+        self.logger.info(f"Merging results for project: {state.get('project_name', 'Unknown Project')}")
+        writer_output = state.get('writer_output', {})
+        visualizer_output = state.get('visualizer_output', {})
+        merged_output = {
+            "draft": writer_output.get('draft', ''),
+            "sections": writer_output.get('sections', {}),
+            "visualizations": visualizer_output.get('visualizations', {}),
+            "visualization_list": visualizer_output.get('visualization_list', []),
+            "visualization_data_sources": visualizer_output.get('visualization_data_sources', {}),
+            "errors": {
+                **writer_output.get('errors', {}),
+                **visualizer_output.get('errors', {})
+            }
+        }
+        updated_state = state.copy()
+        updated_state['merged_output'] = merged_output
+        self.logger.info(f"Merged state keys: {list(updated_state.keys())}")
+        return updated_state

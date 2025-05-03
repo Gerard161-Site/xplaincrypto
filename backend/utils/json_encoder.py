@@ -5,11 +5,8 @@ class CustomJSONEncoder(json.JSONEncoder):
     """Custom JSON encoder that handles special objects."""
     
     def default(self, obj: Any) -> Any:
-        # Import here to avoid circular imports
-        from backend.research.core import ResearchNode
-        
-        # Handle ResearchNode objects
-        if isinstance(obj, ResearchNode):
+        # Handle dictionary-like objects by checking for to_dict method
+        if hasattr(obj, 'to_dict') and callable(getattr(obj, 'to_dict')):
             return obj.to_dict()
             
         # Let the base class handle anything else

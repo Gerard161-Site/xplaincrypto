@@ -19,6 +19,7 @@ node_modules/
 # IDE
 .vscode/
 .idea/
+.cursor/  
 
 # Project specific
 docs/*.md

@@ -65,12 +65,33 @@ class LLMFactory:
             if not hf_token:
                 raise ValueError(f"HUGGINGFACE_API_KEY environment variable not set for {task_name}")
                 
-            return HuggingFaceEndpoint(
-                endpoint_url=f"https://api-inference.huggingface.co/models/{model_name}",
-                huggingface_api_key=hf_token,
-                task="text-generation",
-                **kwargs
-            )
+            try:
+                # Create HuggingFaceEndpoint with proper headers
+                hf_endpoint = HuggingFaceEndpoint(
+                    endpoint_url=f"https://api-inference.huggingface.co/models/{model_name}",
+                    huggingface_api_key=hf_token,
+                    task="text-generation",
+                    **kwargs
+                )
+                
+                # Add model_name attribute explicitly to fix the error
+                # This is needed because HuggingFaceEndpoint doesn't set model_name by default
+                hf_endpoint.model_name = model_name
+                
+                return hf_endpoint
+            except Exception as e:
+                logger.error(f"Error creating HuggingFaceEndpoint: {str(e)}")
+                
+                # Fall back to OpenAI if available
+                if os.getenv("OPENAI_API_KEY"):
+                    logger.info(f"Falling back to OpenAI for {task_name}")
+                    return ChatOpenAI(
+                        temperature=kwargs.get("temperature", 0.7),
+                        model="gpt-3.5-turbo"
+                    )
+                
+                # Re-raise if no fallback
+                raise
     
     @staticmethod
     def get_embedding_model(model_name: Optional[str] = None) -> Any:

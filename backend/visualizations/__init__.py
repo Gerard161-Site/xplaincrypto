@@ -5,18 +5,20 @@ This package contains specialized visualization modules for different chart type
 Each module follows a consistent interface but handles a specific type of visualization.
 """
 
-from backend.visualizations.base import BaseVisualizer
-from backend.visualizations.line_chart import LineChartVisualizer
-from backend.visualizations.bar_chart import BarChartVisualizer
-from backend.visualizations.pie_chart import PieChartVisualizer
-from backend.visualizations.table import TableVisualizer
-from backend.visualizations.timeline import TimelineVisualizer
+from .plotly_visualizer import PlotlyVisualizer
+from .line_chart_visualizer import LineChartVisualizer
+from .pie_chart_visualizer import PieChartVisualizer
+from .table_visualizer import TableVisualizer
+from .chain_distribution_visualizer import ChainDistributionVisualizer
+from .candlestick_chart_visualizer import CandlestickChartVisualizer
+from .api import VisualizationAPI
 
 __all__ = [
-    'BaseVisualizer',
+    'PlotlyVisualizer',
     'LineChartVisualizer',
-    'BarChartVisualizer', 
     'PieChartVisualizer',
     'TableVisualizer',
-    'TimelineVisualizer'
+    'ChainDistributionVisualizer',
+    'CandlestickChartVisualizer',
+    'VisualizationAPI'
 ] 

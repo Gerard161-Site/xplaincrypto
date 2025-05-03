@@ -1,7 +1,7 @@
        {
             "report_name": "Cryptocurrency Research Report",
             "prompt": "A comprehensive analysis of cryptocurrency projects for investment decision-making",
-            "version": "1.1",
+            "version": "1.2",
             "fallback_template": "Data unavailable for {project_name} report.",
             "sections": [
                 {
@@ -26,7 +26,7 @@
                     "fallback_template": "Data unavailable for {section_title}.",
                     "fallback_fields": ["current_price", "market_cap"],
                     "data_sources": ["web_research", "coinmarketcap"],
-                    "visualizations": ["basic_metrics_table"]
+                    "visualizations": ["key_metrics_table", "whitepaper_link"]
                 },
                 {
                     "title": "Tokenomics and Distribution",
@@ -37,8 +37,8 @@
                     "prompt": "Analyze the token's economic model, supply metrics, and distribution strategy...",
                     "fallback_template": "Data unavailable for {section_title}.",
                     "fallback_fields": ["total_supply", "circulating_supply", "token_allocation"],
-                    "data_sources": ["web_research","coinmarketcap"],
-                    "visualizations": ["token_distribution_pie", "supply_metrics_table"]
+                    "data_sources": ["web_research","coinmarketcap", "tokenomics"],
+                    "visualizations": ["tokenomics_pie_chart", "chain_distribution_chart"]
                 },
                 {
                     "title": "Market Analysis",
@@ -50,7 +50,7 @@
                     "fallback_template": "Data unavailable for {section_title}.",
                     "fallback_fields": ["market_cap", "price_change_percentage_24h", "competitors"],
                     "data_sources": ["web_research", "coinmarketcap", "defillama"],
-                    "visualizations": ["price_history_chart", "volume_chart", "tvl_chart", "competitor_comparison_chart"]
+                    "visualizations": ["candlestick_chart", "volume_chart", "competitor_comparison_chart"]
                 },
                 {
                     "title": "Technical Analysis",
@@ -62,7 +62,7 @@
                     "fallback_template": "Data unavailable for {section_title}.",
                     "fallback_fields": ["price_history", "volume_history", "tvl_history", "market_cap", "price_change_percentage_24h"],
                     "data_sources": ["web_research", "coinmarketcap"],
-                    "visualizations": ["price_history_chart", "volume_chart", "tvl_chart", "competitor_comparison_chart"]
+                    "visualizations": []
                 },
                 {
                     "title": "Developer Tools and User Experience",
@@ -98,7 +98,7 @@
                     "fallback_template": "Data unavailable for {section_title}.",
                     "fallback_fields": ["tvl", "active_addresses", "exchange_count"],
                     "data_sources": ["web_research", "coinmarketcap", "defillama"],
-                    "visualizations": ["liquidity_trends_chart", "adoption_metrics_table"]
+                    "visualizations": ["liquidity_trends_chart", "adoption_metrics_table", "tvl_milestone_chart", "tvl_phases_chart", "monthly_growth_chart"]
                 },
                 {
                     "title": "Governance and Community",
@@ -161,144 +161,91 @@
                     "visualizations": []
                 }
             ],
-            "visualization_types": {
-                "price_history_chart": {
-                    "type": "line_chart",
+                    "visualization_types": {
+                    "key_metrics_table": {
+                    "type": "table",
+                    "data_source": "multi",
+                    "data_field": "",
+                    "title": "Key Metrics",
+                    "description_template": "Key metrics for {project_name} as of {date}"
+                    },
+                    "whitepaper_link": {
+                    "type": "table",
+                    "data_source": "tokenomics",
+                    "data_field": "whitepaper_url",
+                    "title": "Whitepaper Link",
+                    "description_template": "Link to the whitepaper for {project_name}"
+                    },
+                    "tokenomics_pie_chart": {
+                    "type": "pie_chart",
+                    "data_source": "tokenomics",
+                    "data_field": "token_distribution",
+                    "title": "Token Distribution",
+                    "description_template": "{tokenomics_description}"
+                    },
+                    "chain_distribution_chart": {
+                    "type": "pie_chart",
+                    "data_source": "defillama",
+                    "data_field": "chains",
+                    "title": "Chain Distribution",
+                    "description_template": "{chain_description}"
+                    },
+                    "candlestick_chart": {
+                    "type": "candlestick_chart",
                     "data_source": "coinmarketcap",
-                    "data_field": "price_history",
-                    "time_period": "60d",
-                    "title": "60-Day Price Trend",
-                    "description_template": "The chart shows the price movement of {project_name} over the past 60 days, illustrating {trend_description}."
-                },
-                "volume_chart": {
+                    "data_field": "ohlcv_data",
+                    "title": "Price Trends",
+                    "description_template": "{price_description}"
+                    },
+                    "volume_chart": {
                     "type": "line_chart",
                     "data_source": "coinmarketcap",
                     "data_field": "volume_history",
-                    "time_period": "30d",
-                    "title": "30-Day Trading Volume",
-                    "description_template": "Trading volume for {project_name} over the past 30 days shows {volume_description}."
-                },
-                "tvl_chart": {
+                    "title": "Trading Volume",
+                    "description_template": "{volume_description}"
+                    },
+                    "competitor_comparison_chart": {
+                    "type": "line_chart",
+                    "data_source": "multi",
+                    "data_field": "comparison_data",
+                    "title": "Competitor Comparison",
+                    "description_template": "{comparison_description}"
+                    },
+                    "liquidity_trends_chart": {
+                    "type": "line_chart",
+                    "data_source": "coinmarketcap",
+                    "data_field": "volume_history",
+                    "title": "Liquidity Trends",
+                    "description_template": "{liquidity_description}"
+                    },
+                    "adoption_metrics_table": {
+                    "type": "table",
+                    "data_source": "multi",
+                    "data_field": "",
+                    "title": "Adoption Metrics",
+                    "description_template": "Adoption metrics for {project_name}"
+                    },
+                    "tvl_milestone_chart": {
                     "type": "line_chart",
                     "data_source": "defillama",
                     "data_field": "tvl_history",
-                    "time_period": "60d",
-                    "title": "Total Value Locked (TVL) Trend",
-                    "description_template": "The Total Value Locked (TVL) in {project_name} over the past 60 days demonstrates {tvl_description}."
-                },
-                "key_metrics_table": {
-                    "type": "table",
-                    "data_source": "multi",
-                    "data_fields": ["current_price", "market_cap", "24h_volume", "tvl"],
-                    "title": "Key Metrics",
-                    "description_template": "Current key metrics for {project_name} as of {timestamp}."
-                },
-                "basic_metrics_table": {
-                    "type": "table",
-                    "data_source": "multi",
-                    "data_fields": ["current_price", "market_cap", "circulating_supply", "total_supply", "24h_volume"],
-                    "title": "Basic Information",
-                    "description_template": "Basic market information for {project_name} as of {timestamp}."
-                },
-                "token_distribution_pie": {
-                    "type": "pie_chart",
-                    "data_source": "web_research",
-                    "data_fields": ["token_allocation"],
-                    "title": "Token Distribution",
-                    "description_template": "Distribution of {project_name} tokens among different stakeholders."
-                },
-                "supply_metrics_table": {
-                    "type": "table",
-                    "data_source": "coinmarketcap",
-                    "data_fields": ["total_supply", "circulating_supply", "max_supply"],
-                    "title": "Supply Metrics",
-                    "description_template": "Key supply metrics for {project_name}."
-                },
-                "developer_tools_table": {
-                    "type": "table",
-                    "data_source": "web_research",
-                    "data_fields": ["tool_name", "description", "link"],
-                    "title": "Developer Tools",
-                    "description_template": "Available tools and resources for developers working with {project_name}."
-                },
-                "user_experience_metrics": {
-                    "type": "table",
-                    "data_source": "web_research",
-                    "data_fields": ["metric", "value", "source"],
-                    "title": "User Experience Metrics",
-                    "description_template": "Key metrics indicating the user experience of {project_name}."
-                },
-                "security_audits_table": {
-                    "type": "table",
-                    "data_source": "web_research",
-                    "data_fields": ["audit_date", "auditor", "findings", "status"],
-                    "title": "Security Audits",
-                    "description_template": "Summary of security audits conducted on {project_name}."
-                },
-                "competitor_comparison_chart": {
-                    "type": "bar_chart",
-                    "data_source": "multi",
-                    "data_fields": ["market_cap", "price_change_percentage_24h"],
-                    "title": "Competitive Comparison",
-                    "description_template": "This chart compares {project_name} with similar projects in terms of {metrics_description}."
-                },
-                "governance_metrics_table": {
-                    "type": "table",
-                    "data_source": "web_research",
-                    "data_fields": ["governance_model", "proposal_count", "voting_participation"],
-                    "title": "Governance Metrics",
-                    "description_template": "Governance statistics for {project_name}."
-                },
-                "partnerships_table": {
-                    "type": "table",
-                    "data_source": "web_research",
-                    "data_fields": ["partner_name", "partnership_type", "partnership_date"],
-                    "title": "Key Partnerships",
-                    "description_template": "Major partnerships and integrations of {project_name}."
-                },
-                "risks_table": {
-                    "type": "table",
-                    "data_source": "web_research",
-                    "data_fields": ["risk_type", "risk_description", "risk_level"],
-                    "title": "Key Risks",
-                    "description_template": "Major risks associated with {project_name}."
-                },
-                "opportunities_table": {
-                    "type": "table",
-                    "data_source": "web_research",
-                    "data_fields": ["opportunity_type", "opportunity_description", "potential_impact"],
-                    "title": "Key Opportunities",
-                    "description_template": "Major opportunities for {project_name}."
-                },
-                "liquidity_trends_chart": {
+                    "title": "TVL Milestones",
+                    "description_template": "{tvl_description}"
+                    },
+                    "tvl_phases_chart": {
                     "type": "line_chart",
-                    "data_source": "coinmarketcap",
-                    "data_field": "volume_history",
-                    "time_period": "30d",
-                    "title": "30-Day Liquidity Trends",
-                    "description_template": "Liquidity trends for {project_name} over the past 30 days show {liquidity_description}."
-                },
-                "adoption_metrics_table": {
-                    "type": "table",
-                    "data_source": "multi",
-                    "data_fields": ["tvl", "active_addresses", "exchange_count"],
-                    "title": "Adoption Metrics",
-                    "description_template": "Adoption indicators for {project_name} as of {timestamp}."
-                },
-                "team_metrics_table": {
-                    "type": "table",
-                    "data_source": "web_research",
-                    "data_fields": ["team_size", "notable_members", "development_activity"],
-                    "title": "Team and Development Metrics",
-                    "description_template": "Key details about the {project_name} team and development efforts."
-                },
-                "key_takeaways_table": {
-                    "type": "table",
-                    "data_source": "generated",
-                    "data_fields": ["aspect", "assessment", "recommendation"],
-                    "title": "Key Takeaways",
-                    "description_template": "Summary of key findings and recommendations for {project_name}."
-                }
+                    "data_source": "defillama",
+                    "data_field": "tvl_history",
+                    "title": "TVL Phases",
+                    "description_template": "{tvl_description}"
+                    },
+                    "monthly_growth_chart": {
+                    "type": "line_chart",
+                    "data_source": "defillama",
+                    "data_field": "tvl_history",
+                    "title": "Monthly Growth",
+                    "description_template": "{growth_description}"
+                    }
             }
         }
     

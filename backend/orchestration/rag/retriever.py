@@ -1,50 +1,361 @@
 from langchain_openai import ChatOpenAI
-from .vector_store import VectorStore
+# Fix imports to handle different import paths
+try:
+    from backend.orchestration.rag.vector_store import VectorStore
+except ImportError:
+    # When running from inside backend directory
+    from orchestration.rag.vector_store import VectorStore
 import os
+import logging
+import datetime
+import sys
+from typing import List, Dict, Any, Tuple, Optional
+from langchain.prompts import ChatPromptTemplate
 
 class RAGRetriever:
-    def __init__(self, vector_store: VectorStore, llm_model: str = "gpt-4o"):
+    def __init__(self, vector_store: VectorStore, llm_model: str = "gpt-4o-mini"):
+        # Initialize logger for this class
+        self.logger = logging.getLogger(__name__)
+        
         self.vector_store = vector_store
-        self.llm = ChatOpenAI(model=llm_model, api_key=os.getenv("OPENAI_API_KEY"))
-
-    async def process_query(self, query: str) -> list[str]:
-        """Process a query and return a list of MCP endpoints to call."""
-        # Retrieve relevant endpoints from Pinecone
-        candidates = self.vector_store.query(query, top_k=5)
-        candidate_ids = [endpoint_id for endpoint_id, _ in candidates]
-        candidate_descriptions = [desc for _, desc in candidates]
-
-        # Use LLM to decide which endpoints are most relevant
-        prompt = f"""
-        Given the query: "{query}"
-        Here are some available data sources:
-        {', '.join(f"{endpoint_id}: {desc}" for endpoint_id, desc in candidates)}
         
-        Which endpoints should be called to answer this query? Return a list of endpoint IDs.
+        # Load API key from environment
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            logging.error("OPENAI_API_KEY not found in environment variables")
+        
+        # Configure LLM with more robust error handling
+        try:
+            self.llm = ChatOpenAI(model=llm_model, api_key=api_key)
+            logging.info(f"Initialized RAGRetriever with model: {llm_model}")
+        except Exception as e:
+            logging.error(f"Error initializing ChatOpenAI: {str(e)}")
+            # Set to None to allow fallback behavior
+            self.llm = None
+
+    async def process_query(self, query: str, data_sources: List[str] = None) -> list[str]:
         """
-        response = await self.llm.ainvoke(prompt)
+        Process a query and return a list of MCP endpoints to call.
         
-        # Parse the response to extract endpoint IDs
-        # This is a simple implementation; in production, you might want more robust parsing
-        response_text = response.content
-        selected_endpoints = []
-        
-        for endpoint_id in candidate_ids:
-            if endpoint_id in response_text:
-                selected_endpoints.append(endpoint_id)
-        
-        # If no endpoints were selected, use the top candidate
-        if not selected_endpoints and candidate_ids:
-            selected_endpoints = [candidate_ids[0]]
+        Args:
+            query: The search query
+            data_sources: Optional list of specific data sources to include
             
-        return selected_endpoints
+        Returns:
+            List of endpoint patterns
+        """
+        try:
+            # Log the query for debugging
+            self.logger.info(f"Processing RAG query: {query}")
+            
+            # Filter candidate pool if specific data sources requested
+            preselected_endpoints = []
+            if data_sources:
+                self.logger.info(f"Using preselected data sources: {data_sources}")
+                for source in data_sources:
+                    if source == "coinmarketcap":
+                        preselected_endpoints.extend([
+                            "data://coinmarketcap/price/{coin}",
+                            "data://coinmarketcap/market/{coin}"
+                        ])
+                    elif source == "coingecko":
+                        preselected_endpoints.extend([
+                            "data://coingecko/price/{coin}",
+                            "data://coingecko/market/{coin}"
+                        ])
+                    elif source == "defillama":
+                        preselected_endpoints.extend([
+                            "data://defillama/tvl/{protocol}",
+                            "data://defillama/yields/{protocol}"
+                        ])
+                    elif source == "tokenomics":
+                        preselected_endpoints.extend([
+                            "data://tokenomics/{project}",
+                            "data://tokenomics/distribution/{project}"
+                        ])
+                    elif source == "web_research" or source == "tavily" or source == "research":
+                        preselected_endpoints.extend([
+                            "data://tavily/research/{query}",
+                            "data://tavily/security/{query}",
+                            "data://tavily/technical/{query}"
+                        ])
+                    
+                if preselected_endpoints:
+                    self.logger.info(f"Preselected {len(preselected_endpoints)} endpoints: {preselected_endpoints}")
+                    return preselected_endpoints
+                    
+            # If no preselected endpoints, use both vector store and LLM for endpoint selection
+            # Get initial candidate endpoints from vector store
+            candidates = self.vector_store.query(query, top_k=10)
+            
+            # Extract just the endpoint strings - fix unpacking error
+            candidate_endpoints = [endpoint_id for endpoint_id, _, _ in candidates]
+            
+            # Filter out problematic endpoints
+            filtered_candidates = []
+            for endpoint in candidate_endpoints:
+                if "://project/" in endpoint or "://multi/" in endpoint or endpoint == "data://huggingface/model/{model_id}":
+                    self.logger.warning(f"Filtering out problematic endpoint: {endpoint}")
+                    continue
+                filtered_candidates.append(endpoint)
+                
+            # Check if we have enough candidates, if not, use sensible defaults
+            if len(filtered_candidates) < 2:
+                return ["data://tavily/research/{query}", "data://huggingface/research/{query}"]
+            
+            # Format candidate endpoints for LLM ranking
+            endpoint_data = "\n".join([f"- {endpoint}" for endpoint in filtered_candidates])
+            
+            # Create prompt for LLM to rank endpoints
+            prompt = ChatPromptTemplate.from_messages([
+                ("system", "You are a helpful assistant that selects the most relevant data endpoints for a given query. Return only the endpoints, no explanations."),
+                ("user", f"""Select 2-3 most relevant endpoints for the query: "{query}"
+                
+                Available endpoints:
+                {endpoint_data}
+                
+                Return ONLY a comma-separated list of the selected endpoints, with no explanation or additional text.""")
+            ])
+            
+            # Invoke LLM for endpoint ranking
+            try:
+                chain = prompt | self.llm
+                result = await chain.ainvoke({})
+                
+                # Extract content from the result
+                if isinstance(result, dict) and "content" in result:
+                    selected_text = result["content"]
+                else:
+                    selected_text = str(result)
+                
+                # Parse comma-separated list
+                selected_endpoints = [endpoint.strip() for endpoint in selected_text.split(",")]
+                
+                # Validate the endpoints
+                valid_selected = [endpoint for endpoint in selected_endpoints if endpoint in filtered_candidates]
+                
+                if valid_selected:
+                    self.logger.info(f"LLM selected endpoints: {valid_selected}")
+                    return valid_selected
+                else:
+                    self.logger.warning("LLM didn't select valid endpoints, returning filtered candidates")
+                    return filtered_candidates
+                    
+            except Exception as e:
+                self.logger.warning(f"Error in LLM endpoint selection: {str(e)}")
+                return filtered_candidates
+                
+        except Exception as e:
+            self.logger.error(f"Error in process_query: {str(e)}")
+            # Return safe defaults
+            return ["data://tavily/research/{query}", "data://huggingface/research/{query}"]
+    
+    async def format_endpoint_for_query(self, endpoint_pattern: str, project_name: str, query: Optional[str] = None) -> str:
+        """
+        Format endpoint pattern by replacing placeholders with provided values.
+        
+        Args:
+            endpoint_pattern: The endpoint pattern with placeholders (e.g., data://coingecko/price/{coin}/{project_name})
+            project_name: The name of the project to use for {coin}, {protocol}, {project}, {project_name}.
+            query: The original search query (used for {query} placeholders).
+            
+        Returns:
+            Formatted endpoint string ready for use.
+        """
+        if not endpoint_pattern:
+            return ""
+            
+        # Normalize project name
+        safe_name = project_name.lower().strip()
+        
+        # Start with the raw pattern
+        formatted_endpoint = endpoint_pattern 
+
+        # Replace placeholders based on their presence in the pattern
+        if '{coin}' in formatted_endpoint:
+            formatted_endpoint = formatted_endpoint.replace('{coin}', safe_name)
+        if '{protocol}' in formatted_endpoint:
+            formatted_endpoint = formatted_endpoint.replace('{protocol}', safe_name)
+        if '{project}' in formatted_endpoint:
+            formatted_endpoint = formatted_endpoint.replace('{project}', safe_name)
+        if '{project_name}' in formatted_endpoint:
+             formatted_endpoint = formatted_endpoint.replace('{project_name}', safe_name)
+
+        # Replace {query} placeholder using the actual query string
+        if '{query}' in formatted_endpoint:
+            if query:
+                # TODO: Consider URL encoding the query if needed
+                formatted_endpoint = formatted_endpoint.replace('{query}', query)
+            else:
+                self.logger.warning(f"No query string provided for pattern '{endpoint_pattern}'. Using project name '{safe_name}' for {{query}} placeholder.")
+                formatted_endpoint = formatted_endpoint.replace('{query}', safe_name)
+                
+        # Log the transformation
+        self.logger.info(f"Formatted endpoint: Pattern='{endpoint_pattern}', Query='{query}', Proj='{project_name}' -> Final='{formatted_endpoint}'")
+        
+        # Return the endpoint with only the existing placeholders filled
+        return formatted_endpoint
+    
+    def _get_specialized_endpoint(self, query: str, endpoint: str) -> str:
+        """
+        Optimize endpoints for specific query types to use more specialized endpoints.
+        For example, redirect security-related queries to security-specific endpoints.
+        
+        Args:
+            query: The search query
+            endpoint: The original endpoint pattern
+            
+        Returns:
+            Potentially updated endpoint pattern for specialized handling
+        """
+        query_lower = query.lower()
+        
+        # Special handling for tavily research endpoints
+        if "data://tavily/research/" in endpoint:
+            # Security-related queries
+            if any(term in query_lower for term in ["security", "audit", "vulnerability", "risk", "exploit"]):
+                self.logger.info(f"Redirecting query to specialized security endpoint: {query}")
+                return "data://tavily/security/{query}"
+                
+            # Technical-related queries  
+            if any(term in query_lower for term in ["technical", "architecture", "implementation", "protocol", "blockchain"]):
+                self.logger.info(f"Redirecting query to specialized technical endpoint: {query}")
+                return "data://tavily/technical/{query}"
+        
+        # Return original endpoint if no specialization applies
+        return endpoint
+
+    async def get_endpoints_for_project(self, query: str, project_name: Optional[str] = None) -> List[str]:
+        """Get the most relevant data endpoints for a project and query."""
+        try:
+            # Ensure the vectorstore is initialized
+            if not self.vector_store:
+                self.vector_store = get_vector_store()
+
+            # Add project name to query if provided
+            enhanced_query = query
+            if project_name and project_name.lower() not in query.lower():
+                enhanced_query = f"{project_name} {query}"
+            
+            self.logger.info(f"RAG query: '{enhanced_query}'")
+            
+            # Get endpoints from vectorstore
+            raw_endpoints = self.vector_store.query(enhanced_query, top_k=10)
+            
+            # Extract just the endpoint strings
+            endpoint_strings = [endpoint_id for endpoint_id, _, _ in raw_endpoints]
+            
+            # FILTER OUT PROBLEMATIC ENDPOINTS - important fix for recursion and timeout issues
+            filtered_endpoints = []
+            for endpoint in endpoint_strings:
+                # Skip invalid server endpoints that cause recursion
+                if "://project/" in endpoint or "://multi/" in endpoint or endpoint == "data://huggingface/model/{model_id}":
+                    self.logger.warning(f"Filtering out problematic endpoint: {endpoint}")
+                    continue
+                    
+                # Check for specialized endpoints
+                specialized_endpoint = self._get_specialized_endpoint(query, endpoint)
+                if specialized_endpoint != endpoint:
+                    filtered_endpoints.append(specialized_endpoint)
+                else:
+                    filtered_endpoints.append(endpoint)
+                
+            self.logger.info(f"Vector store returned {len(filtered_endpoints)} candidate endpoints")
+            
+            # Process endpoints through LLM for selection and refinement if we have enough candidates
+            if len(filtered_endpoints) > 2:
+                try:
+                    llm_selected_endpoints = await self.process_query(enhanced_query)
+                    if llm_selected_endpoints and len(llm_selected_endpoints) > 0:
+                        self.logger.info(f"LLM selected {len(llm_selected_endpoints)} endpoints")
+                        return llm_selected_endpoints
+                    self.logger.warning("LLM didn't return valid endpoints, falling back to vector search results")
+                except Exception as e:
+                    self.logger.error(f"Error in LLM endpoint selection: {str(e)}")
+                    # Fall back to vector store results
+            
+            return filtered_endpoints
+            
+        except Exception as e:
+            self.logger.error(f"Error in get_endpoints_for_project: {str(e)}")
+            # Return a small set of fallback endpoints that should work for most queries
+            return ["data://tavily/research/{query}", "data://huggingface/research/{query}"]
+    
+    async def retrieve_relevant_endpoints(self, query: str, top_k: int = 5) -> dict:
+        """
+        Retrieve relevant endpoints for a query and organize them by category.
+        Returns a dictionary with endpoints and metadata.
+        """
+        try:
+            # Retrieve relevant endpoints from vector store
+            candidate_tuples = self.vector_store.query(query, top_k=top_k)
+            
+            result = {
+                "query": query,
+                "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "endpoints": [],
+                "categories": {}
+            }
+            
+            if not candidate_tuples:
+                self.logger.warning(f"No endpoints found in vector store for query: {query}")
+                return result
+            
+            # Process candidates
+            for endpoint_id, description, score in candidate_tuples:
+                # Parse endpoint parts (e.g., "data://coingecko/price" -> ["data", "coingecko", "price"])
+                parts = endpoint_id.split("://")
+                if len(parts) == 2:
+                    endpoint_type = parts[0]  # e.g., "data"
+                    endpoint_path = parts[1]  # e.g., "coingecko/price"
+                    
+                    # Determine category
+                    if "/" in endpoint_path:
+                        category = endpoint_path.split("/")[0]  # e.g., "coingecko"
+                    else:
+                        category = endpoint_path
+                    
+                    # Add to endpoints list
+                    endpoint_info = {
+                        "id": endpoint_id,
+                        "description": description,
+                        "score": score,
+                        "type": endpoint_type,
+                        "category": category
+                    }
+                    
+                    result["endpoints"].append(endpoint_info)
+                    
+                    # Organize by category
+                    if category not in result["categories"]:
+                        result["categories"][category] = []
+                    
+                    result["categories"][category].append(endpoint_info)
+            
+            # Sort endpoints by score
+            result["endpoints"].sort(key=lambda x: x["score"], reverse=True)
+            
+            # Sort within each category
+            for category in result["categories"]:
+                result["categories"][category].sort(key=lambda x: x["score"], reverse=True)
+            
+            return result
+            
+        except Exception as e:
+            self.logger.error(f"Error retrieving relevant endpoints: {str(e)}")
+            return {
+                "query": query,
+                "error": str(e),
+                "endpoints": [],
+                "categories": {}
+            }
 
 class LLMDecision:
     @staticmethod
     async def refine_endpoints(query: str, endpoints: list[str], llm=None) -> list[str]:
         """Refine the list of endpoints based on query context."""
         if not llm:
-            llm = ChatOpenAI(model="gpt-4o", api_key=os.getenv("OPENAI_API_KEY"))
+            llm = ChatOpenAI(model="gpt-4o-mini", api_key=os.getenv("OPENAI_API_KEY"))
             
         # For now, return as-is; in the future, this could be enhanced with more sophisticated logic
         return endpoints

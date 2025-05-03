@@ -6,7 +6,7 @@
 XplainCrypto/
 ├── backend/                       # Backend API and server
 │   ├── agents/                    # Agent modules
-│   │   ├── enhanced_researcher.py # Main research agent with data fallback
+│   │   ├── researcher.py # Main research agent with data fallback
 │   │   ├── visualization_agent.py # Data visualization agent
 │   │   ├── writer.py              # Report writing agent
 │   │   ├── editor.py              # Report editing agent

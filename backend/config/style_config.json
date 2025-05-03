@@ -1,18 +1,25 @@
 {
     "version": "1.0",
     "description": "Global style configuration for reports and visualizations",
-   "fonts": {
-    "primary": "Helvetica",
-    "secondary": "Helvetica",
-    "bold": "Helvetica-Bold",
-    "italic": "Helvetica-Oblique",
-    "bolditalic": "Helvetica-BoldOblique"
-},
+    "fonts": {
+        "primary": "Helvetica",
+        "secondary": "Helvetica",
+        "bold": "Helvetica-Bold",
+        "italic": "Helvetica-Oblique",
+        "bolditalic": "Helvetica-BoldOblique",
+        "family": "Arial, Helvetica, sans-serif",
+        "size": {
+            "title": 18,
+            "subtitle": 14,
+            "body": 12,
+            "caption": 10
+        }
+    },
     "font_sizes": {
         "title": 16,
         "section_heading": 12,
         "subsection_heading": 10,
-        "body_text": 10,
+        "body_text": 11,
         "caption": 9,
         "disclaimer": 8,
         "reference": 9
@@ -25,10 +32,12 @@
         "table_alternate_row": "#f9f9f9",
         "table_border": "#dddddd",
         "chart_colors": [
-            "#1f77b4",
-            "#ff7f0e",
-            "#2ca02c",
-            "#d62728"
+            "#1E88E5",
+            "#26A69A",
+            "#D81B60",
+            "#FFB300",
+            "#607D8B",
+            "#66BB6A"
         ]
     },
     "spacing": {
@@ -47,16 +56,53 @@
         "line_height": 16
     },
     "visualization": {
+        "themes": {
+            "light": {
+                "background": "#ffffff",
+                "text": "#333333",
+                "accent": "#3366cc",
+                "secondary": "#66aa66",
+                "grid": "#dddddd",
+                "error": "#e15759",
+                "success": "#4caf50",
+                "accent_palette": ["#3366cc", "#dc3912", "#ff9900", "#109618", "#990099", "#0099c6", "#dd4477", "#66aa00"]
+            },
+            "dark": {
+                "background": "#202124",
+                "text": "#e8eaed",
+                "accent": "#8ab4f8",
+                "secondary": "#81c995",
+                "grid": "#3c4043",
+                "error": "#f28b82",
+                "success": "#81c995",
+                "accent_palette": ["#8ab4f8", "#f28b82", "#fdd663", "#81c995", "#d7aefb", "#78d9ec", "#ff8bcb", "#b9e769"]
+            }
+        },
         "figure": {
-            "width": 6.5,
+            "width": 5.0,
             "height": 3.5,
-            "dpi": 300
+            "dpi": 300,
+            "pdf_width": 4.5
         },
         "table": {
-            "row_height": 0.25,
-            "min_height": 2,
-            "max_height": 8,
-            "header_scale": 1.2
+            "row_height": 0.3,
+            "min_height": 2.5,
+            "max_height": 5.0,
+            "header_scale": 1.2,
+            "width": 5.0,
+            "font_size": 10,
+            "header_color": {
+                "light": "#f2f2f2",
+                "dark": "#3c4043"
+            },
+            "row_colors": {
+                "light": ["#ffffff", "#f9f9f9"],
+                "dark": ["#202124", "#292a2d"]
+            },
+            "border_color": {
+                "light": "#dddddd",
+                "dark": "#3c4043"
+            }
         },
         "text_wrap": {
             "width": 40,
@@ -76,23 +122,49 @@
             "grid": {
                 "alpha": 0.3
             }
+        },
+        "chart_sizes": {
+            "desktop": {
+                "width": 800,
+                "height": 500
+            },
+            "mobile": {
+                "width": 350,
+                "height": 250
+            }
+        },
+        "line_chart": {
+            "marker_size": 6,
+            "line_width": 2,
+            "grid": true
+        },
+        "pie_chart": {
+            "donut_hole": 0.4,
+            "label_distance": 1.1,
+            "show_percentages": true
         }
     },
     "pdf": {
         "page": {
             "size": "letter",
             "margins": {
-                "left": 1,
-                "right": 1,
-                "top": 1,
-                "bottom": 1
-            }
+                "left": 0.75,
+                "right": 0.75,
+                "top": 1.0,
+                "bottom": 1.0
+            },
+            "content_width": 7.0,
+            "content_height": 9.0
         },
         "alignment": {
             "title": "center",
             "section": "left",
             "body": "justify",
             "caption": "center"
+        },
+        "images": {
+            "width": 4.5,
+            "max_height": 3.5
         }
     }
 } 

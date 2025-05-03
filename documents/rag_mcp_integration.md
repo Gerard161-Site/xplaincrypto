@@ -44,7 +44,7 @@ backend/
 │           └── huggingface_server.py
 ├── agent/
 │   ├── mcp_integration.py
-│   ├── enhanced_researcher_mcp.py
+│   ├── researcher.py
 │   └── workflow_manager_mcp.py
 └── api/
     └── mcp_api.py

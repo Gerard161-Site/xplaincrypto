@@ -33,7 +33,7 @@ backend/
 │           └── huggingface_server.py
 ├── agent/
 │   ├── mcp_integration.py         # Basic MCP-LangGraph integration
-│   ├── enhanced_researcher_mcp.py # Enhanced Researcher with MCP
+│   ├── researcher.py # Enhanced Researcher with MCP
 │   └── workflow_manager_mcp.py    # Workflow manager with MCP integration
 └── api/
     └── mcp_api.py                 # FastAPI endpoints for MCP integration

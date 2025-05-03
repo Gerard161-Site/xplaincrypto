@@ -14,9 +14,27 @@ class StyleManager:
     def _load_style_config(self) -> Dict[str, Any]:
         """Load the style configuration from JSON file"""
         try:
-            config_path = os.path.join("backend", "config", "style_config.json")
-            with open(config_path, "r") as f:
-                return json.load(f)
+            # Try loading from config/ directory first (current working directory)
+            config_path = os.path.join("config", "style_config.json")
+            if os.path.exists(config_path):
+                with open(config_path, "r") as f:
+                    return json.load(f)
+                    
+            # Try parent directory config/
+            parent_config_path = os.path.join("..", "config", "style_config.json")
+            if os.path.exists(parent_config_path):
+                with open(parent_config_path, "r") as f:
+                    return json.load(f)
+                    
+            # Last attempt with backend/config/
+            backend_config_path = os.path.join("backend", "config", "style_config.json")
+            if os.path.exists(backend_config_path):
+                with open(backend_config_path, "r") as f:
+                    return json.load(f)
+                    
+            # If none of the paths work, return empty dict
+            self.logger.error(f"Could not find style_config.json in config/, ../config/, or backend/config/")
+            return {}
         except Exception as e:
             self.logger.error(f"Error loading style config: {e}")
             return {}
@@ -93,6 +111,13 @@ class StyleManager:
                 alignment=self.get_alignment("caption"),
                 spaceAfter=12
             ),
+            'CaptionTitle': ParagraphStyle(
+                name='CaptionTitle',
+                fontName=fonts.get("bold", "Times-Bold"),
+                fontSize=sizes.get("caption", 10),
+                alignment=self.get_alignment("caption"),
+                spaceAfter=6
+            ),
             'Disclaimer': ParagraphStyle(
                 name='Disclaimer',
                 fontName=fonts.get("italic", "Times-Italic"),
@@ -167,4 +192,35 @@ class StyleManager:
     
     def get_pdf_config(self) -> Dict[str, Any]:
         """Get PDF configuration settings"""
-        return self.style_config.get("pdf", {}) 
+        return self.style_config.get("pdf", {})
+    
+    def get_font_size(self, element_type: str) -> int:
+        """Get font size for a specific element type from configuration."""
+        default_sizes = {
+            'title': 12,
+            'subtitle': 11,
+            'label': 10,
+            'tick': 9,
+            'legend': 9,
+            'caption': 9,
+            'body_text': 10
+        }
+        font_sizes = self.style_config.get("font_sizes", {})
+        viz_config = self.style_config.get("visualization", {}).get("matplotlib", {})
+        if element_type in ['label', 'tick']:
+            return viz_config.get("axes", {}).get(f"{element_type}_size", font_sizes.get(element_type, default_sizes.get(element_type, 10)))
+        elif element_type == 'legend':
+            return viz_config.get("legend", {}).get("font_size", font_sizes.get(element_type, default_sizes.get(element_type, 9)))
+        else:
+            return font_sizes.get(element_type, default_sizes.get(element_type, 10))
+    
+    def get_font_family(self, font_type: str = 'primary') -> str:
+        """Get font family for a specific font type from configuration."""
+        default_fonts = {
+            'primary': 'Times New Roman',
+            'secondary': 'Times Roman',
+            'bold': 'Times Bold',
+            'italic': 'Times Italic'
+        }
+        fonts = self.style_config.get("fonts", {})
+        return fonts.get(font_type, default_fonts.get(font_type, 'Times New Roman')) 

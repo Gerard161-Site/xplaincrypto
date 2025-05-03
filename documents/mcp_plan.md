@@ -17,7 +17,7 @@ The goal is to create a new `RAG + MCP Orchestration Layer` that acts as an inte
 XplainCrypto/
 ├── backend/
 │   ├── agents/                    # Existing agent modules (unchanged)
-│   │   ├── enhanced_researcher.py
+│   │   ├── researcher.py
 │   │   ├── visualization_agent.py
 │   │   ├── writer.py
 │   │   ├── editor.py
@@ -323,13 +323,13 @@ XplainCrypto/
 **Objective**: Update the `Enhanced Researcher` to use the RAG > MCP layer instead of directly calling retrievers.
 
 **Implementation**:
-- **File**: `backend/agents/enhanced_researcher.py`
+- **File**: `backend/agents/researcher.py`
   ```python
   from ..orchestration.rag.retriever import RAGRetriever
   from ..orchestration.mcp.client import MCPClient
   from ..orchestration.mcp.router import MCPRouter
 
-  class EnhancedResearcher:
+  class Researcher:
       def __init__(self):
           self.vector_store = VectorStore(api_key=os.getenv("PINECONE_API_KEY"))
           self.rag_retriever = RAGRetriever(vector_store=self.vector_store)
@@ -355,11 +355,11 @@ XplainCrypto/
 
 - **Update Workflow Manager**: `backend/orchestration/workflow_manager.py`
   ```python
-  from ..agents.enhanced_researcher import EnhancedResearcher
+  from ..agents.researcher import Researcher
 
   class WorkflowManager:
       def __init__(self):
-          self.researcher = EnhancedResearcher()
+          self.researcher = Researcher()
           # Other agents (Visualization, Writer, etc.) remain unchanged
 
       async def execute_workflow(self, query: str):
@@ -373,9 +373,9 @@ XplainCrypto/
   ```
 
 **Testable Deliverable**:
-- Test the `EnhancedResearcher` independently:
+- Test the `Researcher` independently:
   ```python
-  researcher = EnhancedResearcher()
+  researcher = Researcher()
   await researcher.initialize()
   data = await researcher.research("Solana price and market cap")
   print(data)  # Should return data from CoinGecko and CoinMarketCap
@@ -440,7 +440,7 @@ XplainCrypto/
 - **Update `main.py`**: Ensure the `WorkflowManager` is initialized and used in FastAPI routes.
 - **Run Full System Test**:
   - Start the FastAPI server: `python -m uvicorn main:app --reload`.
-  - Use the Web UI to request a report (e.g., “Solana market analysis”).
+  - Use the Web UI to request a report (e.g., "Solana market analysis").
   - Verify that:
     - RAG selects appropriate endpoints (e.g., CoinGecko, CoinMarketCap).
     - MCP fetches data from the correct servers.
@@ -527,4 +527,4 @@ graph TD
 ---
 
 ### Conclusion
-This design plan integrates the RAG > MCP tier into XplainCrypto, ensuring flexibility for future resources while preserving your agent layer’s functionality. Each step is modular and testable, allowing your AI developers to build and validate incrementally. The use of Pinecone for RAG and MCP for standardized data access makes the system scalable and adaptable, aligning with your vision for a robust, monetizable crypto research platform.
+This design plan integrates the RAG > MCP tier into XplainCrypto, ensuring flexibility for future resources while preserving your agent layer's functionality. Each step is modular and testable, allowing your AI developers to build and validate incrementally. The use of Pinecone for RAG and MCP for standardized data access makes the system scalable and adaptable, aligning with your vision for a robust, monetizable crypto research platform.

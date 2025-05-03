@@ -31,8 +31,20 @@ class ProgressTracker:
             message: Progress message
             job_id: Optional job ID to override the default
         """
-        # Set step completion
+        # Ensure percentage is numeric
+        try:
+            percentage = float(percentage)
+        except (ValueError, TypeError):
+            percentage = 0.0
+            
+        # Get previous percentage, ensure it's numeric
         previous_percentage = self.steps_completed.get(step, 0)
+        try:
+            previous_percentage = float(previous_percentage)
+        except (ValueError, TypeError):
+            previous_percentage = 0.0
+        
+        # Set step completion
         self.steps_completed[step] = percentage
         
         # Use provided job_id or default
@@ -100,7 +112,18 @@ class ProgressTracker:
         """Mark tracking as complete and return summary statistics."""
         end_time = datetime.now()
         duration = (end_time - self.start_time).total_seconds() if self.start_time else 0
-        completed_steps = len([s for s, p in self.steps_completed.items() if p >= 100])
+        
+        # Ensure all percentages are numeric before comparison
+        completed_steps = 0
+        for step, percentage in self.steps_completed.items():
+            try:
+                percentage = float(percentage)
+                if percentage >= 100:
+                    completed_steps += 1
+            except (ValueError, TypeError):
+                # Skip invalid percentages
+                pass
+                
         total_steps = getattr(self, 'total_steps', 0)
         
         summary = {
@@ -112,4 +135,23 @@ class ProgressTracker:
         }
         
         self._log(f"Job {summary['job_id']} completed in {duration:.2f} seconds ({summary['completion_percentage']:.1f}% complete)")
-        return summary 
+        return summary
+    
+    def mark_step_completed(self, step: str, percentage: float = 100.0, message: str = "Completed", job_id: str = None):
+        """
+        Mark a step as completed.
+        
+        Args:
+            step: The step to mark as completed
+            percentage: Completion percentage (defaults to 100.0)
+            message: Completion message
+            job_id: Optional job ID to override the default
+        """
+        # Ensure percentage is numeric
+        try:
+            percentage = float(percentage)
+        except (ValueError, TypeError):
+            percentage = 100.0
+            
+        # Use update_progress with the step completed
+        self.update_progress(step, percentage, message, job_id) 
