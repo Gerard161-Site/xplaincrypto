@@ -1,0 +1,20 @@
+{
+  "data": [
+    "data://huggingface/{query}",
+    "data://huggingface/dataset/{dataset_id}",
+    "data://huggingface/research/{query}",
+    "data://defillama/tvl/{protocol}",
+    "huggingface",
+    "tavily",
+    "data://tavily/research/{query}",
+    "tokenomics"
+  ],
+  "metadata": {
+    "source": "rag",
+    "endpoint": "endpoints",
+    "query": "be0dec3b407cf6ee86043c790a2a337b",
+    "cached_at": "2025-05-08T13:55:39.025881",
+    "expires_at": "2025-05-09T13:55:39.025890",
+    "ttl_hours": 24
+  }
+}

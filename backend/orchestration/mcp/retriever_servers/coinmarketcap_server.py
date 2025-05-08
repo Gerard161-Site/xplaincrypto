@@ -42,7 +42,7 @@ async def _fetch_price_data_impl(coin: str, project_name: str = "") -> dict:
     logger.info(f"Fetching price data for coin={coin}, project_name={project_to_use}")
     
     # Check cache first using cache_manager
-    cached_data = cache_manager.load("coinmarketcap", "price", coin.lower(), ttl_seconds=1800)  # 30 min TTL
+    cached_data = cache_manager.load("coinmarketcap", "price", coin.lower())
     if cached_data:
         logger.info(f"Using cached CoinMarketCap price data for {coin} in project {project_to_use}")
         return cached_data
@@ -91,7 +91,7 @@ async def _fetch_market_data_impl(coin: str, project_name: str = "") -> dict:
     logger.info(f"Fetching market data for coin={coin}, project_name={project_to_use}")
     
     # Check cache first using cache_manager
-    cached_data = cache_manager.load("coinmarketcap", "market", coin.lower(), ttl_seconds=1800)  # 30 min TTL
+    cached_data = cache_manager.load("coinmarketcap", "market", coin.lower())
     if cached_data:
         logger.info(f"Using cached CoinMarketCap market data for {coin} in project {project_to_use}")
         return cached_data
@@ -231,7 +231,7 @@ async def get_coin_price_history(symbol: str, days: int = 90, project_name: str 
     
     # Check cache first
     cache_key = f"{symbol.lower()}_history_{days}"
-    cached_data = cache_manager.load("coinmarketcap", "history", cache_key, ttl_seconds=3600)
+    cached_data = cache_manager.load("coinmarketcap", "history", cache_key)
     if cached_data:
         logger.info(f"Using cached price history for {symbol}, days={days}")
         return cached_data

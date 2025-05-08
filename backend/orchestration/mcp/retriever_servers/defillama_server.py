@@ -67,7 +67,7 @@ async def get_defillama_data(protocol: str) -> dict:
     init_with_project(project_name)
         
     # Check cache first
-    cached_data = cache_manager.load("defillama", "general", protocol.lower(), ttl_seconds=10800)  # 3 hour TTL
+    cached_data = cache_manager.load("defillama", "general", protocol.lower())
     if cached_data:
         logger.info(f"Using cached DeFiLlama data for {protocol}")
         return cached_data
@@ -78,7 +78,7 @@ async def get_defillama_data(protocol: str) -> dict:
         
         # Cache the result if successful
         if "error" not in data:
-            cache_manager.save(data, "defillama", "general", protocol.lower(), ttl_seconds=10800)
+            cache_manager.save(data, "defillama", "general", protocol.lower())
             logger.info(f"Cached DeFiLlama data for {protocol}")
         else:
             logger.warning(f"Not caching error response for {protocol}: {data['error']}")
@@ -99,7 +99,7 @@ async def get_defillama_data_with_project(protocol: str, project_name: str) -> d
     init_with_project(project_name)
         
     # Check cache first
-    cached_data = cache_manager.load("defillama", "general", protocol.lower(), ttl_seconds=10800)  # 3 hour TTL
+    cached_data = cache_manager.load("defillama", "general", protocol.lower())
     if cached_data:
         logger.info(f"Using cached DeFiLlama data for {protocol} in project {project_name}")
         return cached_data
@@ -110,7 +110,7 @@ async def get_defillama_data_with_project(protocol: str, project_name: str) -> d
         
         # Cache the result if successful
         if "error" not in data:
-            cache_manager.save(data, "defillama", "general", protocol.lower(), ttl_seconds=10800)
+            cache_manager.save(data, "defillama", "general", protocol.lower())
             logger.info(f"Cached DeFiLlama data for {protocol} in project {project_name}")
         else:
             logger.warning(f"Not caching error response for {protocol}: {data['error']}")
@@ -140,7 +140,7 @@ async def get_tvl_data(protocol: str, project_name: str = ""):
     
     # Check cache first
     cache_key = f"tvl_{protocol.lower()}"
-    cached_data = cache_manager.load("defillama", "tvl", cache_key, ttl_seconds=3 * 60 * 60)  # 3 hours TTL
+    cached_data = cache_manager.load("defillama", "tvl", cache_key)
     
     if cached_data:
         logger.info(f"Returning cached TVL data for {protocol}")
@@ -174,7 +174,7 @@ async def get_protocol_data(protocol: str, project_name: str = ""):
         
     # Check cache first
     cache_key = f"protocol_{protocol.lower()}"
-    cached_data = cache_manager.load("defillama", "protocol", cache_key, ttl_seconds=24 * 60 * 60)  # 24 hours TTL
+    cached_data = cache_manager.load("defillama", "protocol", cache_key)
     
     if cached_data:
         logger.info(f"Returning cached protocol data for {protocol}")
@@ -192,7 +192,7 @@ async def get_protocol_data(protocol: str, project_name: str = ""):
         data = await api.get_protocol_data(protocol_id)
         if data:
             # Cache data
-            cache_manager.save(data, "defillama", "protocol", cache_key, ttl_seconds=24 * 60 * 60)
+            cache_manager.save(data, "defillama", "protocol", cache_key)
             return data
         else:
             return {"error": f"Failed to fetch protocol data for {protocol}"}
@@ -220,7 +220,7 @@ async def get_protocol_tvl_data(protocol: str, project_name: str = ""):
     
     # Check cache first
     cache_key = f"tvl_{protocol.lower()}"
-    cached_data = cache_manager.load("defillama", "tvl", cache_key, ttl_seconds=3 * 60 * 60)  # 3 hours TTL
+    cached_data = cache_manager.load("defillama", "tvl", cache_key)
     
     if cached_data:
         logger.info(f"Returning cached TVL data for {protocol}")
@@ -238,7 +238,7 @@ async def get_protocol_tvl_data(protocol: str, project_name: str = ""):
         data = await api.get_tvl_data(protocol_id)
         if data:
             # Cache data
-            cache_manager.save(data, "defillama", "tvl", cache_key, ttl_seconds=3 * 60 * 60)
+            cache_manager.save(data, "defillama", "tvl", cache_key)
             return data
         else:
             return {"error": f"Failed to fetch TVL data for {protocol}"}
@@ -271,7 +271,7 @@ async def get_protocol_yields_data(protocol: str, project_name: str = ""):
         
     # Check cache first
     cache_key = f"yields_{protocol.lower()}"
-    cached_data = cache_manager.load("defillama", "yields", cache_key, ttl_seconds=3 * 60 * 60)  # 3 hours TTL
+    cached_data = cache_manager.load("defillama", "yields", cache_key)
     
     if cached_data:
         logger.info(f"Returning cached yields data for {protocol}")
@@ -289,7 +289,7 @@ async def get_protocol_yields_data(protocol: str, project_name: str = ""):
         data = await api.get_yields_data(protocol_id)
         if data:
             # Cache data
-            cache_manager.save(data, "defillama", "yields", cache_key, ttl_seconds=3 * 60 * 60)
+            cache_manager.save(data, "defillama", "yields", cache_key)
             return data
         else:
             return {"error": f"Failed to fetch yields data for {protocol}"}
@@ -307,7 +307,7 @@ async def search_protocols(query: str, project_name: str = ""):
         
     # Check cache first
     cache_key = f"search_{query.lower()}"
-    cached_data = cache_manager.load("defillama", "search", cache_key, ttl_seconds=24 * 60 * 60)  # 24 hours TTL
+    cached_data = cache_manager.load("defillama", "search", cache_key)
     
     if cached_data:
         logger.info(f"Returning cached protocol search for {query}")
@@ -324,7 +324,7 @@ async def search_protocols(query: str, project_name: str = ""):
         if results:
             data = {"protocols": results}
             # Cache data
-            cache_manager.save(data, "defillama", "search", cache_key, ttl_seconds=24 * 60 * 60)
+            cache_manager.save(data, "defillama", "search", cache_key)
             return data
         else:
             return {"protocols": []}
@@ -399,7 +399,7 @@ async def fetch_protocol_data(protocol: str, project_name: str = "") -> Dict[str
         # Cache the result if successful
         if result and "error" not in result:
             cache_key = f"protocol_{protocol.lower()}"
-            cache_manager.save(result, "defillama", "protocol", cache_key, ttl_seconds=24 * 60 * 60)
+            cache_manager.save(result, "defillama", "protocol", cache_key)
             logger.info(f"Cached protocol data for {protocol} with project {project_name}")
             
         return result
@@ -447,7 +447,7 @@ async def fetch_tvl_data(protocol: str, project_name: str = "") -> Dict[str, Any
             # Cache the result if successful
             if "error" not in result:
                 cache_key = f"tvl_{protocol.lower()}"
-                cache_manager.save(result, "defillama", "tvl", cache_key, ttl_seconds=3 * 60 * 60)
+                cache_manager.save(result, "defillama", "tvl", cache_key)
                 logger.info(f"Cached TVL data for {protocol} with project {project_name}")
                 
         return result
@@ -574,7 +574,7 @@ async def _fetch_tvl_data_impl(protocol: str, project_name: str = ""):
         
     # Check cache first
     cache_key = f"tvl_{protocol.lower()}"
-    cached_data = cache_manager.load("defillama", "tvl", cache_key, ttl_seconds=3 * 60 * 60)  # 3 hours TTL
+    cached_data = cache_manager.load("defillama", "tvl", cache_key)
     
     if cached_data:
         logger.info(f"Returning cached TVL data for {protocol}")
@@ -592,7 +592,7 @@ async def _fetch_tvl_data_impl(protocol: str, project_name: str = ""):
         data = await api.get_tvl_data(protocol_id)
         if data:
             # Cache data
-            cache_manager.save(data, "defillama", "tvl", cache_key, ttl_seconds=3 * 60 * 60)
+            cache_manager.save(data, "defillama", "tvl", cache_key)
             return data
         else:
             return {"error": f"Failed to fetch TVL data for {protocol}"}
@@ -622,7 +622,7 @@ async def get_tvl(protocol: str, project_name: str = None) -> Dict[str, Any]:
     
     # Check cache first
     cache_key = f"tvl_{protocol.lower()}"
-    cached_data = cache_manager.load("defillama", "tvl", cache_key, ttl_seconds=3 * 60 * 60)  # 3 hours TTL
+    cached_data = cache_manager.load("defillama", "tvl", cache_key)
     
     if cached_data:
         logger.info(f"Returning cached TVL data for {protocol}")
@@ -646,13 +646,18 @@ async def get_tvl(protocol: str, project_name: str = None) -> Dict[str, Any]:
         data = await api.get_tvl_data(protocol_id)
         if data:
             # Cache data
-            cache_manager.save(data, "defillama", "tvl", cache_key, ttl_seconds=3 * 60 * 60)
+            cache_manager.save(data, "defillama", "tvl", cache_key)
             logger.info(f"Cached TVL data for {protocol}")
             return data
         else:
             return {"error": f"Failed to fetch TVL data for {protocol}"}
     except Exception as e:
         logger.error(f"Error fetching TVL data for {protocol}: {e}")
+        return {"error": f"Error fetching TVL data: {str(e)}"}
+
+class DeFiLlamaAPI:
+    """DeFiLlama API client."""
+    
     def __init__(self, project_name=None):
         """Initialize DeFiLlama API with project name."""
         if not project_name:
@@ -770,6 +775,6 @@ async def get_tvl(protocol: str, project_name: str = None) -> Dict[str, Any]:
                     return {"error": f"DeFiLlama API error: {response.status}"}
                 
                 return await response.json()
-
+  
 if __name__ == "__main__":
     mcp.run(transport="stdio")

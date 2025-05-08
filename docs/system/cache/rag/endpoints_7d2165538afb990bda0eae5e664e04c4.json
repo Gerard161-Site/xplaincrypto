@@ -1,0 +1,20 @@
+{
+  "data": [
+    "tokenomics",
+    "data://tokenomics/{project}",
+    "data://tokenomics/distribution/{project}",
+    "data://huggingface/research/{query}",
+    "data://huggingface/dataset/{dataset_id}",
+    "coinmarketcap",
+    "data://tavily/research/{query}",
+    "tavily"
+  ],
+  "metadata": {
+    "source": "rag",
+    "endpoint": "endpoints",
+    "query": "7d2165538afb990bda0eae5e664e04c4",
+    "cached_at": "2025-05-08T13:55:38.596019",
+    "expires_at": "2025-05-09T13:55:38.596026",
+    "ttl_hours": 24
+  }
+}

@@ -32,7 +32,7 @@ async def get_coin_price_data(coin: str, project_name: str = None) -> list:
     cache_manager = CacheManager(project_name=project_name, logger=logger)
     
     # Check cache first
-    cached_data = cache_manager.load("coingecko", "price", coin, ttl_seconds=3600)  # 1 hour TTL
+    cached_data = cache_manager.load("coingecko", "price", coin)
     if cached_data:
         logger.info(f"Using cached price data for {coin}" + (f" in project {project_name}" if project_name else ""))
         return cached_data
@@ -68,7 +68,7 @@ async def get_coin_price_data(coin: str, project_name: str = None) -> list:
                     top_results.append(json.dumps(coin_data))
                 
                 # Cache the results
-                cache_manager.save(top_results, "coingecko", "price", coin, ttl_seconds=3600)
+                cache_manager.save(top_results, "coingecko", "price", coin, ttl_hours=1)
                 logger.info(f"Cached price data for {coin}" + (f" in project {project_name}" if project_name else ""))
                 
                 return top_results
@@ -84,7 +84,7 @@ async def get_coin_market_data(coin: str, project_name: str = None) -> dict:
     cache_manager = CacheManager(project_name=project_name, logger=logger)
     
     # Check cache first
-    cached_data = cache_manager.load("coingecko", "market", coin, ttl_seconds=3600)  # 1 hour TTL
+    cached_data = cache_manager.load("coingecko", "market", coin)
     if cached_data:
         logger.info(f"Using cached market data for {coin}" + (f" in project {project_name}" if project_name else ""))
         return cached_data
@@ -128,7 +128,7 @@ async def get_coin_market_data(coin: str, project_name: str = None) -> dict:
                 }
                 
                 # Cache the results
-                cache_manager.save(result, "coingecko", "market", coin, ttl_seconds=3600)
+                cache_manager.save(result, "coingecko", "market", coin, ttl_hours=1)
                 logger.info(f"Cached market data for {coin}" + (f" in project {project_name}" if project_name else ""))
                 
                 return result
@@ -184,7 +184,7 @@ async def _get_coin_id(coin: str, project_name: str = None) -> str:
                 if best_match:
                     result = {"id": best_match.get("id")}
                     # Cache the ID mapping
-                    cache_manager.save(result, "coingecko", "id_lookup", coin, ttl_seconds=3600)
+                    cache_manager.save(result, "coingecko", "id_lookup", coin, ttl_hours=1)
                     return best_match.get("id")
                 
                 return None
@@ -199,7 +199,7 @@ async def get_coin_history(coin: str, project_name: str = None) -> dict:
     cache_manager = CacheManager(project_name=project_name, logger=logger)
     
     # Check cache first
-    cached_data = cache_manager.load("coingecko", "history", coin, ttl_seconds=86400)  # 24 hour TTL for historical data
+    cached_data = cache_manager.load("coingecko", "history", coin)
     if cached_data:
         logger.info(f"Using cached history data for {coin}" + (f" in project {project_name}" if project_name else ""))
         return cached_data
@@ -272,7 +272,7 @@ async def get_coin_history(coin: str, project_name: str = None) -> dict:
                         })
                 
                 # Cache the results
-                cache_manager.save(result, "coingecko", "history", coin, ttl_seconds=86400)
+                cache_manager.save(result, "coingecko", "history", coin, ttl_hours=24)
                 logger.info(f"Cached history data for {coin}" + (f" in project {project_name}" if project_name else ""))
                 
                 return result
@@ -318,7 +318,7 @@ async def search_coins(query: str, project_name: str = None) -> Dict[str, Any]:
     cache_manager = CacheManager(project_name=project_name, logger=logger)
     
     # Check cache first
-    cached_data = cache_manager.load("coingecko", "search", query, ttl_seconds=86400)  # 24 hour TTL
+    cached_data = cache_manager.load("coingecko", "search", query)
     if cached_data:
         logger.info(f"Using cached search data for {query}" + (f" in project {project_name}" if project_name else ""))
         return cached_data
@@ -355,7 +355,7 @@ async def search_coins(query: str, project_name: str = None) -> Dict[str, Any]:
                 response_data = {"results": results, "count": len(results)}
                 
                 # Cache the results
-                cache_manager.save(response_data, "coingecko", "search", query, ttl_seconds=86400)
+                cache_manager.save(response_data, "coingecko", "search", query)
                 logger.info(f"Cached search data for {query}" + (f" in project {project_name}" if project_name else ""))
                 
                 return response_data

@@ -44,7 +44,7 @@ class DeFiLlamaAPI(DataModule):
         if not api_enabled:
             self.logger.info(f"DeFiLlama API is disabled by environment settings, returning cache or empty data")
             # Try to use cached data if available, otherwise return empty result
-            cached_data = self.cache_manager.load("defillama", "tvl", self.project_name.lower(), ttl_seconds=cache_ttl)
+            cached_data = self.cache_manager.load("defillama", "tvl", self.project_name.lower())
             if cached_data:
                 self.logger.info(f"Using cached DeFiLlama data for {self.project_name} as API is disabled")
                 return cached_data
@@ -52,7 +52,7 @@ class DeFiLlamaAPI(DataModule):
         
         # Check cache if use_cache is enabled
         if use_cache:
-            cached_data = self.cache_manager.load("defillama", "tvl", self.project_name.lower(), ttl_seconds=cache_ttl)
+            cached_data = self.cache_manager.load("defillama", "tvl", self.project_name.lower())
             if cached_data and 'tvl' in cached_data:
                 self.logger.info(f"Using cached DeFi Llama data for {self.project_name} (TVL: ${cached_data['tvl']})")
                 return cached_data
@@ -151,7 +151,7 @@ class DeFiLlamaAPI(DataModule):
             
             if result:
                 # Cache the result
-                cache_path = self.cache_manager.save(result, "defillama", "tvl", self.project_name.lower(), ttl_seconds=cache_ttl)
+                cache_path = self.cache_manager.save(result, "defillama", "tvl", self.project_name.lower())
                 if cache_path:
                     self.logger.info(f"Cached DeFi Llama data for {self.project_name} at {cache_path}")
                 else:
@@ -173,7 +173,7 @@ class DeFiLlamaAPI(DataModule):
             self.project_name = protocol
             
             # Check cache first
-            cached_data = self.cache_manager.load("defillama", "tvl", protocol.lower(), ttl_seconds=21600)
+            cached_data = self.cache_manager.load("defillama", "tvl", protocol.lower())
             if cached_data:
                 self.logger.info(f"Using cached TVL data for {protocol}")
                 return cached_data
@@ -189,7 +189,7 @@ class DeFiLlamaAPI(DataModule):
                 error_result = {"error": error_msg}
                 
                 # Cache the error to prevent repeated failures
-                self.cache_manager.save(error_result, "defillama", "data", protocol.lower(), ttl_seconds=3600)
+                self.cache_manager.save(error_result, "defillama", "data", protocol.lower())
                 return error_result
                 
             protocols = response.json()
@@ -225,7 +225,7 @@ class DeFiLlamaAPI(DataModule):
                 error_result = {"error": error_msg}
                 
                 # Cache the error to prevent repeated failures
-                self.cache_manager.save(error_result, "defillama", "data", protocol.lower(), ttl_seconds=3600)
+                self.cache_manager.save(error_result, "defillama", "data", protocol.lower())
                 return error_result
             
             # Now fetch the protocol data
@@ -276,7 +276,7 @@ class DeFiLlamaAPI(DataModule):
                 result["chains"] = data.get("chains")
             
             # Cache the result
-            cache_path = self.cache_manager.save(result, "defillama", "tvl", protocol.lower(), ttl_seconds=21600)
+            cache_path = self.cache_manager.save(result, "defillama", "tvl", protocol.lower())
             if cache_path:
                 self.logger.info(f"Cached TVL data for {protocol} at {cache_path}")
             else:
@@ -289,7 +289,7 @@ class DeFiLlamaAPI(DataModule):
             error_result = {"error": f"Failed to fetch TVL data: {str(e)}"}
             
             # Cache the error to prevent repeated failures
-            self.cache_manager.save(error_result, "defillama", "tvl", protocol.lower(), ttl_seconds=3600)
+            self.cache_manager.save(error_result, "defillama", "tvl", protocol.lower())
             return error_result
     
     async def fetch_data(self, protocol: str) -> Dict[str, Any]:
@@ -305,7 +305,7 @@ class DeFiLlamaAPI(DataModule):
             self.project_name = protocol
             
             # Check cache first
-            cached_data = self.cache_manager.load("defillama", "yields", protocol.lower(), ttl_seconds=21600)
+            cached_data = self.cache_manager.load("defillama", "yields", protocol.lower())
             if cached_data:
                 self.logger.info(f"Using cached yields data for {protocol}")
                 return cached_data
@@ -314,7 +314,7 @@ class DeFiLlamaAPI(DataModule):
             result = {"message": "Yields data not implemented yet"}
             
             # Cache the result
-            self.cache_manager.save(result, "defillama", "yields", protocol.lower(), ttl_seconds=21600)
+            self.cache_manager.save(result, "defillama", "yields", protocol.lower())
             self.logger.info(f"Cached yields data for {protocol}")
             
             return result
@@ -377,7 +377,7 @@ class DeFiLlamaAPI(DataModule):
         
         # First, try to use cache
         cache_key = f"tvl_{protocol_id.lower()}"
-        cached_data = self.cache_manager.load("defillama", "tvl", cache_key, ttl_seconds=3 * 60 * 60)  # 3 hours TTL
+        cached_data = self.cache_manager.load("defillama", "tvl", cache_key)
         
         if cached_data:
             self.logger.info(f"Using cached TVL data for {protocol_id}")
@@ -425,7 +425,7 @@ class DeFiLlamaAPI(DataModule):
                 result["tvlByChain"] = chain_tvls
             
             # Cache the successful result
-            self.cache_manager.save(result, "defillama", "tvl", cache_key, ttl_seconds=3 * 60 * 60)
+            self.cache_manager.save(result, "defillama", "tvl", cache_key)
             self.logger.info(f"Successfully fetched and cached TVL data for {protocol_id} with {len(tvl_history)} history points")
             
             return result

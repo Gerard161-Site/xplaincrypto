@@ -195,7 +195,7 @@ async def extract_token_distribution(project_name: str, whitepaper_url: str) -> 
         # Only cache if we have actual token allocation data
         if token_allocation:
             # Save to cache manager
-            cache_manager.save(result, "tokenomics", "distribution", project_name.lower(), ttl_seconds=86400)
+            cache_manager.save(result, "tokenomics", "distribution", project_name.lower())
             logger.info(f"Cached token distribution data for {project_name}")
         else:
             logger.warning(f"No token allocation data found for {project_name}")
@@ -223,7 +223,7 @@ async def get_token_distribution(project: str) -> dict:
     init_with_project(project)
     
     # Check cache first
-    cached_data = cache_manager.load("tokenomics", "distribution", project.lower(), ttl_seconds=86400 * 7)  # 7 days TTL
+    cached_data = cache_manager.load("tokenomics", "distribution", project.lower())
     if cached_data:
         logger.info(f"Using cached tokenomics distribution data for {project}")
         return cached_data
@@ -255,9 +255,9 @@ async def get_project_details(project: str) -> dict:
     init_with_project(project)
     
     # Check cache first
-    cached_data = cache_manager.load("tokenomics", "details", project.lower(), ttl_seconds=86400 * 7)  # 7 days TTL
+    cached_data = cache_manager.load("tokenomics", "details", project.lower())
     if cached_data:
-        logger.info(f"Using cached tokenomics details data for {project}")
+        logger.info(f"Using cached tokenomics details for {project}")
         return cached_data
     
     try:
@@ -286,10 +286,10 @@ async def get_whitepaper_url(project: str) -> dict:
     init_with_project(project)
     
     # Check cache first
-    cached_data = cache_manager.load("tokenomics", "whitepaper_url", project.lower(), ttl_seconds=86400 * 30)  # 30 days TTL
+    cached_data = cache_manager.load("tokenomics", "whitepaper_url", project.lower())
     if cached_data:
         logger.info(f"Using cached whitepaper URL for {project}")
-        return {"url": cached_data}
+        return cached_data
     
     try:
         # Get whitepaper URL using TokenInfoExtractor

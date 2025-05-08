@@ -292,7 +292,7 @@ async def extract_token_distribution(project_name: str, whitepaper_url: str) -> 
         # Only cache if we have actual token allocation data
         if token_allocation:
             # Save to cache manager using the project-specific cache key
-            cache_manager.save(result, "tokenomics", "distribution", cache_key, ttl_seconds=86400)
+            cache_manager.save(result, "tokenomics", "distribution", cache_key)
             logger.info(f"Cached token distribution data for {project_name}")
         else:
             logger.warning(f"No token allocation data found for {project_name}")

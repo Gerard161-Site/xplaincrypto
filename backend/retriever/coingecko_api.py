@@ -39,14 +39,14 @@ class CoinGeckoAPI(DataModule):
         if not api_enabled:
             self.logger.info(f"CoinGecko API is disabled by environment settings, returning cache or empty data")
             # Try to use cached data if available, otherwise return empty result
-            cached_data = cache_manager.load("coingecko", "data", self.project_name.lower(), ttl_seconds=cache_ttl)
+            cached_data = cache_manager.load("coingecko", "data", self.project_name.lower())
             if cached_data:
                 self.logger.info(f"Using cached CoinGecko data for {self.project_name} as API is disabled")
                 return cached_data
             return {"coingecko_disabled": "CoinGecko API disabled by configuration"}
         
         # Check cache using CacheManager
-        cached_data = cache_manager.load("coingecko", "data", self.project_name.lower(), ttl_seconds=cache_ttl)
+        cached_data = cache_manager.load("coingecko", "data", self.project_name.lower())
         if cached_data and 'current_price' in cached_data and 'market_cap' in cached_data:
             self.logger.info(f"Using cached CoinGecko data for {self.project_name} (price: ${cached_data['current_price']})")
             return cached_data
@@ -118,7 +118,7 @@ class CoinGeckoAPI(DataModule):
                         self.logger.error(f"Error fetching price history: {str(e)}")
                     
                     # Save to cache using CacheManager
-                    cache_manager.save(result, "coingecko", "data", self.project_name.lower(), ttl_seconds=cache_ttl)
+                    cache_manager.save(result, "coingecko", "data", self.project_name.lower())
                     self.logger.info(f"Cached CoinGecko data for {self.project_name}")
                     return result
                 else:
@@ -141,7 +141,7 @@ class CoinGeckoAPI(DataModule):
         cache_manager = CacheManager(project_name=self.project_name, logger=self.logger)
         
         # Check cache first for quick response
-        cached_data = cache_manager.load("coingecko", "data", coin.lower(), ttl_seconds=10800)
+        cached_data = cache_manager.load("coingecko", "data", coin.lower())
         if cached_data:
             logger.info(f"Using cached CoinGecko data for {coin} (price: ${cached_data.get('current_price', 'N/A')})")
             return cached_data
@@ -217,7 +217,7 @@ class CoinGeckoAPI(DataModule):
                             logger.error(f"Error fetching price history: {str(e)}")
                         
                         # Save to cache using CacheManager
-                        cache_manager.save(result, "coingecko", "data", coin.lower(), ttl_seconds=10800)
+                        cache_manager.save(result, "coingecko", "data", coin.lower())
                         logger.info(f"Cached CoinGecko data for {coin}")
                         return result
                         

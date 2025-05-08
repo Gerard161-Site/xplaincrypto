@@ -7,6 +7,21 @@ import time
 import re
 from datetime import datetime, timedelta
 
+# Import the CacheCleanupManager
+try:
+    from backend.utils.cache_manager import CacheCleanupManager
+except ImportError:
+    # When running from inside backend directory
+    try:
+        from utils.cache_manager import CacheCleanupManager
+    except ImportError:
+        # Define a stub if the class is not available
+        class CacheCleanupManager:
+            def __init__(self, *args, **kwargs):
+                pass
+            def run_maintenance(self, *args, **kwargs):
+                return {"expired": 0, "lru": 0, "project_limits": 0}
+
 logger = logging.getLogger(__name__)
 
 class CacheManager:
@@ -25,33 +40,48 @@ class CacheManager:
         'huggingface': 24,   # 24 hours for ML-based data
         'writer': 24,        # 24 hours for writer-generated content
         'writer_hf': 24,     # 24 hours for HuggingFace-generated content
+        'rag': 24,           # 24 hours for RAG results
     }
 
-    def __init__(self, project_name: str = None, logger=None):
+    def __init__(self, project_name: str, logger=None):
         """
-        Initialize the cache manager with a project name.
+        Initialize the cache manager for a specific project.
         
         Args:
-            project_name: The project name for project-specific caching
+            project_name: The name of the project (e.g., "ondo", "bitcoin")
             logger: Optional logger instance
         """
+        if not project_name or project_name.lower() == "default" or project_name.lower() == "unknown":
+            raise ValueError(f"Invalid project_name provided: '{project_name}'. Must be a valid project name.")
+            
+        self.project_name = project_name.lower()
         self.logger = logger or logging.getLogger(__name__)
         
-        # Use a default project name if none provided
-        if project_name is None:
-            self.project_name = "default"
-            self.logger.warning(f"No project_name provided to CacheManager, using '{self.project_name}'")
-        elif project_name.lower() == "default" or project_name.lower() == "unknown" or project_name.strip() == "":
-            self.logger.error(f"Invalid project_name provided to CacheManager: '{project_name}'")
-            raise ValueError(f"Invalid project_name provided to CacheManager: '{project_name}'")
-        else:
-            self.project_name = project_name.lower()
-            
-        # Create cache directory if it doesn't exist
-        self.base_cache_dir = os.path.join("docs", self.project_name, "cache")
-        os.makedirs(self.base_cache_dir, exist_ok=True)
+        # Set up cache directory
+        self.cache_dir = os.path.join("docs", self.project_name, "cache")
+        self.logger.info(f"Cache directory set to: {self.cache_dir}")
         
-        self.logger.info(f"Cache directory set to: {self.base_cache_dir}")
+        # Create cache directory if it doesn't exist
+        os.makedirs(self.cache_dir, exist_ok=True)
+        
+        # Initialize cleanup manager
+        self.cleanup_manager = CacheCleanupManager(base_cache_dir="docs", logger=self.logger)
+        
+        # Maintenance counter to avoid running cleanup too frequently
+        self._maintenance_counter = 0
+        self._maintenance_threshold = 10  # Run maintenance every 10 cache operations
+        
+    def _maybe_run_maintenance(self):
+        """Run cache maintenance periodically."""
+        self._maintenance_counter += 1
+        if self._maintenance_counter >= self._maintenance_threshold:
+            self._maintenance_counter = 0
+            try:
+                # Run maintenance in a non-blocking way
+                import threading
+                threading.Thread(target=self.cleanup_manager.run_maintenance).start()
+            except Exception as e:
+                self.logger.warning(f"Failed to run cache maintenance: {str(e)}")
 
     def _sanitize_filename(self, name: str) -> str:
         """
@@ -80,7 +110,7 @@ class CacheManager:
             Path to the cache file
         """
         # Create source-specific directory
-        source_dir = os.path.join(self.base_cache_dir, source)
+        source_dir = os.path.join(self.cache_dir, source)
         os.makedirs(source_dir, exist_ok=True)
         
         # Sanitize the query for filename
@@ -90,128 +120,245 @@ class CacheManager:
         filename = f"{endpoint}_{safe_query}.json"
         return os.path.join(source_dir, filename)
 
-    def save_to_cache(self, data: Dict[str, Any], source: str, endpoint: str, query: str, ttl_hours: int = None) -> str:
+    def save(self, data, source, endpoint, query, ttl_hours=None):
         """
-        Save data to cache with metadata including TTL.
-        Uses source-specific TTL values if ttl_hours is not provided.
+        Save data to cache file.
         
         Args:
             data: Data to cache
-            source: Data source (e.g., 'coingecko', 'defillama')
-            endpoint: Endpoint type (e.g., 'price', 'tvl')
-            query: Query parameter (e.g., 'ethereum')
-            ttl_hours: Time-to-live in hours (default: None, uses source-specific TTL)
+            source: Source name (e.g., "coingecko", "coinmarketcap")
+            endpoint: Endpoint name (e.g., "price", "market")
+            query: Query string or identifier
+            ttl_hours: Optional TTL in hours (defaults to class default)
             
         Returns:
-            Path to the cache file
+            bool: True if saved successfully, False otherwise
         """
-        cache_path = self.get_cache_path(source, endpoint, query)
-        
-        # Use source-specific TTL if not provided
-        if ttl_hours is None:
-            ttl_hours = self.TTL_BY_SOURCE.get(source, 24)  # Default to 24 hours if source not found
-            self.logger.info(f"Using source-specific TTL for {source}: {ttl_hours} hours")
-        
-        # Add metadata including expiration time
-        cache_entry = {
-            "data": data,
-            "metadata": {
+        if not self.project_name or not source or not endpoint or not query:
+            if self.logger:
+                self.logger.warning(f"Invalid parameters for cache save: project_name={self.project_name}, source={source}, endpoint={endpoint}, query={query}")
+            return False
+            
+        try:
+            # Use source-specific TTL if not provided
+            if ttl_hours is None:
+                ttl_hours = self.TTL_BY_SOURCE.get(source, 24)  # Default to 24 hours
+                self.logger.info(f"Using source-specific TTL for {source}: {ttl_hours} hours")
+            
+            # Create source directory if it doesn't exist
+            source_dir = os.path.join(self.cache_dir, source)
+            os.makedirs(source_dir, exist_ok=True)
+            
+            # Generate cache file path
+            cache_key = f"{endpoint}_{query}"
+            cache_file = os.path.join(source_dir, f"{cache_key}.json")
+            
+            # Sanitize data for JSON serialization
+            sanitized_data = self._sanitize_for_json(data)
+            
+            # Add metadata
+            now = datetime.now()
+            expires_at = now + timedelta(hours=ttl_hours)
+            
+            metadata = {
                 "source": source,
                 "endpoint": endpoint,
                 "query": query,
-                "cached_at": datetime.now().isoformat(),
-                "expires_at": (datetime.now() + timedelta(hours=ttl_hours)).isoformat(),
+                "cached_at": now.isoformat(),
+                "expires_at": expires_at.isoformat(),
+                "last_accessed": now.isoformat(),
                 "ttl_hours": ttl_hours
             }
-        }
-        
-        try:
-            with open(cache_path, 'w') as f:
-                json.dump(cache_entry, f, indent=2)
-            self.logger.info(f"Cached data saved to {cache_path} with TTL of {ttl_hours} hours")
-            return cache_path
-        except Exception as e:
-            self.logger.error(f"Error saving to cache: {str(e)}")
-            return ""
-
-    def load_from_cache(self, source: str, endpoint: str, query: str, 
-                         check_ttl: bool = True) -> Tuple[Optional[Dict[str, Any]], bool]:
-        """
-        Load data from cache if available and not expired.
-        
-        Args:
-            source: Data source (e.g., 'coingecko', 'defillama')
-            endpoint: Endpoint type (e.g., 'price', 'tvl')
-            query: Query parameter (e.g., 'ethereum')
-            check_ttl: Whether to check if cache is expired (default: True)
             
-        Returns:
-            Tuple of (data, from_cache) where data is the cached data (or None if not found)
-            and from_cache is a boolean indicating if data was loaded from cache
-        """
-        cache_path = self.get_cache_path(source, endpoint, query)
-        
-        if not os.path.exists(cache_path):
-            self.logger.info(f"No cache found at {cache_path}")
-            return None, False
+            # Create cache entry with metadata
+            cache_entry = {
+                "data": sanitized_data,
+                "metadata": metadata
+            }
             
-        try:
-            with open(cache_path, 'r') as f:
-                cache_entry = json.load(f)
+            # Save to file
+            with open(cache_file, 'w', encoding='utf-8') as f:
+                json.dump(cache_entry, f, ensure_ascii=True, default=str, indent=None)
                 
-            # Check if cache is expired
-            if check_ttl and "metadata" in cache_entry and "expires_at" in cache_entry["metadata"]:
-                expires_at = datetime.fromisoformat(cache_entry["metadata"]["expires_at"])
-                if datetime.now() > expires_at:
-                    self.logger.info(f"Cache expired at {cache_path}. Expired at: {expires_at.isoformat()}")
-                    return None, True  # Return None but indicate it was cached (expired)
-                    
-            self.logger.info(f"Loaded data from cache: {cache_path}")
-            return cache_entry.get("data"), True
+            if self.logger:
+                self.logger.debug(f"Saved cache file: {cache_file}")
+                
+            # Maybe run maintenance
+            self._maybe_run_maintenance()
+                
+            return True
             
         except Exception as e:
-            self.logger.error(f"Error loading from cache: {str(e)}")
-            return None, False
-
-    # Simplified save method with ttl_seconds for backward compatibility
-    def save(self, data: Dict[str, Any], source: str, endpoint: str, query: str, **kwargs) -> str:
+            if self.logger:
+                self.logger.error(f"Error saving cache: {str(e)}")
+            return False
+    
+    def _sanitize_for_json(self, data):
         """
-        Save data to cache with default TTL (simplified version).
+        Recursively sanitize data to ensure it can be properly serialized to JSON.
         
         Args:
-            data: Data to cache
-            source: Data source (e.g., 'coingecko', 'defillama')
-            endpoint: Endpoint type (e.g., 'price', 'tvl')
-            query: Query parameter (e.g., 'ethereum')
-            **kwargs: Additional parameters including ttl_seconds for backward compatibility
+            data: The data to sanitize
             
         Returns:
-            Path to the cache file
+            The sanitized data
         """
-        # Convert ttl_seconds to ttl_hours if provided
-        ttl_hours = None
-        if 'ttl_seconds' in kwargs:
-            ttl_hours = kwargs['ttl_seconds'] / 3600  # Convert seconds to hours
-        
-        return self.save_to_cache(data, source, endpoint, query, ttl_hours=ttl_hours)
-
-    # Simplified load method that only returns the data
-    def load(self, source: str, endpoint: str, query: str, check_ttl: bool = True, **kwargs) -> Optional[Dict[str, Any]]:
+        if isinstance(data, dict):
+            return {k: self._sanitize_for_json(v) for k, v in data.items()}
+        elif isinstance(data, list):
+            return [self._sanitize_for_json(item) for item in data]
+        elif isinstance(data, str):
+            try:
+                # First encode and decode to handle any encoding issues
+                text = data.encode('utf-8', errors='replace').decode('utf-8', errors='replace')
+                
+                # Remove control characters but keep basic whitespace
+                sanitized = ''.join(c for c in text if ord(c) >= 32 or c in '\n\r\t')
+                
+                # Replace any remaining problematic characters
+                sanitized = sanitized.replace('\u2028', ' ').replace('\u2029', ' ')
+                
+                return sanitized
+            except Exception as e:
+                self.logger.warning(f"Error sanitizing string for JSON: {str(e)}")
+                # Return a safe fallback
+                return ""
+        elif isinstance(data, (int, float, bool)) or data is None:
+            # Return as is for basic types
+            return data
+        else:
+            # For any other types, convert to string
+            try:
+                return str(data)
+            except Exception as e:
+                self.logger.warning(f"Error converting to string for JSON: {str(e)}")
+                return ""
+    
+    def load(self, source: str, endpoint: str, query: str) -> Any:
         """
-        Load data from cache if available and not expired (simplified version).
+        Load data from cache if not expired.
         
         Args:
-            source: The data source (e.g., "coingecko", "coinmarketcap")
-            endpoint: The specific endpoint used (e.g., "price", "markets")
-            query: The query string or identifier (e.g., "bitcoin", "solana")
-            check_ttl: Whether to check if cache is expired (default: True)
-            **kwargs: Additional arguments (including ttl_seconds) that are ignored for backward compatibility
+            source: The data source (e.g., "coingecko", "tokenomics")
+            endpoint: The API endpoint or data type
+            query: The query or identifier
             
         Returns:
-            The cached data if found and not expired, None otherwise
+            Cached data if found and not expired, None otherwise
         """
-        data, from_cache = self.load_from_cache(source, endpoint, query, check_ttl=check_ttl)
-        return data if from_cache else None
+        # Generate cache file path
+        cache_file = os.path.join(self.cache_dir, source, f"{endpoint}_{query}.json")
+        
+        # Check if cache file exists
+        if not os.path.exists(cache_file):
+            self.logger.info(f"No cache found at {cache_file}")
+            return None
+        
+        try:
+            # Load cache file
+            with open(cache_file, 'r') as f:
+                cache_entry = json.load(f)
+            
+            # Check if cache is expired
+            expires_at = datetime.fromisoformat(cache_entry["metadata"]["expires_at"])
+            now = datetime.now()
+            
+            if now > expires_at:
+                self.logger.info(f"Cache expired at {expires_at.isoformat()}")
+                return None
+            
+            # Update last accessed time
+            cache_entry["metadata"]["last_accessed"] = now.isoformat()
+            with open(cache_file, 'w', encoding='utf-8') as f:
+                json.dump(cache_entry, f, ensure_ascii=True, default=str, indent=None)
+            
+            self.logger.info(f"Loaded data from cache: {cache_file}")
+            return cache_entry["data"]
+            
+        except Exception as e:
+            self.logger.error(f"Error loading cache file {cache_file}: {str(e)}")
+            return None
+    
+    def invalidate(self, source: str = None, endpoint: str = None, query: str = None) -> int:
+        """
+        Invalidate cache entries based on filters.
+        
+        Args:
+            source: Optional source filter
+            endpoint: Optional endpoint filter
+            query: Optional query filter
+            
+        Returns:
+            Number of cache entries invalidated
+        """
+        count = 0
+        base_path = self.cache_dir
+        
+        if source:
+            base_path = os.path.join(base_path, source)
+        
+        if not os.path.exists(base_path):
+            return 0
+        
+        # Find matching cache files
+        for root, _, files in os.walk(base_path):
+            for file in files:
+                if not file.endswith('.json'):
+                    continue
+                    
+                # Check if file matches filters
+                if endpoint and not file.startswith(f"{endpoint}_"):
+                    continue
+                    
+                if query and f"_{query}." not in file:
+                    continue
+                
+                # Delete the file
+                try:
+                    os.remove(os.path.join(root, file))
+                    count += 1
+                    self.logger.info(f"Invalidated cache file: {os.path.join(root, file)}")
+                except Exception as e:
+                    self.logger.error(f"Error invalidating cache file {file}: {str(e)}")
+        
+        return count
+    
+    def clear_all(self) -> int:
+        """
+        Clear all cache entries for this project.
+        
+        Returns:
+            Number of cache entries cleared
+        """
+        count = 0
+        
+        if not os.path.exists(self.cache_dir):
+            return 0
+        
+        # Delete all files in cache directory
+        for root, _, files in os.walk(self.cache_dir):
+            for file in files:
+                if file.endswith('.json'):
+                    try:
+                        os.remove(os.path.join(root, file))
+                        count += 1
+                    except Exception as e:
+                        self.logger.error(f"Error clearing cache file {file}: {str(e)}")
+        
+        self.logger.info(f"Cleared {count} cache entries for project {self.project_name}")
+        return count
+    
+    def run_cleanup(self, force: bool = False) -> Dict[str, int]:
+        """
+        Run cache cleanup operations.
+        
+        Args:
+            force: Whether to force cleanup regardless of threshold
+            
+        Returns:
+            Results of cleanup operations
+        """
+        return self.cleanup_manager.run_maintenance(force=force)
 
     def is_cache_valid(self, source: str, endpoint: str, query: str) -> bool:
         """
@@ -258,14 +405,14 @@ class CacheManager:
             List of cache file paths
         """
         if source:
-            source_dir = os.path.join(self.base_cache_dir, source)
+            source_dir = os.path.join(self.cache_dir, source)
             if not os.path.exists(source_dir):
                 return []
             return [os.path.join(source_dir, f) for f in os.listdir(source_dir) 
                     if os.path.isfile(os.path.join(source_dir, f)) and f.endswith('.json')]
         else:
             cache_files = []
-            for root, _, files in os.walk(self.base_cache_dir):
+            for root, _, files in os.walk(self.cache_dir):
                 for file in files:
                     if file.endswith('.json'):
                         cache_files.append(os.path.join(root, file))
@@ -331,11 +478,11 @@ def save_to_cache(data, source, endpoint, query, project_name):
         project_name: Name of the project for organizing caches
         
     Returns:
-        The path to the cache file
+        True if saved successfully, False otherwise
     """
     # Let the CacheManager handle any invalid project_name values
     cache_mgr = CacheManager(project_name)
-    return cache_mgr.save_to_cache(data, source, endpoint, query)
+    return cache_mgr.save(data, source, endpoint, query)
 
 def load_from_cache(source, endpoint, query, project_name, **kwargs):
     """
@@ -349,12 +496,13 @@ def load_from_cache(source, endpoint, query, project_name, **kwargs):
         **kwargs: Additional parameters for backward compatibility
         
     Returns:
-        The cached data if found, None otherwise
+        Tuple of (cached_data, is_valid) where cached_data is the data if found, None otherwise
+        and is_valid is True if cache is valid, False otherwise
     """
     # Let the CacheManager handle any invalid project_name values
     cache_mgr = CacheManager(project_name)
-    result, _ = cache_mgr.load_from_cache(source, endpoint, query)
-    return result
+    cached_data = cache_mgr.load(source, endpoint, query)
+    return cached_data, cached_data is not None
 
 def clear_cache(project_name, source=None):
     """

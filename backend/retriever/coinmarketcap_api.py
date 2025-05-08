@@ -55,7 +55,7 @@ class CoinMarketCapAPI(DataModule):
         # Check cache first if use_cache is enabled
         if use_cache:
             coin_key = self.project_name.lower()
-            cached_data = cache_manager.load("coinmarketcap", "data", coin_key, ttl_seconds=cache_ttl)
+            cached_data = cache_manager.load("coinmarketcap", "data", coin_key)
             if cached_data and self._is_valid_data(cached_data):
                 self.logger.info(f"Using cached data for {self.project_name} in gather_data")
                 return cached_data
@@ -76,7 +76,7 @@ class CoinMarketCapAPI(DataModule):
         
         # Check cache first
         coin_key = coin.lower()
-        cached_data = cache_manager.load("coinmarketcap", "data", coin_key, ttl_seconds=1800)
+        cached_data = cache_manager.load("coinmarketcap", "data", coin_key)
         if cached_data and self._is_valid_data(cached_data):
             self.logger.info(f"Using cached data for {coin} (price: ${cached_data.get('current_price', 'N/A')})")
             return cached_data
@@ -253,7 +253,7 @@ class CoinMarketCapAPI(DataModule):
 
         # Check cache first
         coin_key = coin.lower()
-        cached_data = cache_manager.load("coinmarketcap", "market", coin_key, ttl_seconds=1800)
+        cached_data = cache_manager.load("coinmarketcap", "market", coin_key)
         if cached_data:
             self.logger.info(f"Using cached market data for {coin}")
             return cached_data
@@ -292,7 +292,7 @@ class CoinMarketCapAPI(DataModule):
 
         # Check cache first
         coin_key = coin.lower()
-        cached_data = cache_manager.load("coinmarketcap", "price", coin_key, ttl_seconds=1800)
+        cached_data = cache_manager.load("coinmarketcap", "price", coin_key)
         if cached_data:
             self.logger.info(f"Using cached price data for {coin}")
             return cached_data
@@ -333,7 +333,7 @@ class CoinMarketCapAPI(DataModule):
 
         # Use days in cache key to allow different time ranges
         cache_key = f"{coin.lower()}_days_{days}"
-        cached_data = cache_manager.load("coinmarketcap", "historical", cache_key, ttl_seconds=3600)
+        cached_data = cache_manager.load("coinmarketcap", "historical", cache_key)
         if cached_data:
             self.logger.info(f"Using cached historical data for {coin} ({days} days)")
             return cached_data
@@ -435,7 +435,7 @@ class CoinMarketCapAPI(DataModule):
         
         # Check cache first
         cache_key = f"{query.lower()}_limit_{limit}"
-        cached_data = cache_manager.load("coinmarketcap", "search", cache_key, ttl_seconds=86400)  # 24 hours
+        cached_data = cache_manager.load("coinmarketcap", "search", cache_key)
         if cached_data:
             self.logger.info(f"Using cached search results for '{query}'")
             return cached_data

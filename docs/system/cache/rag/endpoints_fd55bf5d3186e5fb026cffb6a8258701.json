@@ -1,0 +1,21 @@
+{
+  "data": [
+    "data://defillama/yields/{protocol}",
+    "data://defillama/tvl/{protocol}",
+    "defillama",
+    "data://tokenomics/distribution/{project}",
+    "data://tokenomics/{project}",
+    "data://tavily/research/{query}",
+    "data://coingecko/market/{coin}",
+    "data://huggingface/research/{query}",
+    "huggingface"
+  ],
+  "metadata": {
+    "source": "rag",
+    "endpoint": "endpoints",
+    "query": "fd55bf5d3186e5fb026cffb6a8258701",
+    "cached_at": "2025-05-08T13:55:38.738781",
+    "expires_at": "2025-05-09T13:55:38.738794",
+    "ttl_hours": 24
+  }
+}

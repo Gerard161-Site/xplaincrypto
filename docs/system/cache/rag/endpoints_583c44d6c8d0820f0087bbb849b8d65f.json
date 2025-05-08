@@ -1,0 +1,21 @@
+{
+  "data": [
+    "coingecko",
+    "data://coingecko/market/{coin}",
+    "coinmarketcap",
+    "data://coingecko/price/{coin}",
+    "data://huggingface/research/{query}",
+    "huggingface",
+    "data://huggingface/dataset/{dataset_id}",
+    "defillama",
+    "tavily"
+  ],
+  "metadata": {
+    "source": "rag",
+    "endpoint": "endpoints",
+    "query": "583c44d6c8d0820f0087bbb849b8d65f",
+    "cached_at": "2025-05-08T13:55:39.587652",
+    "expires_at": "2025-05-09T13:55:39.587660",
+    "ttl_hours": 24
+  }
+}

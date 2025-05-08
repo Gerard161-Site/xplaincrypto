@@ -56,7 +56,7 @@ class HuggingFaceSearch:
         
         # Check cache first if enabled and available
         if use_cache and self.cache_manager:
-            cached_data = self.cache_manager.load("huggingface", model_id.split("/")[-1], cache_key, ttl_seconds=86400)  # 24 hour TTL
+            cached_data = self.cache_manager.load("huggingface", model_id.split("/")[-1], cache_key)
             if cached_data:
                 self.logger.info(f"Using cached HuggingFace results for model {model_id}")
                 return cached_data if isinstance(cached_data, list) else [cached_data]

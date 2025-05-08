@@ -106,7 +106,7 @@ class TavilySearch:
         # Check cache first if project_name is available
         if use_cache and self.cache_manager:
             cache_key = f"{query[:100].lower().replace(' ', '_')}"
-            cached_data = self.cache_manager.load("tavily", "search", cache_key, ttl_seconds=86400)  # 24 hour TTL
+            cached_data = self.cache_manager.load("tavily", "search", cache_key)
             if cached_data:
                 self.logger.info(f"Using cached Tavily search results for: {query[:50]}...")
                 return cached_data
@@ -145,6 +145,20 @@ class TavilySearch:
                     
                     # Cache the result if project_name is available
                     if self.cache_manager:
+                        # Ensure the result is properly formatted before saving
+                        if isinstance(result, dict):
+                            # Make sure we have a valid structure
+                            if "results" not in result:
+                                result["results"] = []
+                            # Ensure all content is properly sanitized for JSON
+                            for item in result.get("results", []):
+                                if "content" in item and item["content"] is not None:
+                                    # Remove any control characters that might break JSON
+                                    item["content"] = ''.join(c for c in item["content"] if ord(c) >= 32 or c in '\n\r\t')
+                                if "raw_content" in item and item["raw_content"] is not None:
+                                    # Remove any control characters that might break JSON
+                                    item["raw_content"] = ''.join(c for c in item["raw_content"] if ord(c) >= 32 or c in '\n\r\t')
+                                    
                         self.cache_manager.save(result, "tavily", "search", cache_key)
                         self.logger.info(f"Cached Tavily search results for: {query[:50]}...")
                     
@@ -265,12 +279,102 @@ class TavilySearch:
         # Prevent excessive API calls for the same query
         research_result = await self._tavily_research(query)
         
+        # Enhanced sanitization for the research result to ensure proper JSON formatting
+        if isinstance(research_result, dict):
+            # Make sure we have a valid structure
+            if "results" not in research_result:
+                research_result["results"] = []
+            
+            # Sanitize the results array
+            for item in research_result.get("results", []):
+                # Sanitize content field
+                if "content" in item:
+                    if item["content"] is None:
+                        item["content"] = ""
+                    else:
+                        # Remove control characters and ensure proper UTF-8 encoding
+                        item["content"] = self._sanitize_text(item["content"])
+                
+                # Sanitize raw_content field
+                if "raw_content" in item:
+                    if item["raw_content"] is None:
+                        item["raw_content"] = ""
+                    else:
+                        # Remove control characters and ensure proper UTF-8 encoding
+                        item["raw_content"] = self._sanitize_text(item["raw_content"])
+                
+                # Sanitize title field
+                if "title" in item and item["title"] is not None:
+                    item["title"] = self._sanitize_text(item["title"])
+                
+                # Sanitize url field
+                if "url" in item and item["url"] is not None:
+                    item["url"] = self._sanitize_text(item["url"])
+                
+                # Sanitize score field
+                if "score" in item and not isinstance(item["score"], (int, float)):
+                    item["score"] = 0.0
+            
+            # Sanitize answer field if present
+            if "answer" in research_result:
+                if research_result["answer"] is None:
+                    research_result["answer"] = ""
+                else:
+                    research_result["answer"] = self._sanitize_text(research_result["answer"])
+            
+            # Sanitize follow_up_questions field if present
+            if "follow_up_questions" in research_result and research_result["follow_up_questions"] is not None:
+                if isinstance(research_result["follow_up_questions"], list):
+                    research_result["follow_up_questions"] = [
+                        self._sanitize_text(q) if q is not None else "" 
+                        for q in research_result["follow_up_questions"]
+                    ]
+                else:
+                    research_result["follow_up_questions"] = None
+            
+            # Sanitize query field if present
+            if "query" in research_result and research_result["query"] is not None:
+                research_result["query"] = self._sanitize_text(research_result["query"])
+            
+            # Ensure images is a list if present
+            if "images" in research_result and not isinstance(research_result["images"], list):
+                research_result["images"] = []
+        
         # Always cache the result if we have a project_name
         if project_name:
             cache_manager = CacheManager(project_name=project_name, logger=self.logger)
             cache_manager.save(research_result, "tavily", "research", query)
         
         return research_result
+
+    def _sanitize_text(self, text):
+        """
+        Thoroughly sanitize text to ensure it can be properly serialized to JSON.
+        
+        Args:
+            text: The text to sanitize
+            
+        Returns:
+            Sanitized text
+        """
+        if not isinstance(text, str):
+            return str(text)
+        
+        try:
+            # First encode and decode to handle any encoding issues
+            text = text.encode('utf-8', errors='replace').decode('utf-8', errors='replace')
+            
+            # Remove control characters but keep basic whitespace
+            sanitized = ''.join(c for c in text if ord(c) >= 32 or c in '\n\r\t')
+            
+            # Replace any remaining problematic characters
+            sanitized = sanitized.replace('\u2028', ' ').replace('\u2029', ' ')
+            
+            return sanitized
+        except Exception as e:
+            self.logger.warning(f"Error sanitizing text: {str(e)}")
+            # Return a safe fallback
+            return ""
 
     async def _tavily_research(self, query: str) -> Dict:
         """
