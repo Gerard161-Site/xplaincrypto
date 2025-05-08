@@ -191,22 +191,44 @@ class TavilySearch:
             return {"results": [], "error": f"Tavily search failed: {str(e)}"}
 
     async def search_batch(self, queries: List[str], max_results: int = 7) -> List[Dict]:
+        # Process and prepare queries
+        processed_queries = []
         for query in queries:
-            if not query or len(query.strip()) < 3:
-                self.logger.warning(f"Invalid query in batch: '{query}' is too short or empty")
+            # Handle dictionary queries
+            if isinstance(query, dict):
+                self.logger.warning(f"Received query as dict in search_batch: {query}")
+                if "query" in query and isinstance(query["query"], str):
+                    query_str = query["query"]
+                elif "topic" in query and isinstance(query["topic"], str):
+                    query_str = query["topic"]
+                else:
+                    # Convert dict to string as fallback
+                    query_str = str(query)
+                    # Remove curly braces for better search
+                    query_str = query_str.strip('{}')
+                
+                self.logger.info(f"Extracted query string from dictionary: '{query_str}'")
+            else:
+                query_str = str(query) if query is not None else ""
+            
+            # Validate query
+            if not query_str or len(query_str.strip()) < 3:
+                self.logger.warning(f"Invalid query in batch: '{query_str}' is too short or empty")
                 raise ValueError("Query too short or empty")
+                
+            processed_queries.append(query_str)
         
         # If Tavily is known to be unavailable, return empty results
         if not self._tavily_available:
-            self.logger.warning(f"Using empty results for all {len(queries)} queries (Tavily unavailable)")
-            return [{"results": [], "error": "Tavily API unavailable"} for _ in queries]
+            self.logger.warning(f"Using empty results for all {len(processed_queries)} queries (Tavily unavailable)")
+            return [{"results": [], "error": "Tavily API unavailable"} for _ in processed_queries]
             
         # Try with Tavily API
         try:
             async with aiohttp.ClientSession() as session:
                 tasks = [self._search_async(session, q, search_depth=self.search_depth, 
-                                            max_results=max_results, topic=self.topic) 
-                         for q in queries]
+                                           max_results=max_results, topic=self.topic) 
+                         for q in processed_queries]
                 results = await asyncio.gather(*tasks, return_exceptions=True)
                 
                 processed_results = []
@@ -218,31 +240,50 @@ class TavilySearch:
                             "error": f"Exception: {str(res)}"
                         })
                     else:
-                        processed_results.append({
-                            "results": [{"href": r["url"], "body": r["content"]} for r in res.get("results", [])]
-                        })
+                        processed_results.append(res)
                         
                 return processed_results
                 
         except Exception as e:
             self.logger.error(f"Batch search failed completely: {str(e)}")
             self._tavily_available = False
-            return [{"results": [], "error": f"Batch search failed: {str(e)}"} for _ in queries]
+            return [{"results": [], "error": f"Batch search failed: {str(e)}"} for _ in processed_queries]
 
     async def search(self) -> List[Dict[str, str]]:
         """Perform an async search using the query provided during initialization."""
-        if not self.query or len(self.query.strip()) < 3:
+        # Handle case when query is a dict
+        query = self.query
+        
+        if isinstance(query, dict):
+            self.logger.warning(f"Received query as dict in search method: {query}")
+            if "query" in query and isinstance(query["query"], str):
+                query_str = query["query"]
+            elif "topic" in query and isinstance(query["topic"], str):
+                query_str = query["topic"]
+            else:
+                # Convert dict to string as fallback
+                query_str = str(query)
+                # Remove curly braces for better search
+                query_str = query_str.strip('{}')
+            
+            self.logger.info(f"Extracted query string from dictionary: '{query_str}'")
+            # Update the query attribute
+            self.query = query_str
+        else:
+            query_str = str(query) if query is not None else ""
+        
+        if not query_str or len(query_str.strip()) < 3:
             self.logger.warning("Search query too short or empty")
             raise ValueError("Query too short or empty")
         
         # Use search_batch with a single query
-        result = await self.search_batch([self.query])
+        result = await self.search_batch([query_str])
         return result[0] if result else {"results": [], "error": "Search failed"}
 
     def batch_queries(self, queries: List[str], batch_size: int = 4) -> List[List[str]]:
         return [queries[i:i + batch_size] for i in range(0, len(queries), batch_size)]
 
-    async def research(self, query: str, project_name=None) -> Dict:
+    async def research(self, query: str, project_name=None, cache_key=None) -> Dict:
         """
         Perform in-depth research on a topic using Tavily's advanced search.
         This returns more comprehensive results than regular search.
@@ -250,34 +291,69 @@ class TavilySearch:
         Args:
             query: The research query
             project_name: Optional project name for caching
+            cache_key: Optional key to use for caching (defaults to query)
             
         Returns:
             Dictionary with research data
         """
-        if not query or len(query.strip()) < 3:
+        # Handle case when query is a dict
+        if isinstance(query, dict):
+            self.logger.warning(f"Received query as dict in research method: {query}")
+            if "query" in query and isinstance(query["query"], str):
+                query_str = query["query"]
+            elif "topic" in query and isinstance(query["topic"], str):
+                query_str = query["topic"]
+            else:
+                # Convert dict to string as fallback
+                query_str = str(query)
+                # Remove curly braces for better search
+                query_str = query_str.strip('{}')
+            
+            self.logger.info(f"Extracted query string from dictionary: '{query_str}'")
+        else:
+            query_str = str(query) if query is not None else ""
+
+        # Ensure query is a non-empty string
+        if not query_str or not isinstance(query_str, str) or len(query_str.strip()) < 3:
             self.logger.warning("Research query too short or empty")
             raise ValueError("Query too short or empty")
         
         # Use the provided project_name or fallback to the one from init
         project_name = project_name or self.project_name
         
+        # Handle case when project_name is a dict
+        if isinstance(project_name, dict):
+            self.logger.warning(f"Received project_name as dict: {project_name}")
+            if "project_name" in project_name and isinstance(project_name["project_name"], str):
+                project_name_str = project_name["project_name"]
+            else:
+                # Use a default project name
+                project_name_str = "default_project"
+                self.logger.warning(f"Using default project name: {project_name_str}")
+        else:
+            project_name_str = str(project_name) if project_name is not None else "default_project"
+        
         # Save the original query, unmodified - CRITICAL
-        self.query = query
-        self.logger.info(f"Using query EXACTLY as provided: '{query}' with project_name='{project_name}'")
+        self.query = query_str
+        self.logger.info(f"Using query EXACTLY as provided: '{query_str}' with project_name='{project_name_str}'")
+        
+        # Use the provided cache_key or fallback to query_str
+        cache_key = cache_key or query_str
+        self.logger.info(f"Using cache key: '{cache_key}' for query '{query_str}'")
         
         # First check cache if we have a project_name
-        if project_name:
+        if project_name_str:
             # Initialize cache manager with project-specific directory
-            cache_manager = CacheManager(project_name=project_name, logger=self.logger)
+            cache_manager = CacheManager(project_name=project_name_str, logger=self.logger)
             
-            # Try to get from cache before API call
-            cached_data = cache_manager.load("tavily", "research", query)
+            # Try to get from cache before API call - use cache_key
+            cached_data = cache_manager.load("tavily", "research", cache_key)
             if cached_data:
-                self.logger.info(f"Using cached research data for '{query}' in project '{project_name}'")
+                self.logger.info(f"Using cached research data for key '{cache_key}' in project '{project_name_str}'")
                 return cached_data
         
         # Prevent excessive API calls for the same query
-        research_result = await self._tavily_research(query)
+        research_result = await self._tavily_research(query_str)
         
         # Enhanced sanitization for the research result to ensure proper JSON formatting
         if isinstance(research_result, dict):
@@ -341,9 +417,10 @@ class TavilySearch:
                 research_result["images"] = []
         
         # Always cache the result if we have a project_name
-        if project_name:
-            cache_manager = CacheManager(project_name=project_name, logger=self.logger)
-            cache_manager.save(research_result, "tavily", "research", query)
+        if project_name_str:
+            cache_manager = CacheManager(project_name=project_name_str, logger=self.logger)
+            # Use the cache_key parameter for saving to cache
+            cache_manager.save(research_result, "tavily", "research", cache_key)
         
         return research_result
 

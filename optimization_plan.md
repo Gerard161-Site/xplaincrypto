@@ -1,377 +1,92 @@
-# Optimization Plan for XplainCrypto Research Workflow
+# XplainCrypto Optimization Plan
 
-This document outlines the plan to improve the research speed and cost-effectiveness of XplainCrypto while maintaining data integrity.
+This document outlines the optimization plan for improving the XplainCrypto application's performance, resource usage, and reliability.
 
-## Progress Tracking
+## Phase 1: API Call Optimization (Completed)
 
-| Phase | Task | Status | Date | Notes |
-|-------|------|--------|------|-------|
-| Pre-optimization | Fix cache directory structure issues | ✅ Completed | May 8, 2023 | Fixed issues with cache files being created in incorrect locations |
-| Pre-optimization | Fix CoinGecko caching | ✅ Completed | May 8, 2023 | Ensured CoinGecko cache files are stored in project-specific directories |
-| Pre-optimization | Fix tokenomics caching | ✅ Completed | May 8, 2023 | Fixed redundant cache files in tokenomics server |
-| Phase 1 | Implement RAG result caching | ✅ Completed | May 8, 2023 | Added caching layer for RAG results to avoid redundant vector searches. Performance test showed ~896x average speedup! |
-| Phase 1 | Implement cache cleanup for scale | ✅ Completed | May 8, 2023 | Added LRU cache cleanup to handle thousands of projects with automatic maintenance |
-| Phase 1 | Enhance existing RAG system | 🔄 Planned | - | - |
-| Phase 1 | Batch Tavily searches | 🔄 Planned | - | - |
-| Phase 2 | Single API calls for data sources | 🔄 Planned | - | - |
-| Phase 2 | Optimize state management | 🔄 Planned | - | - |
-| Phase 3 | Implement report-driven workflow | �� Planned | - | - |
-| Phase 2 | Implement dynamic TTL caching | 🔄 Planned | - | - |
-| Phase 2 | Add two-level cache system | 🔄 Planned | - | - |
-| Phase 3 | Create dependency-aware workflow manager | 🔄 Planned | - | - |
-| Phase 3 | Implement cascading fallback system | 🔄 Planned | - | - |
-| Phase 3 | Add performance monitoring | 🔄 Planned | - | - |
+### Batch Processing for API Calls
+- ✅ Implemented `_batch_process_project_data` method in Researcher class that analyzes report_config.json and identifies all required data sources
+- ✅ Created source-specific batch processing methods for CoinGecko, CoinMarketCap, DeFiLlama, and Tokenomics
+- ✅ Enhanced the existing `_run_parallel_tavily_searches` method to process all section queries in batches
+- ✅ Consolidated Tavily API calls by making `research` and `deep_research` use the same underlying implementation and cache
+- ✅ Each data source is queried exactly once per project research session, with consolidated API calls
+- ✅ Implemented proper endpoint tracking to prevent duplicate API calls across different sections
+- ✅ Ensured HuggingFace is only used as a fallback when primary sources fail, not as a primary source
+- ✅ Fixed MCP integration by using direct tool calls instead of hardcoded endpoints
 
-## Scaling Considerations
+### Caching Improvements
+- ✅ Standardized cache paths and formats across all data sources
+- ✅ Added cache expiration based on data type (24h for most data, 1h for price data)
+- ✅ Implemented cache hit/miss logging for debugging and optimization
 
-XplainCrypto needs to handle research for any cryptocurrency project (10,000+ potential projects), not just the ones we test with like Ondo. This introduces several key considerations for our optimization plan:
+## Phase 2: State Management Optimization (In Progress)
 
-### Cache Management at Scale
-- **Disk Space Management**: With thousands of projects, each with multiple queries and data sources, cache size could grow rapidly. We need to implement:
-  - Automatic cache cleanup for least recently used (LRU) entries
-  - Maximum cache size limits per project (configurable in `app_config.json`)
-  - Cache expiration based on data volatility (e.g., price data expires faster than tokenomics data)
+### Section-Aligned Data Structure
+- 🔄 Refactor state management to better align with report_config.json sections
+- 🔄 Create consistent data access patterns for visualization agent
+- 🔄 Implement proper error handling for missing data fields
 
-### Optimizing for New Projects
-- **Cold Start Performance**: First-time queries for new projects will have no cache, requiring:
-  - Efficient RAG retrieval with minimal API calls
-  - Parallel processing of initial data gathering
-  - Background pre-caching of common data points once a project is first researched
+### Visualization Data Preparation
+- 🔄 Pre-process data for visualizations during research phase
+- 🔄 Standardize data formats for each visualization type
+- 🔄 Add data validation before passing to visualization agent
 
-### Resource Utilization
-- **API Rate Limiting**: With many concurrent users researching different projects:
-  - Implement token bucket rate limiting for external APIs
-  - Prioritize cache hits over fresh data when approaching rate limits
-  - Queue and batch similar requests across different projects
+## Phase 3: Advanced Optimizations (Planned)
 
-### Monitoring and Analytics
-- **Usage Patterns**: Track which projects and query types are most common
-- **Cache Hit Ratios**: Monitor effectiveness of caching by project
-- **Resource Consumption**: Track API usage, processing time, and storage requirements by project
+### Dynamic TTL Caching
+- ⏳ Implement variable cache TTL based on data volatility
+- ⏳ Add cache invalidation triggers for certain events
 
-These scaling considerations will be incorporated into each phase of our optimization plan to ensure the system remains efficient and cost-effective as usage grows.
+### Two-Level Cache System
+- ⏳ Add memory cache for frequent requests
+- ⏳ Implement disk cache for persistence
 
-## 1. RAG-Driven Endpoint Selection
+### Parallel Processing
+- ⏳ Optimize concurrent API calls with proper rate limiting
+- ⏳ Implement work stealing for better resource utilization
 
-**Current Implementation:** 
-The system uses RAG with Pinecone for endpoint selection:
-- `RAGRetriever` queries Pinecone to select MCP endpoints
-- `vector_store.py` interfaces with Pinecone to store endpoint metadata
-- Some hardcoded routing logic exists in `client_manager.py`
+## Phase 4: Monitoring and Analytics (Planned)
 
-**Proposed Improvement:**
-- Enhance the existing RAG system to better utilize query context
-- Implement more sophisticated embedding models for better endpoint matching
-- Add a caching layer specifically for RAG results to avoid redundant vector searches
-- Reduce hardcoded endpoint mappings in `client_manager.py`
+### Performance Metrics
+- ⏳ Add timing for each phase of the research workflow
+- ⏳ Track API call counts and cache hit rates
 
-```python
-class EnhancedRAGRetriever:
-    def __init__(self, vector_store):
-        self.vector_store = vector_store
-        self.cache_manager = CacheManager(project_name="system", logger=logger)
-        
-    async def get_endpoints_for_query(self, query, project_name):
-        # Check cache first
-        cache_key = f"{query.lower().replace(' ', '_')}"
-        cached_endpoints = self.cache_manager.load("rag", "endpoints", cache_key)
-        if cached_endpoints:
-            return cached_endpoints
-            
-        # Query vector store
-        endpoints = await self.vector_store.query(query)
-        
-        # Cache results
-        self.cache_manager.save(endpoints, "rag", "endpoints", cache_key)
-        return endpoints
-```
+### Resource Usage Tracking
+- ⏳ Monitor memory usage during large report generation
+- ⏳ Track disk space used by cache
 
-## 2. Batch Processing for API Calls
+### Automated Optimization
+- ⏳ Implement adaptive batch sizes based on API response times
+- ⏳ Auto-tune cache TTL based on data change frequency
 
-**Current Implementation:** 
-Each endpoint is called individually, even when multiple data points are needed from the same source.
+## Legend
+- ✅ Completed
+- 🔄 In Progress
+- ⏳ Planned
 
-**Proposed Improvement:**
-- Aggregate all required endpoints by source before making API calls
-- Implement a batching system for Tavily searches (3 queries at a time)
-- Create a dependency graph to determine the optimal order of API calls
+## Completed Optimizations
 
-```python
-async def batch_process_endpoints(self, endpoints, project_name):
-    # Group endpoints by source
-    endpoints_by_source = {}
-    for endpoint in endpoints:
-        source = endpoint.split("://")[1].split("/")[0]
-        if source not in endpoints_by_source:
-            endpoints_by_source[source] = []
-        endpoints_by_source[source].append(endpoint)
-    
-    # Process each source with a single API call when possible
-    results = {}
-    for source, source_endpoints in endpoints_by_source.items():
-        if source == "tavily":
-            results[source] = await self._process_tavily_batch(source_endpoints, project_name)
-        else:
-            results[source] = await self._process_source_batch(source, source_endpoints, project_name)
-            
-    return results
-```
+1. **API Call Consolidation**: Eliminated redundant API calls by implementing batch processing for all data sources.
+2. **Tavily API Optimization**: Fixed duplicate API calls between `research` and `deep_research` functions.
+3. **Endpoint Tracking**: Added system to track processed endpoints and avoid duplicate calls.
+4. **Fallback Strategy**: Implemented HuggingFace as a true fallback only when primary sources fail.
+5. **Parallel Processing**: Implemented efficient parallel processing with proper error handling.
+6. **Caching Improvements**: Standardized cache keys and improved cache hit rates.
+7. **MCP Integration**: Fixed integration with MCP by using direct tool calls instead of hardcoded endpoints.
 
-## 3. Tavily Query Batching
+## Next Steps
 
-**Current Implementation:** 
-Each Tavily search is executed independently.
+1. Complete the State Management Optimization phase
+2. Begin implementing Dynamic TTL Caching
+3. Conduct comprehensive performance testing
 
-**Proposed Improvement:**
-- Implement a batching system for Tavily searches
-- Process 3 queries at a time to respect rate limits
-- Deduplicate similar queries to avoid redundant searches
+## Performance Metrics
 
-```python
-async def _process_tavily_batch(self, endpoints, project_name, batch_size=3):
-    queries = [self._extract_query(endpoint) for endpoint in endpoints]
-    unique_queries = list(set(queries))  # Remove duplicates
-    
-    results = {}
-    for i in range(0, len(unique_queries), batch_size):
-        batch = unique_queries[i:i+batch_size]
-        batch_results = await asyncio.gather(*[
-            self.client_manager.fetch_data(
-                f"data://tavily/research/{query}", 
-                {"project_name": project_name}
-            ) for query in batch
-        ])
-        
-        # Map results back to queries
-        for query, result in zip(batch, batch_results):
-            results[query] = result
-            
-    return results
-```
+| Metric | Before | After | Improvement |
+|--------|--------|-------|-------------|
+| API calls per project | ~25-30 | ~8-10 | ~70% reduction |
+| Duplicate API calls | ~10-15 | ~0-1 | ~95% reduction |
+| Average processing time | ~120s | ~60s | ~50% reduction |
+| Cache hit rate | ~50% | ~80% | ~30% increase |
 
-## 4. Enhanced State Management
-
-**Current Implementation:** 
-State is managed but not optimized for section-specific data access.
-
-**Proposed Improvement:**
-- Restructure ResearchState to better align with report_config.json sections
-- Add metadata about data sources and confidence levels
-- Implement a versioning system for state to track changes
-
-```python
-class ResearchState:
-    def __init__(self, project_name):
-        self.project_name = project_name
-        self.data = {}  # Section-specific data
-        self.multi_source_data = {}  # Source-specific data (shared across sections)
-        self.visualization_data = {}  # Data specifically for visualizations
-        self.errors = []
-        self.cache_paths = {}
-        self.metadata = {
-            "version": "1.0",
-            "created_at": datetime.now().isoformat(),
-            "updated_at": datetime.now().isoformat(),
-            "data_sources": []
-        }
-        
-    def add_data(self, section_name, source, data):
-        if section_name not in self.data:
-            self.data[section_name] = {}
-        self.data[section_name][source] = data
-        
-        # Also store in multi_source_data for cross-section access
-        if source not in self.multi_source_data:
-            self.multi_source_data[source] = {}
-        self.multi_source_data[source].update(data)
-        
-        # Update metadata
-        if source not in self.metadata["data_sources"]:
-            self.metadata["data_sources"].append(source)
-        self.metadata["updated_at"] = datetime.now().isoformat()
-```
-
-## 5. Intelligent Caching Strategy
-
-**Current Implementation:** 
-Basic caching with fixed TTLs by source.
-
-**Proposed Improvement:**
-- Implement dynamic TTLs based on data volatility
-- Add cache invalidation triggers for significant market events
-- Implement a two-level cache (memory and disk) for frequently accessed data
-
-```python
-class EnhancedCacheManager(CacheManager):
-    # Dynamic TTL calculation based on data volatility
-    def calculate_ttl(self, source, endpoint, data):
-        base_ttl = self.TTL_BY_SOURCE.get(source, 24)
-        
-        # Adjust TTL based on data volatility
-        if source == "coingecko" and "price" in endpoint:
-            # Price data is highly volatile
-            return base_ttl * 0.5  # Half the default TTL
-        elif source == "defillama" and "tvl" in endpoint:
-            # TVL changes less frequently
-            return base_ttl * 1.5  # 1.5x the default TTL
-            
-        return base_ttl
-        
-    def save(self, data, source, endpoint, query, **kwargs):
-        # Calculate dynamic TTL
-        ttl_hours = self.calculate_ttl(source, endpoint, data)
-        return super().save_to_cache(data, source, endpoint, query, ttl_hours=ttl_hours)
-```
-
-## 6. Fallback Mechanism Enhancement
-
-**Current Implementation:** 
-Limited fallback options when data sources fail.
-
-**Proposed Improvement:**
-- Implement a cascading fallback system
-- Try multiple alternative sources before resorting to Hugging Face
-- Add data quality scores to indicate source reliability
-
-```python
-async def get_data_with_fallbacks(self, endpoint, project_name):
-    # Try primary source
-    result = await self.client_manager.fetch_data(endpoint, {"project_name": project_name})
-    
-    # Check if result has error
-    if "error" in result:
-        logger.warning(f"Primary source failed for {endpoint}, trying alternatives")
-        
-        # Try alternative sources based on endpoint type
-        alternatives = self._get_alternative_sources(endpoint)
-        for alt_endpoint in alternatives:
-            alt_result = await self.client_manager.fetch_data(alt_endpoint, {"project_name": project_name})
-            if "error" not in alt_result:
-                # Mark as from alternative source
-                alt_result["source"] = f"alternative:{alt_endpoint}"
-                alt_result["primary_source_failed"] = True
-                return alt_result
-                
-        # If all alternatives fail, try Hugging Face as last resort
-        hf_result = await self.client_manager.fetch_data(
-            f"data://huggingface/{project_name}", 
-            {"query": endpoint, "project_name": project_name}
-        )
-        
-        if "error" not in hf_result:
-            hf_result["source"] = "fallback:huggingface"
-            hf_result["primary_source_failed"] = True
-            return hf_result
-            
-        # All sources failed, return data_unavailable
-        return {
-            "data_unavailable": True,
-            "source": "unavailable",
-            "error": result["error"],
-            "endpoint": endpoint
-        }
-        
-    return result
-```
-
-## 7. Workflow Orchestration Improvements
-
-**Current Implementation:** 
-Sequential processing of endpoints.
-
-**Proposed Improvement:**
-- Implement a dependency-aware workflow manager
-- Process independent endpoints in parallel
-- Add progress tracking for long-running operations
-
-```python
-class WorkflowManager:
-    def __init__(self, client_manager, rag_retriever):
-        self.client_manager = client_manager
-        self.rag_retriever = rag_retriever
-        
-    async def run_research_workflow(self, project_name):
-        # Initialize state
-        state = ResearchState(project_name)
-        
-        # Load report config
-        report_config = self._load_report_config()
-        
-        # Collect all required endpoints using RAG
-        all_endpoints = await self._collect_endpoints(report_config, project_name)
-        
-        # Build dependency graph
-        dependency_graph = self._build_dependency_graph(all_endpoints)
-        
-        # Process endpoints in optimal order
-        results = await self._process_endpoints_with_dependencies(dependency_graph, project_name)
-        
-        # Update state with results
-        self._update_state(state, results, report_config)
-        
-        # Save state to cache
-        self._save_state(state)
-        
-        return state
-```
-
-## 8. Performance Monitoring
-
-**Current Implementation:** 
-Basic logging without performance metrics.
-
-**Proposed Improvement:**
-- Add timing metrics for each phase of the research process
-- Implement a performance dashboard for monitoring API calls and processing time
-- Set up alerts for slow operations or high API usage
-
-```python
-class PerformanceTracker:
-    def __init__(self):
-        self.metrics = {}
-        
-    @contextmanager
-    def track(self, operation_name):
-        start_time = time.time()
-        try:
-            yield
-        finally:
-            elapsed = time.time() - start_time
-            if operation_name not in self.metrics:
-                self.metrics[operation_name] = []
-            self.metrics[operation_name].append(elapsed)
-            logger.info(f"Operation {operation_name} completed in {elapsed:.2f}s")
-            
-    def get_summary(self):
-        summary = {}
-        for op, times in self.metrics.items():
-            summary[op] = {
-                "count": len(times),
-                "total_time": sum(times),
-                "avg_time": sum(times) / len(times) if times else 0,
-                "min_time": min(times) if times else 0,
-                "max_time": max(times) if times else 0
-            }
-        return summary
-```
-
-## Implementation Strategy
-
-To implement these improvements while maintaining what's working, we recommend a phased approach:
-
-### Phase 1: RAG Integration and Endpoint Batching
-1. Enhance the existing RAG system
-2. Implement endpoint batching for each source
-3. Add Tavily query batching
-
-### Phase 2: Enhanced State and Caching
-1. Enhance the ResearchState structure
-2. Implement the dynamic TTL caching strategy
-3. Add the two-level cache system
-
-### Phase 3: Workflow Optimization
-1. Create the dependency-aware workflow manager
-2. Implement the cascading fallback system
-3. Add performance monitoring
-
-This approach allows us to incrementally improve the system without disrupting the current functionality, while significantly enhancing research speed and cost-effectiveness. 
+*Note: These metrics are estimates and will be updated with actual measurements* 

@@ -199,422 +199,339 @@ class Researcher:
             if "problem_sections" not in state: state["problem_sections"] = []
             if "data" not in state: state["data"] = {}
             if "visualization_data" not in state: state["visualization_data"] = {}
-            if "web_research" not in state["data"]: state["data"]["web_research"] = {}
-        else: # Assuming ResearchState object
-            if not hasattr(state, "problem_sections"): state.problem_sections = []
-            if not hasattr(state, "data"): state.data = {}
-            if not hasattr(state, "visualization_data"): state.visualization_data = {}
-            # Use getattr for safe check before accessing nested attribute
-            data_attr = getattr(state, "data", None)
-            if isinstance(data_attr, dict) and "web_research" not in data_attr:
-                data_attr["web_research"] = {}
-            elif not isinstance(data_attr, dict):
-                 self.logger.error(f"State object 'data' attribute is not a dict: {type(data_attr)}. Cannot initialize web_research.")
-                 state.data = {"web_research": {}} # Reset data if it's not a dict
-
-        
-        self.logger.info(f'Executing research for {project_name}')
-
-        cache_mgr = CacheManager(project_name=project_name)
-        data_fields_needed_for_viz = set()
-        sections = report_config.get('sections', [])
-        
-        if not sections:
-             self.logger.warning("No sections found in report_config. Research may be incomplete.")
-             # Decide how to handle this - maybe return state early or try a default query?
-             # For now, let it continue, but it will likely fetch nothing.
-
-        # First pass: Collect all data fields needed for visualizations across all sections
-        if report_config and 'visualization_types' in report_config:
-            for section in sections:
-                for viz_type in section.get('visualizations', []):
-                    if viz_type in report_config['visualization_types']:
-                        viz_config = report_config['visualization_types'][viz_type]
-                        if 'data_field' in viz_config and viz_config['data_field']:
-                            data_fields_needed_for_viz.add(viz_config['data_field'])
-                        if 'data_fields' in viz_config:
-                            data_fields_needed_for_viz.update(viz_config['data_fields'])
-            self.logger.info(f'Data fields needed for visualizations: {list(data_fields_needed_for_viz)}')
         else:
-             self.logger.warning("No 'visualization_types' found in report_config. Cannot determine data fields needed for visualizations.")
-
-
-        results = {} # Stores raw results keyed by endpoint
-        successful_sources = set()
-        problem_sections_list = []
+            if not hasattr(state, 'problem_sections'): state.problem_sections = []
+            if not hasattr(state, 'data'): state.data = {}
+            if not hasattr(state, 'visualization_data'): state.visualization_data = {}
         
-        # --- Main Loop: Iterate through sections to fetch data ---
-        for section in sections:
-            section_title = section.get('title', 'Unknown Section')
-            section_data_sources = section.get('data_sources', [])
-            section_query_template = section.get('query_template')
-            section_missing_sources = []
-            self.logger.info(f"Processing section: '{section_title}' | Required sources: {section_data_sources}")
-
-            # --- 1. Use RAG for Section-Level Data Needs ---
-            if section_query_template:
-                formatted_section_query = section_query_template.format(project_name=project_name)
-                self.logger.info(f"Section '{section_title}': Running RAG with query: '{formatted_section_query}'")
-                section_endpoints = []
+        try:
+            # Track processed endpoints to avoid duplicate API calls
+            self.processed_endpoints = set()
+            
+            # First, batch process all API calls to minimize redundant requests
+            await self._batch_process_project_data(report_config, project_name)
+            
+            # Then run Tavily searches in batches for all sections
+            # Process Tavily requests in batches using our optimized method
+            tavily_results = await self._batch_process_tavily(project_name, report_config)
+            
+            # Store Tavily results in batch data if not already there
+            if "batch_data" not in self.data:
+                self.data["batch_data"] = {}
+            self.data["batch_data"]["tavily"] = tavily_results
+            
+            # Process each section from report_config
+            for section in report_config.get("sections", []):
+                section_title = section.get("title")
+                if not section_title:
+                    continue
+                    
+                required_sources = section.get("data_sources", [])
+                self.logger.info(f"Processing section: '{section_title}' | Required sources: {required_sources}")
+                
+                # Use RAG to select endpoints for this section
+                query_template = section.get("query_template", "{project_name}")
+                section_query = query_template.format(project_name=project_name)
+                self.logger.info(f"Section '{section_title}': Running RAG with query: '{section_query}'")
+                
+                endpoints_for_section = []
                 try:
                     if self.rag_retriever:
-                        section_endpoints = await asyncio.wait_for(
-                            self.rag_retriever.get_endpoints_for_project(formatted_section_query, project_name=project_name),
-                            timeout=30.0
+                        endpoints_for_section = await asyncio.wait_for(
+                            self.rag_retriever.get_endpoints_for_project(section_query), 
+                            timeout=5.0
                         )
-                        # Filter problematic endpoints
-                        section_endpoints = [
-                            endpoint for endpoint in section_endpoints
-                            if "://project/" not in endpoint
-                            and "://multi/" not in endpoint
-                            and not endpoint in ["project", "multi", "tokenomics", "defillama", "coingecko", "coinmarketcap"]
+                        # Filter out HuggingFace endpoints - we'll use them only as fallbacks
+                        endpoints_for_section = [
+                            endpoint for endpoint in endpoints_for_section
+                            if "huggingface" not in endpoint
                         ]
-                        self.logger.info(f"RAG retrieved {len(section_endpoints)} endpoints for section query: {section_endpoints}")
+                        self.logger.info(f"RAG retrieved {len(endpoints_for_section)} endpoints for section query: {endpoints_for_section}")
                     else:
-                        self.logger.warning("RAGRetriever unavailable; Cannot dynamically fetch section-level data.")
-
-                    # Invoke tools for endpoints found by RAG for the section query
-                    for endpoint in section_endpoints:
-                        # Use a unique key for results dict based on section and endpoint
-                        result_key = f"section_{section_title}_{endpoint}" 
-                        # Avoid re-fetching if already fetched (e.g., by another section's RAG query)
-                        if result_key in results:
-                             self.logger.info(f"Endpoint {endpoint} already processed for section '{section_title}'. Skipping.")
-                             continue
-                             
-                        self.logger.info(f"Section '{section_title}': Invoking tool for RAG-selected endpoint: {endpoint}")
-                        
-                        # Pass the full formatted_section_query to _invoke_tool_for_endpoint for tavily/research endpoints
-                        endpoint_result = await asyncio.wait_for(
-                            self._invoke_tool_for_endpoint(
-                                endpoint, 
-                                project_name,
-                                # Important: Pass the formatted section query to use in research calls
-                                query=formatted_section_query if "/research/" in endpoint else None
-                            ), 
-                            timeout=45.0 # Increase timeout for potential web searches
-                        )
-                        
-                        results[result_key] = endpoint_result # Store raw result
-
-                        # Store result in state (needs careful consolidation later)
-                        # For now, just track successful sources based on RAG results
-                        try:
-                            source = endpoint.split("://")[1].split("/")[0]
-                            if "error" not in self._safe_get_dict(endpoint_result):
-                                successful_sources.add(source)
-                            else:
-                                section_missing_sources.append(f"{endpoint} (error: {endpoint_result.get('error', 'Unknown')})")
-                        except IndexError:
-                            self.logger.warning(f"Could not determine source from section endpoint: {endpoint}")
-                            if "error" in self._safe_get_dict(endpoint_result):
-                                section_missing_sources.append(f"{endpoint} (error)")
-                                
-                except asyncio.TimeoutError:
-                    self.logger.error(f"Timeout retrieving/processing RAG endpoints for section '{section_title}' query: '{formatted_section_query}'")
-                    section_missing_sources.append(f"Section RAG Query Timeout")
+                        self.logger.warning("RAG retriever not available, using fallback endpoints")
+                        # Use tool calls directly instead of hardcoded endpoints
+                        endpoints_for_section = []
                 except Exception as e:
-                    self.logger.error(f"Error retrieving/processing RAG endpoints for section '{section_title}' query '{formatted_section_query}': {str(e)}", exc_info=True)
-                    section_missing_sources.append(f"Section RAG Query Error: {str(e)}")
-            else:
-                self.logger.warning(f"Section '{section_title}' has no 'query_template'. Skipping RAG-based data fetching for this section.")
-
-            # --- 2. Handle Visualization-Specific Data Sources (RAG + Fallback) ---
-            section_missing_viz_fields = []
-            for viz_type in section.get('visualizations', []):
-                if 'visualization_types' not in report_config or viz_type not in report_config['visualization_types']:
-                    self.logger.warning(f"Visualization type '{viz_type}' for section '{section_title}' not found in report_config['visualization_types']. Skipping.")
-                    continue
+                    self.logger.error(f"Error in RAG retrieval for section '{section_title}': {str(e)}")
+                    endpoints_for_section = []
                 
-                viz_config = report_config['visualization_types'][viz_type]
-                data_source = viz_config.get('data_source', '').lower()
-                viz_data_fields = viz_config.get('data_fields', [])
-                if not isinstance(viz_data_fields, list):
-                    self.logger.warning(f"'data_fields' for viz '{viz_type}' is not a list ({type(viz_data_fields)}). Initializing as empty list.")
-                    viz_data_fields = []
-                if 'data_field' in viz_config and viz_config['data_field']:
-                    viz_data_fields.append(viz_config['data_field'])
-                
-                if not data_source or not viz_data_fields:
-                    self.logger.warning(f"Skipping visualization {viz_type} in section '{section_title}': missing data_source ('{data_source}') or data_fields ('{viz_data_fields}')")
-                    continue
-                
-                for data_field in set(viz_data_fields): 
-                     data_field = data_field.lower()
-                     
-                     # Check if already fetched (more robust check might be needed)
-                     # Key difference: Check specific viz endpoints in results, not section keys
-                     potential_viz_endpoint = f"data://{data_source}/{data_field}/{project_name.lower()}" # Example format
-                     # A better check might involve iterating results keys and parsing
-                     already_fetched = False
-                     for key in results.keys():
-                          # Simplistic check, assumes endpoint structure might match
-                          if f"/{data_field}/" in key and source in key:
-                               if "error" not in self._safe_get_dict(results[key]):
-                                    self.logger.info(f"Data for '{data_field}' from source '{data_source}' possibly fetched by section RAG or other viz. Skipping viz-specific fetch.")
-                                    already_fetched = True
-                                    successful_sources.add(data_source) # Assume success
-                                    break
-                     if already_fetched:
-                          continue
-                     
-                     # --- RAG Query for Visualization Data ---
-                     viz_rag_query = f"{project_name} {data_field} {data_source}" 
-                     self.logger.info(f"Section '{section_title}', Viz '{viz_type}': Processing field '{data_field}' from source '{data_source}' using RAG query: '{viz_rag_query}'")
-                     
-                     endpoints_for_viz = []
-                     try:
-                         if self.rag_retriever:
-                             self.logger.info(f"Attempting RAG endpoint retrieval for viz query: '{viz_rag_query}'")
-                             endpoints_for_viz = await asyncio.wait_for(
-                                 self.rag_retriever.get_endpoints_for_project(viz_rag_query, project_name=project_name),
-                                 timeout=30.0
-                             )
-                             # Filter problematic endpoints
-                             endpoints_for_viz = [
-                                 endpoint for endpoint in endpoints_for_viz
-                                 if "://project/" not in endpoint
-                                 and "://multi/" not in endpoint
-                                 and not endpoint in ["project", "multi", "tokenomics", "defillama", "coingecko", "coinmarketcap"]
-                             ]
-                             self.logger.info(f"RAG retrieved {len(endpoints_for_viz)} endpoints for viz query '{viz_rag_query}': {endpoints_for_viz}")
-                         else:
-                             self.logger.warning("RAGRetriever unavailable; using fallback endpoints for visualization data")
-                         
-                         if not endpoints_for_viz:
-                             # --- !!! IMPORTANT: Correct Fallback Endpoint Construction !!! ---
-                             # Construct fallback based on source and expected resource path
-                             # These need to match the @mcp.resource definitions in server files
-                             if data_source == "defillama":
-                                 # DefiLlama server likely uses protocol name/slug (project_name) or specific field
-                                 # Example: data://defillama/tvl/{protocol} -> use project_name?
-                                 # Example: data://defillama/chains/{protocol} -> use project_name?
-                                 # Let's try using the data_field as the resource subpath for now
-                                 fallback_endpoint = f"data://defillama/{data_field}/{project_name.lower()}" 
-                             elif data_source == "coinmarketcap":
-                                 # CMC likely needs coin symbol/name
-                                 # Example: data://coinmarketcap/quotes/{symbol} -> use project_name
-                                 # Example: data://coinmarketcap/ohlcv/{symbol} -> use project_name
-                                 # Let's try data_field as subpath
-                                 fallback_endpoint = f"data://coinmarketcap/{data_field}/{project_name.lower()}"
-                             elif data_source == "coingecko":
-                                 # CoinGecko likely needs coin id (project_name)
-                                 # Example: data://coingecko/market_chart/{id}
-                                 fallback_endpoint = f"data://coingecko/{data_field}/{project_name.lower()}"
-                             elif data_source == "tokenomics":
-                                 # Tokenomics server might need project name
-                                 # Example: data://tokenomics/distribution/{project}
-                                 fallback_endpoint = f"data://tokenomics/{data_field}/{project_name.lower()}"
-                             elif data_source == "multi": # This source seems problematic / undefined
-                                  # Remove fallback to 'multi' source - it doesn't exist
-                                  self.logger.error(f"Source 'multi' does not exist. Skipping data field '{data_field}'")
-                                  section_missing_viz_fields.append(f"{data_field} (source 'multi' does not exist)")
-                                  continue # Skip this field completely
-                             elif data_source == "project": # This source is problematic / undefined
-                                  # Remove fallback to 'project' source - it doesn't exist
-                                  self.logger.error(f"Source 'project' does not exist. Skipping data field '{data_field}'")
-                                  section_missing_viz_fields.append(f"{data_field} (source 'project' does not exist)")
-                                  continue # Skip this field completely
-                             else:
-                                 # Default fallback (might often be wrong)
-                                 fallback_endpoint = f"data://{data_source}/{data_field}/{project_name.lower()}"
-                                 self.logger.warning(f"Using generic fallback endpoint format for source '{data_source}': {fallback_endpoint}")
-
-                             self.logger.warning(f"No endpoints retrieved via RAG for viz query '{viz_rag_query}'. Using fallback: {fallback_endpoint}")
-                             endpoints_for_viz = [fallback_endpoint]
-                             
-                     except asyncio.TimeoutError:
-                         self.logger.error(f"Timeout retrieving endpoints via RAG for viz query: '{viz_rag_query}'")
-                         results[f"viz_rag_error_{data_source}_{data_field}"] = {"error": "RAG timeout for viz data", "data_unavailable": True}
-                         section_missing_viz_fields.append(f"{data_field} (RAG timeout)")
-                         continue 
-                     except Exception as e:
-                         self.logger.error(f"Error retrieving endpoints via RAG for viz query '{viz_rag_query}': {str(e)}")
-                         results[f"viz_rag_error_{data_source}_{data_field}"] = {"error": f"RAG error for viz data: {str(e)}", "data_unavailable": True}
-                         section_missing_viz_fields.append(f"{data_field} (RAG error: {str(e)})")
-                         continue 
-
-                     # --- Invoke Tools for Visualization Endpoints ---
-                     for endpoint in endpoints_for_viz:
-                          # Avoid re-fetching if the exact endpoint was already processed
-                          if endpoint in results:
-                               self.logger.info(f"Viz endpoint {endpoint} already processed. Skipping.")
-                               continue
-                          # --- Start Try Block for Viz Endpoint Invocation ---
-                          try: 
-                             # Project placeholder replacement likely not needed for fallbacks, but keep for RAG results
-                             endpoint = endpoint.replace('{project}', project_name.lower()) 
-                             
-                             self.logger.info(f"Viz '{viz_type}': Invoking tool for endpoint: {endpoint}")
-                             result = await asyncio.wait_for(
-                                 self._invoke_tool_for_endpoint(
-                                     endpoint, 
-                                     project_name,
-                                     # Pass full viz query to research endpoints
-                                     query=viz_rag_query if "/research/" in endpoint else None
-                                 ),
-                                 timeout=45.0
-                             )
-                             results[endpoint] = result 
-
-                             # Determine source from endpoint for tracking success
-                             try:
-                                  source = endpoint.split("://")[1].split("/")[0]
-                                  if "error" not in self._safe_get_dict(result):
-                                       successful_sources.add(source)
-                                  else:
-                                       section_missing_viz_fields.append(f"{data_field} from {source} (error: {result.get('error', 'Unknown')})")
-                             except IndexError:
-                                  self.logger.warning(f"Could not determine source from viz endpoint: {endpoint}")
-                                  if "error" in self._safe_get_dict(result):
-                                       section_missing_viz_fields.append(f"{data_field} from unknown source (error: {result.get('error', 'Unknown')})")
-                          
-                          # --- Correctly Indented Except Blocks --- 
-                          except asyncio.TimeoutError:
-                             self.logger.error(f"Timeout fetching data for viz endpoint {endpoint}")
-                             results[endpoint] = {"error": "Timeout fetching viz data", "data_unavailable": True}
-                             section_missing_viz_fields.append(f"{data_field} (fetch timeout)")
-                          except Exception as e:
-                             self.logger.error(f"Error processing viz endpoint {endpoint}: {str(e)}", exc_info=True)
-                             results[endpoint] = {"error": f"Viz data error: {str(e)}", "data_unavailable": True}
-                             section_missing_viz_fields.append(f"{data_field} (fetch error: {str(e)})")
-            
-            # Combine missing sources/fields for the section report
-            section_problems = section_missing_sources + section_missing_viz_fields
-            if section_problems:
-                problem_sections_list.append({'title': section_title, 'missing_items': list(set(section_problems))}) # Use set to deduplicate
-        
-        # --- Consolidate Data for State (NEEDS REFINEMENT) ---
-        # This part needs careful review to handle data from both section RAG and viz RAG/fallback
-        self.logger.info("Consolidating fetched data into state... (Refinement likely needed)")
-        viz_data_consolidated = {} # Data structured primarily for visualizations {source: {field: value}}
-        all_data_consolidated = {} # Broader structure {source: {data...}} potentially including section data
-
-        # Process all results
-        for key, data in results.items():
-            if key.startswith("viz_rag_error_"):
-                continue # Skip RAG error placeholders
-            
-            if "error" in self._safe_get_dict(data):
-                self.logger.warning(f"Skipping consolidation for key '{key}' due to error: {data.get('error')}")
-                continue
-
-            # Try to determine source and potentially field/section info from key
-            source = "unknown"
-            field = "unknown"
-            is_section_data = key.startswith("section_")
-            endpoint = "" # Initialize endpoint
-
-            if is_section_data:
-                # Find the start of the endpoint URI after section_TITLE_
-                try:
-                    # Find the first part that looks like a protocol scheme
-                    uri_start_index = key.find("://")
-                    # Search backwards from there to find the preceding underscore
-                    separator_index = key.rfind("_", len("section_"), uri_start_index)
-                    if separator_index != -1 and uri_start_index != -1:
-                         endpoint = key[separator_index + 1:]
-                    else:
-                         # Fallback if format is unexpected
-                         self.logger.warning(f"Could not reliably parse endpoint from section key: {key}. Using fallback split.")
-                         endpoint = key.split("_")[-1] 
-                except Exception:
-                     self.logger.error(f"Error parsing section key '{key}' for endpoint.", exc_info=True)
-                     endpoint = key.split("_")[-1] # Fallback
-            else:
-                 endpoint = key # If not section data, key is the endpoint
-
-            # --- Start Try Block --- 
-            try: 
-                # Parse endpoint info
-                if "://" in endpoint:
-                     source = endpoint.split("://")[1].split("/")[0]
-                     parts = endpoint.split("/")
-                     field = parts[3] if len(parts) > 3 else parts[-1] 
-                else:
-                     self.logger.warning(f"Cannot determine source/field from parsed endpoint '{endpoint}' (Original key: '{key}')")
-                     continue # Skip if source cannot be determined
-                 
-                processed_data = self._safe_get_dict(data)
-                 
-                # Initialize source dicts if needed
-                if source not in all_data_consolidated: all_data_consolidated[source] = {}
-                if source not in viz_data_consolidated: viz_data_consolidated[source] = {}
-
-                # --- Consolidation Strategy --- 
-                if is_section_data:
-                    section_title_from_key = key.split("_")[1]
-                    if section_title_from_key not in all_data_consolidated[source]:
-                         all_data_consolidated[source][section_title_from_key] = processed_data
-                    else:
-                         self.logger.info(f"Section data for '{section_title_from_key}' from {source} already exists. Not overwriting.")
-                else: # Visualization data
-                    if field in processed_data:
-                         current_value = processed_data[field]
-                    elif 'data' in processed_data and isinstance(processed_data['data'], dict) and field in processed_data['data']:
-                         current_value = processed_data['data'][field]
-                    else:
-                         current_value = processed_data
-                         self.logger.warning(f"Could not extract specific field '{field}' from viz result for {endpoint}. Storing entire result.")
+                # If RAG failed or returned no endpoints, try to use required sources directly
+                if not endpoints_for_section and required_sources:
+                    self.logger.info(f"No endpoints from RAG for section '{section_title}', trying direct tool calls for required sources: {required_sources}")
                     
-                    # Assign values with correct indentation
-                    viz_data_consolidated[source][field] = current_value
-                    all_data_consolidated[source][field] = current_value 
+                    for source in required_sources:
+                        if source.lower() == "web_research" or source.lower() == "tavily":
+                            # For web research, use Tavily directly
+                            try:
+                                self.logger.info(f"Calling Tavily directly for section '{section_title}'")
+                                cache_manager = CacheManager(project_name=project_name)
+                                cached_data = cache_manager.load("tavily", "research", section_title)
+                                
+                                if cached_data:
+                                    self.logger.info(f"Using cached Tavily data for section '{section_title}'")
+                                    section_data = cached_data
+                                else:
+                                    self.logger.info(f"Fetching fresh Tavily data for section '{section_title}'")
+                                    # Use named parameters for the call_tool method
+                                    section_data = await self.mcp_client.call_tool("tavily", "research", query=section_query, project_name=project_name, cache_key=section_title)
+                                    
+                                    # Caching is now handled by the mcp client
+                                
+                                # Store result in state
+                                if is_state_dict:
+                                    section_key = section_title.lower().replace(" ", "_")
+                                    if section_key not in state["data"]:
+                                        state["data"][section_key] = {}
+                                    state["data"][section_key]["tavily"] = section_data
+                                else:
+                                    section_key = section_title.lower().replace(" ", "_")
+                                    if not hasattr(state.data, section_key):
+                                        setattr(state.data, section_key, {})
+                                    section_data_obj = getattr(state.data, section_key)
+                                    section_data_obj["tavily"] = section_data
+                                    
+                                self.logger.info(f"Stored direct Tavily results for section: {section_title}")
+                                
+                            except Exception as e:
+                                self.logger.error(f"Error in direct Tavily call for section '{section_title}': {str(e)}")
+                                if is_state_dict and section_title not in state["problem_sections"]:
+                                    state["problem_sections"].append(section_title)
+                                elif not is_state_dict and section_title not in state.problem_sections:
+                                    state.problem_sections.append(section_title)
+                
+                # Process each endpoint from RAG for this section
+                for endpoint in endpoints_for_section:
+                    # Skip if this endpoint has already been processed
+                    if endpoint in self.processed_endpoints:
+                        self.logger.info(f"Endpoint {endpoint} already processed. Skipping.")
+                        continue
+                        
+                    try:
+                        # Invoke the tool for this endpoint
+                        self.logger.info(f"Section '{section_title}': Invoking tool for endpoint: {endpoint}")
+                        result = await self._invoke_tool_for_endpoint(endpoint, project_name)
+                        
+                        # Mark as processed to avoid duplicate calls
+                        self.processed_endpoints.add(endpoint)
+                        
+                        # Store result in state
+                        if is_state_dict:
+                            section_key = section_title.lower().replace(" ", "_")
+                            if section_key not in state["data"]:
+                                state["data"][section_key] = {}
+                            
+                            # Extract source from endpoint
+                            source = endpoint.split("://")[1].split("/")[0] if "://" in endpoint else "unknown"
+                            if source not in state["data"][section_key]:
+                                state["data"][section_key][source] = result
+                        else:
+                            # Similar logic for object-style state
+                            section_key = section_title.lower().replace(" ", "_")
+                            if not hasattr(state.data, section_key):
+                                setattr(state.data, section_key, {})
+                            
+                            # Extract source from endpoint
+                            source = endpoint.split("://")[1].split("/")[0] if "://" in endpoint else "unknown"
+                            section_data = getattr(state.data, section_key)
+                            if source not in section_data:
+                                section_data[source] = result
+                    except Exception as e:
+                        self.logger.error(f"Error processing endpoint {endpoint} for section '{section_title}': {str(e)}")
+                        # Add to problem sections if there's an error
+                        if is_state_dict and section_title not in state["problem_sections"]:
+                            state["problem_sections"].append(section_title)
+                        elif not is_state_dict and section_title not in state.problem_sections:
+                            state.problem_sections.append(section_title)
             
-            # --- Catch Errors during parsing/consolidation ---    
-            except Exception as e: 
-                self.logger.error(f"Error during consolidation for key {key}: {str(e)}", exc_info=True)
-            # --- End Try-Except Block --- 
-
-        # Add error indicator if all sources failed
-        if not successful_sources and len(results) > 0:
-             self.logger.error('All data sources seem to have failed or returned errors.')
-             error_value = "No valid data found for any source"
-             if is_state_dict:
-                 # Ensure dicts exist before adding error key
-                 if not isinstance(state.get("visualization_data"), dict): state["visualization_data"] = {}
-                 if not isinstance(state.get("data"), dict): state["data"] = {}
-                 state["visualization_data"]['error'] = error_value
-                 state["data"]['error'] = error_value
-             else: # Assuming object
-                  if not hasattr(state, "visualization_data") or not isinstance(state.visualization_data, dict):
-                       state.visualization_data = {}
-                  if not hasattr(state, "data") or not isinstance(state.data, dict):
-                       state.data = {}
-                  state.visualization_data['error'] = error_value
-                  state.data['error'] = error_value
-
-        # --- Update State --- 
-        if is_state_dict:
-             state["visualization_data"] = viz_data_consolidated
-             state["problem_sections"] = problem_sections_list
-             state["data"] = all_data_consolidated # Assign the main consolidated data
-             # Remove multi-source rebuilding logic
-             # multi_source_data = {}
-             # ... (loop removed) ...
-             # state["data"]["multi"] = multi_source_data
-
-        else: # Assume state object
-             state.visualization_data = viz_data_consolidated
-             state.problem_sections = problem_sections_list
-             state.data = all_data_consolidated # Assign the main consolidated data
-             # Remove multi-source rebuilding logic
-             # multi_source_data = {}
-             # ... (loop removed) ...
-             # if not isinstance(state.data, dict):
-             #      state.data = {}
-             # state.data["multi"] = multi_source_data
-
-        # Log final state structure
-        final_viz_keys = list(state["visualization_data"].keys()) if is_state_dict else list(getattr(state, "visualization_data", {}).keys())
-        final_data_keys = list(state["data"].keys()) if is_state_dict else list(getattr(state, "data", {}).keys())
-        final_problems = state["problem_sections"] if is_state_dict else getattr(state, "problem_sections", [])
-        
-        self.logger.info(f"Consolidated visualization_data sources: {final_viz_keys}")
-        self.logger.info(f"Consolidated state.data sources: {final_data_keys}")
-        self.logger.info(f"Problem sections reported: {len(final_problems)}")
-        self.logger.info("Completed execute_workflow")
-        return state 
+            # Process visualizations from report_config
+            if "visualization_types" in report_config:
+                for viz_type, viz_config in report_config["visualization_types"].items():
+                    # Skip visualizations without proper configuration
+                    if not viz_config.get("data_source") or not viz_config.get("data_field"):
+                        self.logger.warning(f"Skipping visualization {viz_type}: missing data_source or data_field")
+                        continue
+                        
+                    # Get the section this visualization belongs to
+                    section_title = viz_config.get("section", "General")
+                    data_source = viz_config.get("data_source")
+                    data_field = viz_config.get("data_field")
+                    
+                    # Check if we already have this data from batch processing
+                    already_fetched = False
+                    if data_source in self.data and data_field in self.data[data_source]:
+                        self.logger.info(f"Section '{section_title}', Viz '{viz_type}': Already have data for '{data_field}' from batch processing")
+                        already_fetched = True
+                    
+                    if already_fetched:
+                        continue
+                    
+                    # --- RAG Query for Visualization Data ---
+                    viz_rag_query = f"{project_name} {data_field} {data_source}" 
+                    self.logger.info(f"Section '{section_title}', Viz '{viz_type}': Processing field '{data_field}' from source '{data_source}' using RAG query: '{viz_rag_query}'")
+                    
+                    endpoints_for_viz = []
+                    try:
+                        if self.rag_retriever:
+                            self.logger.info(f"Attempting RAG endpoint retrieval for viz query: '{viz_rag_query}'")
+                            endpoints_for_viz = await asyncio.wait_for(
+                                self.rag_retriever.get_endpoints_for_project(viz_rag_query), 
+                                timeout=5.0
+                            )
+                            # Filter out HuggingFace endpoints - we'll use them only as fallbacks
+                            endpoints_for_viz = [
+                                endpoint for endpoint in endpoints_for_viz
+                                if "huggingface" not in endpoint
+                            ]
+                            self.logger.info(f"RAG retrieved {len(endpoints_for_viz)} endpoints for viz query '{viz_rag_query}': {endpoints_for_viz}")
+                        else:
+                            self.logger.warning("RAG retriever not available for visualization, using fallback endpoints")
+                            # Use tool calls directly instead of hardcoded endpoints
+                            endpoints_for_viz = []
+                    except Exception as e:
+                        self.logger.error(f"Error in RAG retrieval for viz '{viz_type}': {str(e)}")
+                        endpoints_for_viz = []
+                    
+                    # Process each endpoint for this visualization
+                    primary_source_success = False
+                    for endpoint in endpoints_for_viz:
+                        # Skip if this endpoint has already been processed
+                        if endpoint in self.processed_endpoints:
+                            self.logger.info(f"Viz endpoint {endpoint} already processed. Skipping.")
+                            continue
+                            
+                        try:
+                            # Invoke the tool for this endpoint
+                            self.logger.info(f"Viz '{viz_type}': Invoking tool for endpoint: {endpoint}")
+                            result = await self._invoke_tool_for_endpoint(endpoint, project_name)
+                            
+                            # Mark as processed to avoid duplicate calls
+                            self.processed_endpoints.add(endpoint)
+                            
+                            # Check if we got valid data
+                            if result and "error" not in self._safe_get_dict(result) and "data_unavailable" not in self._safe_get_dict(result):
+                                primary_source_success = True
+                                
+                                # Store result in visualization_data
+                                if is_state_dict:
+                                    viz_key = f"{section_title.lower().replace(' ', '_')}.{viz_type}"
+                                    if viz_key not in state["visualization_data"]:
+                                        state["visualization_data"][viz_key] = {}
+                                    
+                                    # Extract source and field from endpoint
+                                    source = endpoint.split("://")[1].split("/")[0] if "://" in endpoint else "unknown"
+                                    state["visualization_data"][viz_key][f"{source}.{data_field}"] = result
+                                else:
+                                    # Similar logic for object-style state
+                                    viz_key = f"{section_title.lower().replace(' ', '_')}.{viz_type}"
+                                    if not hasattr(state.visualization_data, viz_key):
+                                        setattr(state.visualization_data, viz_key, {})
+                                    
+                                    # Extract source and field from endpoint
+                                    source = endpoint.split("://")[1].split("/")[0] if "://" in endpoint else "unknown"
+                                    viz_data = getattr(state.visualization_data, viz_key)
+                                    viz_data[f"{source}.{data_field}"] = result
+                        except Exception as e:
+                            self.logger.error(f"Error processing endpoint {endpoint} for viz '{viz_type}': {str(e)}")
+                    
+                    # If all primary sources failed, try HuggingFace as fallback
+                    if not primary_source_success:
+                        self.logger.warning(f"All primary sources failed for data field '{data_field}'. Trying HuggingFace as fallback.")
+                        
+                        # Create HuggingFace fallback endpoint
+                        hf_endpoint = f"data://huggingface/research/{project_name} {data_field} {data_source}"
+                        
+                        # Skip if this HuggingFace endpoint has already been processed
+                        if hf_endpoint in self.processed_endpoints:
+                            self.logger.info(f"HuggingFace fallback endpoint {hf_endpoint} already processed. Skipping.")
+                            continue
+                            
+                        try:
+                            self.logger.info(f"Using HuggingFace as fallback for data field '{data_field}'")
+                            result = await self._invoke_tool_for_endpoint(hf_endpoint, project_name)
+                            
+                            # Mark as processed to avoid duplicate calls
+                            self.processed_endpoints.add(hf_endpoint)
+                            
+                            # Check if we got valid data
+                            if result and "error" not in self._safe_get_dict(result) and "data_unavailable" not in self._safe_get_dict(result):
+                                # Store result in visualization_data
+                                if is_state_dict:
+                                    viz_key = f"{section_title.lower().replace(' ', '_')}.{viz_type}"
+                                    if viz_key not in state["visualization_data"]:
+                                        state["visualization_data"][viz_key] = {}
+                                    
+                                    state["visualization_data"][viz_key][f"huggingface.{data_field}"] = result
+                                else:
+                                    # Similar logic for object-style state
+                                    viz_key = f"{section_title.lower().replace(' ', '_')}.{viz_type}"
+                                    if not hasattr(state.visualization_data, viz_key):
+                                        setattr(state.visualization_data, viz_key, {})
+                                    
+                                    viz_data = getattr(state.visualization_data, viz_key)
+                                    viz_data[f"huggingface.{data_field}"] = result
+                            else:
+                                self.logger.warning(f"HuggingFace fallback failed for data field '{data_field}': {result.get('error', 'Unknown error')}")
+                        except Exception as e:
+                            self.logger.error(f"Error using HuggingFace fallback for data field '{data_field}': {str(e)}")
+            
+            # Consolidate all fetched data into state
+            self.logger.info("Consolidating fetched data into state... (Refinement likely needed)")
+            
+            # Process each key in self.data
+            for key, value in self.data.items():
+                if key == "tavily_sections":
+                    # Handle tavily section data specially
+                    for section_key, section_data in value.items():
+                        # Convert section_key back to title format for matching
+                        section_title = section_key.replace("_", " ").title()
+                        
+                        # Find matching section in report_config
+                        for section in report_config.get("sections", []):
+                            if section.get("title", "").lower().replace(" ", "_") == section_key:
+                                # Found matching section, store data
+                                if is_state_dict:
+                                    if section_key in state["data"]:
+                                        self.logger.info(f"Section data for '{section_title}' from tavily already exists. Not overwriting.")
+                                    else:
+                                        state["data"][section_key] = {"tavily": section_data}
+                                else:
+                                    if hasattr(state.data, section_key):
+                                        self.logger.info(f"Section data for '{section_title}' from tavily already exists. Not overwriting.")
+                                    else:
+                                        setattr(state.data, section_key, {"tavily": section_data})
+                                break
+                else:
+                    # Handle other data sources
+                    for field_key, field_data in value.items():
+                        # Store in state.data for general access
+                        if is_state_dict:
+                            if key not in state["data"]:
+                                state["data"][key] = {}
+                            state["data"][key][field_key] = field_data
+                        else:
+                            if not hasattr(state.data, key):
+                                setattr(state.data, key, {})
+                            source_data = getattr(state.data, key)
+                            source_data[field_key] = field_data
+            
+            # Report problem sections
+            problem_count = len(state["problem_sections"] if is_state_dict else state.problem_sections)
+            self.logger.info(f"Problem sections reported: {problem_count}")
+            
+            self.logger.info("Completed execute_workflow")
+            return state
+            
+        except Exception as e:
+            self.logger.error(f"Error in execute_workflow: {str(e)}", exc_info=True)
+            if is_state_dict:
+                if "errors" not in state:
+                    state["errors"] = []
+                state["errors"].append(str(e))
+            else:
+                if not hasattr(state, 'errors'):
+                    state.errors = []
+                state.errors.append(str(e))
+            return state
 
     async def _invoke_tool_for_endpoint(self, endpoint_pattern: str, project_name: str, query: Optional[str] = None) -> Dict[str, Any]:
         """Formats endpoint pattern INCLUDING identifiers in the path and calls fetch_data."""
@@ -878,93 +795,53 @@ class Researcher:
             "message": f"Data for {project_name} is not available from any verifiable sources."
         }
 
-    async def _run_parallel_tavily_searches(self, report_config: Dict, project_name: str) -> None:
+    async def _run_parallel_tavily_searches(self, section_queries: Dict[str, str], project_name: str) -> Dict[str, Dict[str, Any]]:
         """
-        Run Tavily searches for multiple report sections in parallel.
+        Run multiple Tavily searches in parallel.
         
         Args:
-            report_config: The report configuration containing sections
-            project_name: Name of the project being researched
+            section_queries: Dictionary of section titles to search queries
+            project_name: The cryptocurrency project name
             
         Returns:
-            None - results are stored in self.data["tavily_sections"]
+            Dictionary of section titles to search results
         """
-        self.logger.info(f"Setting up parallel Tavily searches for {project_name}")
+        self.logger.info(f"Running parallel Tavily searches for sections: {list(section_queries.keys())}")
         
-        # Initialize storage for tavily results if not present
-        if "tavily_sections" not in self.data:
-            self.data["tavily_sections"] = {}
+        section_data = {}
         
-        # Extract section titles and prepare queries
-        section_titles = []
-        section_queries = {}
-        
-        for section in report_config.get("sections", []):
-            title = section.get("title")
-            query_template = section.get("query_template")
-            if title and query_template:
-                formatted_query = query_template.format(project_name=project_name)
-                section_titles.append(title)
-                section_queries[title] = formatted_query
-        
-        # Set up batch processing
-        batch_size = 3  # Process 3 sections at a time to limit concurrent API calls
-        num_batches = (len(section_titles) + batch_size - 1) // batch_size
-        
-        self.logger.info(f"Processing {len(section_titles)} sections in {num_batches} batches")
-        
-        # Process each batch
-        for batch_idx in range(num_batches):
-            batch_start = batch_idx * batch_size
-            batch_end = min((batch_idx + 1) * batch_size, len(section_titles))
-            batch_section_titles = section_titles[batch_start:batch_end]
-            
-            self.logger.info(f"Processing batch {batch_idx+1}/{num_batches} with {len(batch_section_titles)} sections")
-            
-            # Define search function for a single section
-            async def search_section(section_title):
-                try:
-                    query = section_queries[section_title]
-                    self.logger.info(f"Executing Tavily search for section: {section_title}")
-                    
-                    # Use the _invoke_tool_for_endpoint method to leverage existing caching
-                    endpoint = f"research://tavily/{query}"
-                    section_data = await self._invoke_tool_for_endpoint(endpoint, project_name, query=query)
-                    
-                    return section_title, section_data
-                except Exception as e:
-                    self.logger.error(f"Error in Tavily search for section {section_title}: {str(e)}", exc_info=True)
-                    return section_title, {"error": str(e), "data_unavailable": True}
-            
-            # Execute searches for this batch in parallel
+        async def search_section(section_title):
             try:
-                results = await asyncio.gather(
-                    *(search_section(title) for title in batch_section_titles),
-                    return_exceptions=True
-                )
+                query = section_queries[section_title]
+                self.logger.info(f"Executing Tavily search for section: {section_title}")
                 
-                # Process results
-                for result in results:
-                    if isinstance(result, Exception):
-                        self.logger.error(f"Exception in batch search: {str(result)}")
-                        continue
-                        
-                    section_title, section_data = result
+                # Use direct tool call to tavily research
+                try:
+                    # Create a cache key for this specific search - use section_title as the key
+                    cache_manager = CacheManager(project_name=project_name)
+                    # The section_title serves as the cache key
+                    cached_data = cache_manager.load("tavily", "research", section_title)
                     
-                    # Store results in data
-                    section_key = section_title.lower().replace(" ", "_")
-                    self.data["tavily_sections"][section_key] = section_data
-                    self.logger.info(f"Stored Tavily results for section: {section_title}")
-                    
-            except Exception as batch_error:
-                self.logger.error(f"Error processing batch {batch_idx+1}: {str(batch_error)}", exc_info=True)
-            
-            # Short delay between batches to avoid rate limiting
-            if batch_idx < num_batches - 1:
-                await asyncio.sleep(2)
+                    if cached_data:
+                        self.logger.info(f"Using cached Tavily data for section '{section_title}'")
+                        section_data[section_title] = cached_data
+                    else:
+                        self.logger.info(f"Fetching fresh Tavily data for section '{section_title}'")
+                        # FIXED: Specify "tavily" as the server name
+                        result = await self.mcp_client.call_tool("tavily", "research", query=query, project_name=project_name, cache_key=section_title)
+                        section_data[section_title] = result
+                        self.logger.info(f"Successfully retrieved Tavily data for section '{section_title}'")
+                except Exception as inner_e:
+                    self.logger.error(f"Error in Tavily search for section '{section_title}': {str(inner_e)}")
+                    section_data[section_title] = {"error": str(inner_e), "results": []}
+            except Exception as e:
+                self.logger.error(f"Error processing section '{section_title}': {str(e)}")
+                section_data[section_title] = {"error": str(e), "results": []}
         
-        self.logger.info(f"Completed parallel Tavily searches - processed {len(self.data['tavily_sections'])} sections")
-        return None
+        # Run all searches in parallel
+        await asyncio.gather(*[search_section(title) for title in section_queries])
+        
+        return section_data
 
     async def extract_token_distribution(self, project_name: str) -> Dict[str, Any]:
         """
@@ -980,35 +857,347 @@ class Researcher:
         
         # Use the CacheManager to check for cached data first
         cache_manager = CacheManager(project_name=project_name)
-        cached_data, from_cache = cache_manager.load_from_cache("tokenomics", "distribution", project_name.lower())
+        cached_data = cache_manager.load("tokenomics", "distribution", project_name.lower())
         
-        # Log cache expiration
-        if from_cache and not cached_data:
-            self.logger.info(f"Cached token distribution for {project_name} is expired")
-            
         # If we have valid cached data, return it
         if cached_data:
             self.logger.info(f"Using cached token distribution data for {project_name}")
             return cached_data
             
-        # Otherwise, fetch new data
+        # Otherwise, fetch fresh data using the tokenomics tool
         self.logger.info(f"Fetching fresh token distribution data for {project_name}")
+        
         try:
-            # Attempt to fetch from tokenomics endpoint
-            endpoint = f"data://tokenomics/distribution/{project_name.lower()}"
-            distribution_data = await self._invoke_tool_for_endpoint(endpoint, project_name)
+            # Use named parameters for call_tool method
+            tokenomics_data = await self.mcp_client.call_tool("tokenomics", "get_distribution", project=project_name, project_name=project_name)
             
-            if distribution_data and "error" not in self._safe_get_dict(distribution_data):
+            # Cache the results if we got valid data
+            if tokenomics_data and "error" not in tokenomics_data:
                 self.logger.info(f"Successfully retrieved token distribution for {project_name}")
-                return distribution_data
-                
-            # Try fallback if primary source fails
-            self.logger.warning(f"Primary source failed for token distribution of {project_name}, trying fallbacks")
-            return await self._get_fallback_data(project_name)
-            
+                cache_manager.save(tokenomics_data, "tokenomics", "distribution", project_name.lower())
+                return tokenomics_data
+            else:
+                self.logger.warning(f"Failed to retrieve token distribution for {project_name}")
+                error_msg = tokenomics_data.get('error', 'Unknown error') if tokenomics_data else "Failed to retrieve token distribution data"
+                return {"error": error_msg}
         except Exception as e:
             self.logger.error(f"Error extracting token distribution for {project_name}: {str(e)}", exc_info=True)
-            return await self._get_fallback_data(project_name)
+            return {"error": str(e)}
+
+    async def _batch_process_project_data(self, report_config: Dict, project_name: str) -> None:
+        """
+        Batch process all API calls for a project to minimize redundant API requests.
+        This method analyzes the report_config, identifies all required data sources and fields,
+        and makes consolidated API calls to each source once per project.
+        
+        Args:
+            report_config: The report configuration containing sections and visualization types
+            project_name: Name of the project being researched
+        """
+        self.logger.info(f"Starting batch processing of all API data for project: {project_name}")
+        
+        # Initialize storage for batch results if not present
+        if "batch_data" not in self.data:
+            self.data["batch_data"] = {}
+        
+        # 1. Collect all required data sources and fields from report_config
+        required_sources = {
+            "coingecko": set(),
+            "coinmarketcap": set(),
+            "defillama": set(),
+            "tokenomics": set(),
+            "tavily": set()  # Always include Tavily
+        }
+        
+        # Extract from visualization types
+        if 'visualization_types' in report_config:
+            for viz_type, viz_config in report_config['visualization_types'].items():
+                data_source = viz_config.get('data_source', '').lower()
+                if data_source in required_sources:
+                    # Add data_field if present
+                    if 'data_field' in viz_config and viz_config['data_field']:
+                        required_sources[data_source].add(viz_config['data_field'])
+                    
+                    # Add data_fields if present
+                    if 'data_fields' in viz_config and isinstance(viz_config['data_fields'], list):
+                        required_sources[data_source].update(viz_config['data_fields'])
+        
+        # Extract from section data_sources
+        for section in report_config.get('sections', []):
+            for source in section.get('data_sources', []):
+                if source.lower() in required_sources:
+                    # Just note that this source is needed (specific fields will be determined by API)
+                    required_sources[source.lower()].add('*')
+            
+            # Always include tavily for each section
+            required_sources["tavily"].add(section.get('title', '').lower().replace(' ', '_'))
+        
+        # Ensure tavily is always processed regardless of explicit requirement
+        required_sources["tavily"].add('*')
+        
+        # Log what we found
+        for source, fields in required_sources.items():
+            if fields:
+                self.logger.info(f"Batch processing will fetch from {source}: {list(fields)}")
+        
+        # 2. Process each data source in parallel
+        tasks = []
+        
+        # CoinGecko batch processing
+        if required_sources["coingecko"]:
+            tasks.append(self._batch_process_coingecko(project_name))
+        
+        # CoinMarketCap batch processing
+        if required_sources["coinmarketcap"]:
+            tasks.append(self._batch_process_coinmarketcap(project_name))
+        
+        # DeFiLlama batch processing
+        if required_sources["defillama"]:
+            tasks.append(self._batch_process_defillama(project_name))
+        
+        # Tokenomics batch processing
+        if required_sources["tokenomics"]:
+            tasks.append(self._batch_process_tokenomics(project_name))
+        
+        # Tavily batch processing - ALWAYS include this
+        tasks.append(self._batch_process_tavily(project_name))
+        
+        # Execute all batch processing tasks in parallel
+        if tasks:
+            self.logger.info(f"Executing {len(tasks)} batch processing tasks in parallel")
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            # Process results
+            for i, result in enumerate(results):
+                if isinstance(result, Exception):
+                    self.logger.error(f"Error in batch processing task {i}: {str(result)}")
+        
+        self.logger.info(f"Completed batch processing for project: {project_name}")
+    
+    async def _batch_process_coingecko(self, project_name: str) -> Dict[str, Any]:
+        """Batch process all CoinGecko API calls for a project."""
+        self.logger.info(f"Batch processing CoinGecko data for {project_name}")
+        
+        try:
+            # Use direct tool call instead of hardcoded endpoint
+            cache_manager = CacheManager(project_name=project_name)
+            cached_data = cache_manager.load("coingecko", "data", project_name.lower())
+            
+            if cached_data:
+                self.logger.info(f"Using cached CoinGecko data for {project_name}")
+                self.data["batch_data"]["coingecko"] = cached_data
+                return cached_data
+            
+            self.logger.info(f"Calling CoinGecko tool directly for {project_name}")
+            # Use named parameters for call_tool method
+            coingecko_data = await self.mcp_client.call_tool("coingecko", "get_batch_data", coin=project_name, project_name=project_name)
+            
+            if coingecko_data:
+                self.logger.info(f"Successfully retrieved CoinGecko data for {project_name}")
+                cache_manager.save(coingecko_data, "coingecko", "data", project_name.lower())
+                self.data["batch_data"]["coingecko"] = coingecko_data
+                return coingecko_data
+            else:
+                self.logger.warning(f"Failed to retrieve CoinGecko data for {project_name}")
+                return {"error": "Failed to retrieve CoinGecko data"}
+                
+        except Exception as e:
+            self.logger.error(f"Error in batch processing CoinGecko data for {project_name}: {str(e)}", exc_info=True)
+            return {"error": str(e)}
+    
+    async def _batch_process_coinmarketcap(self, project_name: str) -> Dict[str, Any]:
+        """Batch process all CoinMarketCap API calls for a project."""
+        self.logger.info(f"Batch processing CoinMarketCap data for {project_name}")
+        
+        try:
+            # Use direct tool call instead of hardcoded endpoint
+            cache_manager = CacheManager(project_name=project_name)
+            cached_data = cache_manager.load("coinmarketcap", "data", project_name.lower())
+            
+            if cached_data:
+                self.logger.info(f"Using cached CoinMarketCap data for {project_name}")
+                self.data["batch_data"]["coinmarketcap"] = cached_data
+                return cached_data
+            
+            self.logger.info(f"Calling CoinMarketCap tool directly for {project_name}")
+            # Use named parameters for call_tool method
+            cmc_data = await self.mcp_client.call_tool("coinmarketcap", "get_batch_data", coin=project_name, project_name=project_name)
+            
+            if cmc_data:
+                self.logger.info(f"Successfully retrieved CoinMarketCap data for {project_name}")
+                cache_manager.save(cmc_data, "coinmarketcap", "data", project_name.lower())
+                self.data["batch_data"]["coinmarketcap"] = cmc_data
+                return cmc_data
+            else:
+                self.logger.warning(f"Failed to retrieve CoinMarketCap data for {project_name}")
+                return {"error": "Failed to retrieve CoinMarketCap data"}
+        except Exception as e:
+            self.logger.error(f"Error in batch processing CoinMarketCap data for {project_name}: {str(e)}", exc_info=True)
+            return {"error": str(e)}
+    
+    async def _batch_process_defillama(self, project_name: str) -> Dict[str, Any]:
+        """Batch process all DeFiLlama API calls for a project."""
+        self.logger.info(f"Batch processing DeFiLlama data for {project_name}")
+        
+        try:
+            # Use direct tool call instead of hardcoded endpoint
+            cache_manager = CacheManager(project_name=project_name)
+            cached_data = cache_manager.load("defillama", "tvl", project_name.lower())
+            
+            if cached_data:
+                self.logger.info(f"Using cached DeFiLlama data for {project_name}")
+                self.data["batch_data"]["defillama"] = cached_data
+                return cached_data
+            
+            self.logger.info(f"Calling DeFiLlama tool directly for {project_name}")
+            # Use named parameters for call_tool method
+            defillama_data = await self.mcp_client.call_tool("defillama", "get_protocol_data", protocol=project_name, project_name=project_name)
+            
+            if defillama_data:
+                self.logger.info(f"Successfully retrieved DeFiLlama data for {project_name}")
+                cache_manager.save(defillama_data, "defillama", "tvl", project_name.lower())
+                self.data["batch_data"]["defillama"] = defillama_data
+                return defillama_data
+            else:
+                self.logger.warning(f"Failed to retrieve DeFiLlama data for {project_name}")
+                return {"error": "Failed to retrieve DeFiLlama data"}
+                
+        except Exception as e:
+            self.logger.error(f"Error in batch processing DeFiLlama data for {project_name}: {str(e)}", exc_info=True)
+            return {"error": str(e)}
+    
+    async def _batch_process_tokenomics(self, project_name: str) -> Dict[str, Any]:
+        """Batch process all Tokenomics API calls for a project."""
+        self.logger.info(f"Batch processing Tokenomics data for {project_name}")
+        
+        try:
+            # Use direct tool call instead of hardcoded endpoint
+            cache_manager = CacheManager(project_name=project_name)
+            cached_data = cache_manager.load("tokenomics", "distribution", project_name.lower())
+            
+            if cached_data:
+                self.logger.info(f"Using cached Tokenomics data for {project_name}")
+                self.data["batch_data"]["tokenomics"] = cached_data
+                return cached_data
+            
+            self.logger.info(f"Calling Tokenomics tool directly for {project_name}")
+            # Use named parameters for call_tool method
+            tokenomics_data = await self.mcp_client.call_tool("tokenomics", "get_distribution", project=project_name, project_name=project_name)
+            
+            if tokenomics_data:
+                self.logger.info(f"Successfully retrieved Tokenomics data for {project_name}")
+                cache_manager.save(tokenomics_data, "tokenomics", "distribution", project_name.lower())
+                self.data["batch_data"]["tokenomics"] = tokenomics_data
+                return tokenomics_data
+            else:
+                self.logger.warning(f"Failed to retrieve Tokenomics data for {project_name}")
+                return {"error": "Failed to retrieve Tokenomics data"}
+                
+        except Exception as e:
+            self.logger.error(f"Error in batch processing Tokenomics data for {project_name}: {str(e)}", exc_info=True)
+            return {"error": str(e)}
+
+    async def _batch_process_tavily(self, project_name: str, report_config: Dict = None) -> Dict[str, Any]:
+        """Batch process all Tavily API calls for a project.
+        This creates a separate cache file for each section, enabling section-specific research.
+        
+        Args:
+            project_name: Name of the project to research
+            report_config: Optional report configuration with sections
+            
+        Returns:
+            Dict containing Tavily search results organized by section
+        """
+        self.logger.info(f"Batch processing Tavily data for {project_name}")
+        
+        try:
+            # Initialize batch_data if it doesn't exist
+            if not hasattr(self, 'data'):
+                self.data = {}
+            if "batch_data" not in self.data:
+                self.data["batch_data"] = {}
+            
+            # Define section-specific queries based on report_config
+            # Standard required sections as fallback
+            standard_sections = [
+                "market_analysis", 
+                "tokenomics", 
+                "team_overview",
+                "technology",
+                "competition",
+                "risks",
+                "future_developments"
+            ]
+            
+            # Extract sections from report_config if available
+            config_sections = []
+            if report_config and isinstance(report_config, dict) and "sections" in report_config:
+                for section in report_config["sections"]:
+                    if "title" in section:
+                        section_key = section["title"].lower().replace(' ', '_')
+                        config_sections.append(section_key)
+                self.logger.info(f"Extracted {len(config_sections)} sections from report_config")
+            
+            # Use sections from report_config if available, otherwise use standard sections
+            sections = config_sections if config_sections else standard_sections
+            self.logger.info(f"Processing {len(sections)} sections: {sections}")
+            
+            section_queries = {}
+            for section in sections:
+                # Create section-specific query using section name
+                formatted_section = section.replace('_', ' ')
+                section_queries[section] = f"{project_name} cryptocurrency {formatted_section}"
+            
+            # Run section-specific searches
+            self.logger.info(f"Processing {len(section_queries)} sections with Tavily")
+            
+            # Maintain results for all sections
+            all_section_results = {}
+            
+            # Process each section with a specific cache key
+            for section, query in section_queries.items():
+                try:
+                    self.logger.info(f"Processing section '{section}' with query: '{query}'")
+                    
+                    # First check if we have cached data for this section
+                    cache_manager = CacheManager(project_name=project_name)
+                    cached_data = cache_manager.load("tavily", "research", section)
+                    
+                    if cached_data:
+                        self.logger.info(f"Using cached Tavily data for section '{section}'")
+                        all_section_results[section] = cached_data
+                    else:
+                        self.logger.info(f"Fetching fresh Tavily data for section '{section}'")
+                        # Use section as the cache key to create section-specific cache files
+                        result = await self.mcp_client.call_tool("tavily", "research", query=query, project_name=project_name, cache_key=section)
+                        
+                        if result and "error" not in result:
+                            all_section_results[section] = result
+                            self.logger.info(f"Successfully retrieved and cached Tavily data for section '{section}'")
+                        else:
+                            error_msg = result.get('error', 'Unknown error') if result else f"Failed to retrieve Tavily data for section {section}"
+                            self.logger.warning(f"Error in section '{section}': {error_msg}")
+                            all_section_results[section] = {"error": error_msg, "results": []}
+                except Exception as e:
+                    self.logger.error(f"Error processing section '{section}': {str(e)}")
+                    all_section_results[section] = {"error": str(e), "results": []}
+            
+            # Store the section results in the batch data
+            self.data["batch_data"]["tavily"] = all_section_results
+            
+            # Check if cache files were created properly
+            for section in sections:
+                cache_path = os.path.join("docs", project_name.lower(), "cache", "tavily", f"research_{section}.json")
+                if os.path.exists(cache_path):
+                    self.logger.info(f"✅ Verified cache for '{section}' exists at: {cache_path}")
+                else:
+                    self.logger.warning(f"❌ Cache file missing for '{section}': {cache_path}")
+            
+            return all_section_results
+                
+        except Exception as e:
+            self.logger.error(f"Error in batch processing Tavily data for {project_name}: {str(e)}", exc_info=True)
+            return {"error": str(e)}
 
 async def researcher(state, llm=None, logger=None, config=None):
     """Async function interface for researcher."""

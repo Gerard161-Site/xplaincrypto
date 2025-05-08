@@ -27,6 +27,7 @@ class MCPClientManager:
         self.external_servers = set()  # Track servers started externally
         self.base_dir = Path(__file__).parent.resolve()
         self.server_dir = self.base_dir / "retriever_servers"
+        self.logger = logging.getLogger(__name__)  # Add logger attribute
         
         # Set up pythonpath for server processes
         project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../"))
@@ -338,6 +339,10 @@ class MCPClientManager:
         Returns:
             The result of the tool execution
         """
+        # Make sure servers_started is a set
+        if not isinstance(self.servers_started, set):
+            self.servers_started = set()
+        
         # Start the server if needed
         if server_name not in self.servers_started:
             try:
@@ -561,6 +566,9 @@ class MCPClientManager:
             elif service == "coingecko":
                 # Extract coin from path
                 coin = None
+                project_name_from_path = None
+                
+                # Parse endpoint format data://coingecko/ENDPOINT/COIN or data://coingecko/ENDPOINT/COIN/PROJECT_NAME
                 if len(service_path) > 1:
                     if len(service_path) > 2:
                         coin = service_path[2]
@@ -652,3 +660,75 @@ class MCPClientManager:
         except Exception as e:
             logger.error(f"Error in fetch_data: {str(e)}")
             return {"error": f"Error fetching data: {str(e)}"}
+
+    async def call_tool(self, server_name: str, tool_name: str, *args, **kwargs) -> Dict[str, Any]:
+        """
+        Call a tool on a specific server with positional and keyword arguments.
+        This is a convenience wrapper around execute_tool that handles parameter formatting.
+        
+        Args:
+            server_name: The name of the server to call the tool on
+            tool_name: The name of the tool to call
+            *args: Positional arguments to pass to the tool
+            **kwargs: Keyword arguments to pass to the tool
+            
+        Returns:
+            The result of the tool execution
+        """
+        try:
+            self.logger.info(f"Calling tool {tool_name} on server {server_name} with args={args}, kwargs={kwargs}")
+            
+            # Make sure servers_started is a set
+            if not isinstance(self.servers_started, set):
+                self.servers_started = set()
+            
+            # If server doesn't exist, try to start it
+            if server_name not in self.servers_started:
+                self.logger.info(f"Server {server_name} not connected, attempting to start it")
+                await self.start_server(server_name)
+            
+            # Create a parameters dictionary
+            parameters = {}
+            
+            # Handle common parameter mappings for known servers and tools
+            if args:
+                if server_name == "tavily" and (tool_name == "research" or tool_name == "deep_research"):
+                    parameters["query"] = args[0]
+                elif server_name == "coingecko":
+                    parameters["coin"] = args[0]
+                elif server_name == "coinmarketcap":
+                    parameters["coin"] = args[0]
+                elif server_name == "defillama":
+                    parameters["protocol"] = args[0]
+                elif server_name == "tokenomics":
+                    parameters["project"] = args[0]
+                elif server_name == "huggingface":
+                    parameters["query"] = args[0]
+                else:
+                    # Generic fallback - use "query" for the first arg
+                    parameters["query"] = args[0]
+                
+                # Add any additional positional args with generic names
+                for i, arg in enumerate(args[1:], start=1):
+                    parameters[f"arg{i}"] = arg
+            
+            # Add keyword arguments, which override positional args if there's a conflict
+            parameters.update(kwargs)
+            
+            # Special handling for Tavily
+            if server_name == "tavily":
+                # Ensure we're calling the right tool on the tavily server
+                self.logger.info(f"Detected tavily call with tool: {tool_name}")
+                # If tool_name is 'research', keep as is
+                if tool_name != "research" and tool_name != "deep_research":
+                    # Default to 'research' tool if another name is provided (like 'tavily')
+                    self.logger.info(f"Changing tool name from {tool_name} to 'research' for tavily server")
+                    tool_name = "research"
+            
+            self.logger.info(f"Executing {tool_name} with parameters: {parameters}")
+            result = await self.execute_tool(server_name, tool_name, parameters)
+            self.logger.info(f"Tool {tool_name} execution successful")
+            return result
+        except Exception as e:
+            self.logger.error(f"Error calling tool {tool_name} on server {server_name}: {str(e)}", exc_info=True)
+            return {"error": f"Tool execution failed: {str(e)}"}

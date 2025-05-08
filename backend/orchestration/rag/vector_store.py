@@ -192,6 +192,69 @@ class VectorStore:
             logger.error(f"Error clearing all endpoints: {str(e)}")
             return False
 
+    async def embed_text(self, text: str) -> List[float]:
+        """
+        Generate an embedding for the given text.
+        
+        Args:
+            text: The text to embed
+            
+        Returns:
+            A list of floats representing the embedding
+        """
+        try:
+            from sentence_transformers import SentenceTransformer
+            
+            # Use a shared instance of the model to avoid reloading
+            if not hasattr(self, "_embedding_model"):
+                self._embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
+                
+            # Generate embedding
+            embedding = self._embedding_model.encode(text)
+            
+            # Convert to list of floats
+            return embedding.tolist()
+        except Exception as e:
+            self.logger.error(f"Error generating embedding: {str(e)}", exc_info=True)
+            return None
+            
+    async def search(self, embedding: List[float], top_k: int = 10) -> List[Dict[str, Any]]:
+        """
+        Search the vector store for similar vectors.
+        
+        Args:
+            embedding: The embedding to search for
+            top_k: The number of results to return
+            
+        Returns:
+            A list of dictionaries containing the search results
+        """
+        try:
+            if not self.index:
+                self.logger.error("Vector store index not initialized")
+                return []
+                
+            # Query the index
+            results = self.index.query(
+                vector=embedding,
+                top_k=top_k,
+                include_metadata=True
+            )
+            
+            # Format results
+            formatted_results = []
+            for match in results.matches:
+                formatted_results.append({
+                    "id": match.id,
+                    "score": match.score,
+                    "metadata": match.metadata
+                })
+                
+            return formatted_results
+        except Exception as e:
+            self.logger.error(f"Error searching vector store: {str(e)}", exc_info=True)
+            return []
+
 # Initialize with environment variable
 def get_vector_store():
     try:

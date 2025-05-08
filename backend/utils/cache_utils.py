@@ -1,10 +1,10 @@
 import os
 import json
 import logging
+import re
 from pathlib import Path
 from typing import Optional, Dict, Any, Union, List, Tuple
 import time
-import re
 from datetime import datetime, timedelta
 
 # Import the CacheCleanupManager
@@ -83,19 +83,35 @@ class CacheManager:
             except Exception as e:
                 self.logger.warning(f"Failed to run cache maintenance: {str(e)}")
 
-    def _sanitize_filename(self, name: str) -> str:
+    def _sanitize_filename(self, value):
         """
-        Sanitize a string to make it safe for use in a filename.
-        Allows valid characters like dots and spaces while removing illegal characters.
+        Sanitize a string to be used as a filename.
         
         Args:
-            name: The string to sanitize
+            value: String to sanitize
             
         Returns:
-            A sanitized string
+            Sanitized string safe for use in filenames
         """
-        # Remove invalid filename characters but preserve useful ones like dots and spaces
-        return re.sub(r'[<>:"/\\|?*]', '_', name.strip())
+        if not isinstance(value, str):
+            value = str(value)
+        
+        # Replace characters that are problematic in filenames
+        invalid_chars = ['/', '\\', ':', '*', '?', '"', '<', '>', '|', '\n', '\r', '\t', '#', '%', '&', '{', '}', '+', '`', '=', '$', '@', '!', '^']
+        for char in invalid_chars:
+            value = value.replace(char, '_')
+            
+        # Replace multiple spaces with a single underscore
+        value = re.sub(r'\s+', '_', value)
+        
+        # Remove any leading or trailing underscores
+        value = value.strip('_')
+        
+        # Limit length to avoid overly long filenames
+        if len(value) > 100:
+            value = value[:100]
+            
+        return value
 
     def get_cache_path(self, source: str, endpoint: str, query: str) -> str:
         """
@@ -149,8 +165,8 @@ class CacheManager:
             source_dir = os.path.join(self.cache_dir, source)
             os.makedirs(source_dir, exist_ok=True)
             
-            # Generate cache file path
-            cache_key = f"{endpoint}_{query}"
+            # Generate cache file path - sanitize the query for filename safety
+            cache_key = f"{endpoint}_{self._sanitize_filename(query)}"
             cache_file = os.path.join(source_dir, f"{cache_key}.json")
             
             # Sanitize data for JSON serialization
@@ -187,10 +203,9 @@ class CacheManager:
             self._maybe_run_maintenance()
                 
             return True
-            
         except Exception as e:
             if self.logger:
-                self.logger.error(f"Error saving cache: {str(e)}")
+                self.logger.error(f"Failed to save cache: {str(e)}", exc_info=True)
             return False
     
     def _sanitize_for_json(self, data):
@@ -234,47 +249,57 @@ class CacheManager:
                 self.logger.warning(f"Error converting to string for JSON: {str(e)}")
                 return ""
     
-    def load(self, source: str, endpoint: str, query: str) -> Any:
+    def load(self, source, endpoint, query, check_freshness=True):
         """
-        Load data from cache if not expired.
+        Load data from cache file.
         
         Args:
-            source: The data source (e.g., "coingecko", "tokenomics")
-            endpoint: The API endpoint or data type
-            query: The query or identifier
+            source: Source name (e.g., "coingecko", "coinmarketcap")
+            endpoint: Endpoint name (e.g., "price", "market")
+            query: Query string or identifier
+            check_freshness: Whether to check if the cache is fresh (default: True)
             
         Returns:
-            Cached data if found and not expired, None otherwise
+            Cached data if available, None otherwise
         """
-        # Generate cache file path
-        cache_file = os.path.join(self.cache_dir, source, f"{endpoint}_{query}.json")
-        
-        # Check if cache file exists
-        if not os.path.exists(cache_file):
-            self.logger.info(f"No cache found at {cache_file}")
+        if not self.project_name or not source or not endpoint or not query:
+            if self.logger:
+                self.logger.warning(f"Invalid parameters for cache load: project_name={self.project_name}, source={source}, endpoint={endpoint}, query={query}")
             return None
-        
+            
         try:
-            # Load cache file
-            with open(cache_file, 'r') as f:
-                cache_entry = json.load(f)
+            # Generate cache file path using sanitized query
+            cache_key = f"{endpoint}_{self._sanitize_filename(query)}"
+            cache_file = os.path.join(self.cache_dir, source, f"{cache_key}.json")
             
-            # Check if cache is expired
-            expires_at = datetime.fromisoformat(cache_entry["metadata"]["expires_at"])
-            now = datetime.now()
-            
-            if now > expires_at:
-                self.logger.info(f"Cache expired at {expires_at.isoformat()}")
+            if not os.path.exists(cache_file):
+                if self.logger:
+                    self.logger.debug(f"Cache miss: {cache_file} does not exist")
                 return None
-            
+                
+            with open(cache_file, 'r', encoding='utf-8') as f:
+                cache_entry = json.load(f)
+                
             # Update last accessed time
-            cache_entry["metadata"]["last_accessed"] = now.isoformat()
+            metadata = cache_entry.get('metadata', {})
+            now = datetime.now()
+            metadata['last_accessed'] = now.isoformat()
+            
+            # Check freshness if requested
+            if check_freshness and 'expires_at' in metadata:
+                expires_at = datetime.fromisoformat(metadata['expires_at'])
+                if now > expires_at:
+                    if self.logger:
+                        self.logger.debug(f"Cache stale: {cache_file} expired at {expires_at.isoformat()}")
+                    return None
+            
+            # Update cache file with new last_accessed time
+            cache_entry['metadata'] = metadata
             with open(cache_file, 'w', encoding='utf-8') as f:
                 json.dump(cache_entry, f, ensure_ascii=True, default=str, indent=None)
-            
-            self.logger.info(f"Loaded data from cache: {cache_file}")
-            return cache_entry["data"]
-            
+                
+            # Return the cached data
+            return cache_entry.get('data')
         except Exception as e:
             self.logger.error(f"Error loading cache file {cache_file}: {str(e)}")
             return None
@@ -310,8 +335,10 @@ class CacheManager:
                 if endpoint and not file.startswith(f"{endpoint}_"):
                     continue
                     
-                if query and f"_{query}." not in file:
-                    continue
+                if query:
+                    sanitized_query = self._sanitize_filename(query)
+                    if f"_{sanitized_query}." not in file:
+                        continue
                 
                 # Delete the file
                 try:

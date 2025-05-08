@@ -655,6 +655,24 @@ async def get_tvl(protocol: str, project_name: str = None) -> Dict[str, Any]:
         logger.error(f"Error fetching TVL data for {protocol}: {e}")
         return {"error": f"Error fetching TVL data: {str(e)}"}
 
+@mcp.tool(name="get_protocol_data")
+async def get_protocol_data_tool(protocol: str, project_name: str = ""):
+    """
+    Tool version of get_protocol_data - fetch protocol data from DeFiLlama.
+    
+    Args:
+        protocol: The protocol name or identifier
+        project_name: Project name for caching
+        
+    Returns:
+        Protocol data for the given protocol
+    """
+    if not project_name:
+        return {"error": "project_name is required for DeFiLlama protocol data retrieval"}
+        
+    # Delegate to the resource implementation
+    return await get_protocol_data(protocol, project_name)
+
 class DeFiLlamaAPI:
     """DeFiLlama API client."""
     

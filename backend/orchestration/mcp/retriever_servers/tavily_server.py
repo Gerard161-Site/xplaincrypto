@@ -1,53 +1,175 @@
 from mcp.server.fastmcp import FastMCP
 import sys
 import os
+import json
+import logging
+import asyncio
+import time
+from typing import Dict, Any, Optional, List
+from pathlib import Path
 
 # Simple path fix: add project root to path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../.."))
 sys.path.insert(0, project_root)
 from backend.retriever.tavily_search import TavilySearch
 from backend.utils.cache_utils import CacheManager
-import logging
 
 # Set up logging
 logger = logging.getLogger("TavilyServer")
 mcp = FastMCP("Tavily")
 
+# Create a cache for API responses
+CACHE_DIR = os.path.join("docs", "cache", "tavily")
+os.makedirs(CACHE_DIR, exist_ok=True)
+
+# Default project name to use when none is provided
+DEFAULT_PROJECT_NAME = "default_project"
+
+# Shared implementation for both research and deep_research endpoints
+async def _perform_tavily_search(query: str, project_name: str = None, cache_key: str = None) -> dict:
+    """
+    Shared implementation for all Tavily search functions to avoid duplicate API calls.
+    Uses a single caching mechanism and API call path.
+    """
+    # Handle case when query is a dict
+    if isinstance(query, dict):
+        logger.warning(f"Received query as dict instead of string: {query}")
+        # Extract query string from dict
+        if "query" in query and isinstance(query["query"], str):
+            query_str = query["query"]
+        elif "topic" in query and isinstance(query["topic"], str):
+            query_str = query["topic"]
+        else:
+            # Convert dict to string as fallback
+            query_str = str(query).strip('{}')
+            
+        # Preserve the original query object for cache key
+        original_query = query
+    else:
+        query_str = str(query) if query is not None else ""
+        # For string queries, use the query directly as cache key
+        original_query = query
+    
+    # Basic validation
+    if not query_str or len(query_str.strip()) < 3:
+        logger.warning(f"Query too short or empty: '{query_str}'")
+        return {"error": f"Invalid query: {query_str}"}
+    
+    # Handle case when project_name is None or empty
+    if project_name is None or project_name == "":
+        project_name_str = DEFAULT_PROJECT_NAME
+        logger.warning(f"Received empty project_name, using default: '{project_name_str}'")
+    # Handle case when project_name is a dict
+    elif isinstance(project_name, dict):
+        logger.warning(f"Received project_name as dict instead of string: {project_name}")
+        if "project_name" in project_name and isinstance(project_name["project_name"], str):
+            project_name_str = project_name["project_name"]
+        else:
+            # Use a default project name
+            project_name_str = DEFAULT_PROJECT_NAME
+            logger.warning(f"Using default project name: {project_name_str}")
+    else:
+        project_name_str = str(project_name)
+    
+    # Use provided cache_key if available, otherwise use original_query
+    cache_key_to_use = cache_key if cache_key is not None else original_query
+    logger.info(f"Using cache key: '{cache_key_to_use}' for query '{query_str}'")
+    
+    # Initialize cache manager with project-specific directory if provided
+    try:
+        cache_manager = CacheManager(project_name=project_name_str, logger=logger)
+        
+        # Check cache first - use cache_key_to_use for lookup
+        cached_data = cache_manager.load("tavily", "research", cache_key_to_use)
+        if cached_data:
+            logger.info(f"Using cached research data for '{cache_key_to_use}' with project_name='{project_name_str}'")
+            return cached_data
+    except ValueError as e:
+        logger.warning(f"Cache manager initialization failed: {str(e)}. Using fallback cache.")
+        # If CacheManager fails, continue without caching
+        cached_data = None
+    
+    try:
+        # Initialize TavilySearch with the string query
+        logger.info(f"Performing research on: '{query_str}' with project_name='{project_name_str}'")
+        tavily_search = TavilySearch(query=query_str, project_name=project_name_str)
+        
+        # Perform research - pass cache_key_to_use as cache_key
+        result = await tavily_search.research(query_str, project_name=project_name_str, cache_key=cache_key_to_use)
+        
+        return result
+    except Exception as e:
+        error_msg = f"Error in tavily search: {str(e)}"
+        logger.error(error_msg)
+        return {"error": error_msg, "query": query_str}
+
 @mcp.resource("data://tavily/{query}/{project_name}")
 async def search_web(query: str, project_name: str = None) -> dict:
     """Search the web using Tavily for a given query."""
-    # Initialize cache manager with project-specific directory if provided
-    cache_manager = CacheManager(project_name=project_name, logger=logger)
+    # Handle case when query is a dict
+    if isinstance(query, dict):
+        logger.warning(f"Received query as dict in search_web: {query}")
+        if "query" in query and isinstance(query["query"], str):
+            query_str = query["query"]
+        else:
+            # Convert dict to string as fallback
+            query_str = str(query).strip('{}')
+    else:
+        query_str = str(query) if query is not None else ""
     
-    # Try to get from cache first
-    cached_data = cache_manager.load("tavily", "search", query)
-    if cached_data:
-        logger.info(f"Using cached search data for {query}" + (f" in project {project_name}" if project_name else ""))
-        return cached_data
+    # Handle case when project_name is None or empty
+    if project_name is None or project_name == "":
+        project_name_str = DEFAULT_PROJECT_NAME
+        logger.warning(f"Received empty project_name in search_web, using default: '{project_name_str}'")
+    # Handle case when project_name is a dict
+    elif isinstance(project_name, dict):
+        logger.warning(f"Received project_name as dict: {project_name}")
+        if "project_name" in project_name and isinstance(project_name["project_name"], str):
+            project_name_str = project_name["project_name"]
+        else:
+            project_name_str = DEFAULT_PROJECT_NAME
+    else:
+        project_name_str = str(project_name)
+    
+    # Initialize cache manager with project-specific directory if provided
+    try:
+        cache_manager = CacheManager(project_name=project_name_str, logger=logger)
+        
+        # Try to get from cache first
+        cached_data = cache_manager.load("tavily", "search", query_str)
+        if cached_data:
+            logger.info(f"Using cached search data for {query_str}" + (f" in project {project_name_str}" if project_name_str else ""))
+            return cached_data
+    except ValueError as e:
+        logger.warning(f"Cache manager initialization failed: {str(e)}. Using fallback cache.")
+        # If CacheManager fails, continue without caching
+        cached_data = None
         
     try:
         # Initialize the TavilySearch instance with the exact query
-        logger.info(f"Creating TavilySearch with exact query: '{query}'")
-        searcher = TavilySearch(query=query, project_name=project_name)
+        logger.info(f"Creating TavilySearch with exact query: '{query_str}'")
+        searcher = TavilySearch(query=query_str, project_name=project_name_str)
         
         # Check if we have a valid API key
         api_key = searcher.api_key
         if api_key == "tavily-fallback-key":
-            logger.warning(f"No valid Tavily API key available - returning empty results for {query}")
+            logger.warning(f"No valid Tavily API key available - returning empty results for {query_str}")
             error_response = {
                 "error": "Tavily API key not configured. Please add TAVILY_API_KEY to your environment.",
                 "results": []
             }
             # Cache this error to prevent repeated failures
-            cache_manager.save(error_response, "tavily", "search", query)
+            if cached_data is not None:  # Only save if cache manager was created successfully
+                cache_manager.save(error_response, "tavily", "search", query_str)
             return error_response
         
         # Execute the search with a valid key - use the query exactly as provided
         result = await searcher.search()
         
         # Cache the result
-        cache_manager.save(result, "tavily", "search", query)
-        logger.info(f"Cached new search data for query: '{query}'" + (f" in project {project_name}" if project_name else ""))
+        if cached_data is not None:  # Only save if cache manager was created successfully
+            cache_manager.save(result, "tavily", "search", query_str)
+            logger.info(f"Cached new search data for query: '{query_str}'" + (f" in project {project_name_str}" if project_name_str else ""))
         
         return result
     
@@ -57,497 +179,159 @@ async def search_web(query: str, project_name: str = None) -> dict:
             "results": []
         }
         # Cache the error to prevent repeated failures
-        cache_manager.save(error_response, "tavily", "search", query)
-        logger.error(f"Error in Tavily search for query '{query}': {str(e)}")
+        if cached_data is not None:  # Only save if cache manager was created successfully
+            cache_manager.save(error_response, "tavily", "search", query_str)
+        logger.error(f"Error in Tavily search for query '{query_str}': {str(e)}")
         
         return error_response
 
-@mcp.resource("data://tavily/research/{query}")
-async def research_topic(query: str) -> dict:
-    """Perform in-depth research on a topic using Tavily."""
-    # Handle case when query is a dict
-    if isinstance(query, dict):
-        logger.warning(f"Received query as dict instead of string: {query}")
-        # Extract query string from dict
-        if "query" in query:
-            query_str = query["query"]
-        elif "project_name" in query and isinstance(query["project_name"], str):
-            query_str = query["project_name"]
-        else:
-            # Convert dict to string as fallback
-            query_str = str(query)
-            # Remove curly braces for better search results
-            query_str = query_str.replace("{", "").replace("}", "")
-    else:
-        query_str = query
-    
-    # Ensure query is a non-empty string
-    if not query_str or not isinstance(query_str, str) or len(query_str.strip()) < 2:
-        logger.error(f"Invalid query: {query_str}")
-        return {"error": f"Invalid query: {query_str}"}
-    
-    # Extract project name from first word for caching
-    words = query_str.split()
-    project_name = None
-    if len(words) > 0:
-        potential_project = words[0]
-        # Check if first word appears to be a project name (shorter token, possibly all caps)
-        if len(potential_project) < 10 or potential_project.isupper():
-            project_name = potential_project
-            logger.info(f"Extracted project name for caching: '{project_name}'")
-    
-    # Initialize cache manager with project-specific directory if provided
-    cache_manager = CacheManager(project_name=project_name, logger=logger)
-    
-    # Check cache first with normalized query
-    normalized_query = query_str.lower().strip()
-    cached_data = cache_manager.load("tavily", "research", normalized_query)
-    if cached_data:
-        logger.info(f"Using cached research data for '{query_str}'" + (f" in project '{project_name}'" if project_name else ""))
-        return cached_data
-    
-    try:
-        # Initialize TavilySearch with the string query
-        logger.info(f"Performing research on: '{query_str}' with project_name='{project_name}'")
-        tavily_search = TavilySearch(query=query_str, project_name=project_name)
-        
-        # Perform research
-        result = await tavily_search.research(query_str, project_name=project_name)
-        
-        # Cache the result
-        cache_manager.save(result, "tavily", "research", normalized_query)
-        logger.info(f"Cached research data for '{query_str}'")
-        
-        return result
-    except Exception as e:
-        error_msg = f"Error in research_topic: {str(e)}"
-        logger.error(error_msg)
-        return {"error": error_msg, "query": query_str}
-
-@mcp.resource("data://tavily/research/{query}/{project_name}")
-async def research_with_project(query: str, project_name: str) -> dict:
-    """Perform in-depth research on a topic using Tavily with explicit project name."""
-    logger.info(f"Research with explicit project name: query='{query}', project_name='{project_name}'")
-    
-    # Handle case when query is a dict
-    if isinstance(query, dict):
-        logger.warning(f"Received query as dict instead of string: {query}")
-        # Extract query string from dict
-        if "query" in query:
-            query_str = query["query"]
-        elif "project_name" in query and isinstance(query["project_name"], str):
-            query_str = query["project_name"]
-        else:
-            # Convert dict to string as fallback
-            query_str = str(query)
-            # Remove curly braces for better search results
-            query_str = query_str.replace("{", "").replace("}", "")
-    else:
-        query_str = query
-    
-    # Ensure query is a non-empty string
-    if not query_str or not isinstance(query_str, str) or len(query_str.strip()) < 2:
-        logger.error(f"Invalid query: {query_str}")
-        return {"error": f"Invalid query: {query_str}"}
-    
-    # Initialize cache manager with project-specific directory
-    cache_manager = CacheManager(project_name=project_name, logger=logger)
-    
-    # Check cache first with normalized query
-    normalized_query = query_str.lower().strip()
-    cached_data = cache_manager.load("tavily", "research", normalized_query)
-    if cached_data:
-        logger.info(f"Using cached research data for '{query_str}' in project '{project_name}'")
-        return cached_data
-    
-    try:
-        # Initialize TavilySearch with the string query
-        logger.info(f"Performing research on: '{query_str}' with project_name='{project_name}'")
-        tavily_search = TavilySearch(query=query_str, project_name=project_name)
-        
-        # Perform research
-        result = await tavily_search.research(query_str, project_name=project_name)
-        
-        # Cache the result
-        cache_manager.save(result, "tavily", "research", normalized_query)
-        logger.info(f"Cached research data for '{query_str}' in project '{project_name}'")
-        
-        return result
-    except Exception as e:
-        error_msg = f"Error in research_with_project: {str(e)}"
-        logger.error(error_msg)
-        return {"error": error_msg, "query": query_str}
-
-@mcp.resource("data://tavily/simple_research/{query}")
-async def simple_research(query: str) -> dict:
+@mcp.tool("research")
+async def research(query: str, project_name: str = None, cache_key: str = None) -> Dict[str, Any]:
     """
-    Simplified endpoint for research that doesn't require project_name parameter.
-    Maintains compatibility with the RAG retriever format.
-    
-    This endpoint properly handles query templates from report_config.json
-    (e.g. "ondo technical architecture blockchain" where "ondo" is project_name
-    and "technical architecture blockchain" is from the query_template).
-    """
-    logger.info(f"Processing simplified research endpoint with query: {query}")
-    
-    # Handle case when query is a dict
-    if isinstance(query, dict):
-        logger.warning(f"Received query as dict instead of string: {query}")
-        # Extract query string from dict
-        if "query" in query:
-            query_str = query["query"]
-        elif "project_name" in query and isinstance(query["project_name"], str):
-            query_str = query["project_name"]
-        else:
-            # Convert dict to string as fallback
-            query_str = str(query)
-            # Remove curly braces for better search results
-            query_str = query_str.replace("{", "").replace("}", "")
-    else:
-        query_str = query
-    
-    # Ensure query is a non-empty string
-    if not query_str or not isinstance(query_str, str) or len(query_str.strip()) < 2:
-        logger.error(f"Invalid query: {query_str}")
-        return {"error": f"Invalid query: {query_str}"}
-    
-    # When query template is used, we should get a full query like
-    # "ondo technical architecture blockchain" for the Technical Analysis section
-    
-    # Extract project name from first word for caching purposes only
-    words = query_str.split()
-    extracted_project = None
-    
-    if len(words) > 0:
-        # Extract project name from first word for caching purposes only
-        potential_project = words[0]
-        # Check if first word appears to be a project name (shorter token, possibly all caps)
-        if len(potential_project) < 10 or potential_project.isupper():
-            extracted_project = potential_project
-            logger.info(f"Extracted project name for caching: '{extracted_project}'")
-    
-    # IMPORTANT: Use the ENTIRE query string to get the complete search benefits
-    # from the report_config.json template, rather than just processing part of it
-    logger.info(f"Calling research_topic with FULL original query: '{query_str}'")
-    return await research_topic(query_str)
-
-@mcp.tool()
-async def web_search(query: str, project_name: str = None) -> list:
-    """Search the web for information on a given query using Tavily."""
-    # Initialize cache manager with project-specific directory if provided
-    cache_manager = CacheManager(project_name=project_name, logger=logger)
-    
-    # Check cache first
-    cached_data = cache_manager.load("tavily", "tool_search", query)
-    if cached_data:
-        logger.info(f"Using cached tool search data for {query}" + (f" in project {project_name}" if project_name else ""))
-        return cached_data
-        
-    try:
-        # Initialize the TavilySearch instance with project_name
-        logger.info(f"Creating TavilySearch with project_name='{project_name}' for query: '{query}'")
-        searcher = TavilySearch(query=query, project_name=project_name)
-        
-        # Check if we have a valid API key
-        api_key = searcher.api_key
-        if api_key == "tavily-fallback-key":
-            logger.warning(f"No valid Tavily API key available - returning empty results for {query}")
-            error_response = {
-                "error": "Tavily API key not configured. Please add TAVILY_API_KEY to your environment.",
-                "results": []
-            }
-            # Cache this error to prevent repeated failures
-            cache_manager.save(error_response, "tavily", "tool_search", query)
-            return error_response
-            
-        # Execute the search with a valid key
-        result = await searcher.search()
-        
-        # Cache the result
-        cache_manager.save(result, "tavily", "tool_search", query)
-        logger.info(f"Cached new tool search data for {query}" + (f" in project {project_name}" if project_name else ""))
-        
-        return result
-        
-    except Exception as e:
-        error_response = {
-            "error": str(e),
-            "results": []
-        }
-        # Cache the error to prevent repeated failures
-        cache_manager.save(error_response, "tavily", "tool_search", query)
-        logger.error(f"Error in Tavily tool search for {query}: {str(e)}")
-        
-        return error_response
-
-@mcp.tool()
-async def deep_research(query: str, project_name: str = None) -> dict:
-    """Perform comprehensive research on a topic using Tavily Search."""
-    # Initialize cache manager with project-specific directory if provided
-    cache_manager = CacheManager(project_name=project_name, logger=logger)
-    
-    # Handle case when query is a dict
-    if isinstance(query, dict):
-        logger.warning(f"Received query as dict instead of string: {query}")
-        # Extract query string from dict
-        if "query" in query:
-            query_str = query["query"]
-        elif "project_name" in query and isinstance(query["project_name"], str):
-            query_str = query["project_name"]
-        else:
-            # Convert dict to string as fallback
-            query_str = str(query)
-            # Remove curly braces for better search results
-            query_str = query_str.replace("{", "").replace("}", "")
-    else:
-        query_str = query
-    
-    # Ensure query is a non-empty string
-    if not query_str or not isinstance(query_str, str) or len(query_str.strip()) < 2:
-        logger.error(f"Invalid query: {query_str}")
-        return {"error": f"Invalid query: {query_str}"}
-    
-    # Check cache first
-    cache_key = f"deep_research_{query_str.lower().replace(' ', '_')}"
-    cached_data = cache_manager.load("tavily", "deep_research", query_str)
-    if cached_data:
-        logger.info(f"Using cached deep research data for '{query_str}'")
-        return cached_data
-    
-    try:
-        # Initialize TavilySearch with the string query
-        logger.info(f"Performing deep research on: '{query_str}' with project_name='{project_name}'")
-        tavily_search = TavilySearch(query=query_str, project_name=project_name)
-        
-        # Perform research
-        result = await tavily_search.research(query_str, project_name=project_name)
-        
-        # Cache the result
-        cache_manager.save(result, "tavily", "deep_research", query_str)
-        
-        return result
-    except Exception as e:
-        error_msg = f"Error in deep_research: {str(e)}"
-        logger.error(error_msg)
-        return {"error": error_msg, "query": query_str}
-
-@mcp.tool()
-async def batch_search(queries: list, project_name: str = None) -> dict:
-    """Perform multiple searches in a single batch."""
-    # Create a cache key based on the concatenated queries
-    if not queries:
-        return {"results": [], "count": 0, "error": "No queries provided"}
-        
-    # Initialize cache manager with project-specific directory if provided
-    cache_manager = CacheManager(project_name=project_name, logger=logger)
-    
-    # For batch searches, we need a deterministic cache key
-    cache_key = "_".join([q.lower().strip()[:20] for q in queries])
-    
-    # Check cache first
-    cached_data = cache_manager.load("tavily", "batch_search", cache_key)
-    if cached_data:
-        logger.info(f"Using cached batch search data for {len(queries)} queries" + (f" in project {project_name}" if project_name else ""))
-        return cached_data
-    
-    try:
-        # Initialize the TavilySearch instance - using exact queries
-        logger.info(f"Creating TavilySearch for batch of {len(queries)} queries - using queries exactly as provided")
-        searcher = TavilySearch(project_name=project_name)
-        
-        # Check if we have a valid API key
-        api_key = searcher.api_key
-        if api_key == "tavily-fallback-key":
-            logger.warning(f"No valid Tavily API key available - returning empty results for batch search")
-            error_response = {
-                "error": "Tavily API key not configured. Please add TAVILY_API_KEY to your environment.",
-                "results": [{"results": []} for _ in queries],
-                "count": len(queries)
-            }
-            # Cache this error to prevent repeated failures
-            cache_manager.save(error_response, "tavily", "batch_search", cache_key)
-            return error_response
-            
-        # Execute the search with a valid key - use the queries exactly as provided
-        results = await searcher.search_batch(queries)
-        
-        # Package results with metadata
-        response = {"results": results, "count": len(results)}
-        
-        # Cache the result
-        cache_manager.save(response, "tavily", "batch_search", cache_key)
-        logger.info(f"Cached new batch search data for {len(queries)} queries" + (f" in project {project_name}" if project_name else ""))
-        
-        return response
-        
-    except Exception as e:
-        error_response = {
-            "error": str(e),
-            "results": [{"results": []} for _ in queries],
-            "count": len(queries)
-        }
-        # Cache the error to prevent repeated failures
-        cache_manager.save(error_response, "tavily", "batch_search", cache_key)
-        logger.error(f"Error in Tavily batch search: {str(e)}")
-        
-        return error_response
-
-@mcp.tool()
-async def research(query: str, project_name: str = None) -> dict:
-    """
-    Tool that directly matches the data://tavily/research/{query} resource pattern.
-    This makes the tools discoverable when processing this endpoint format.
+    Perform a research query using Tavily.
     
     Args:
-        query: The research query from report_config.json template
-        project_name: Optional project name for project-specific caching
+        query: The query to search for
+        project_name: The project name for cache organization (e.g., "ondo", "bitcoin")
+        cache_key: Optional custom cache key to use instead of the query (useful for section-based caching)
         
     Returns:
-        Research results from Tavily
+        Dictionary containing search results with sources
     """
-    logger.info(f"Tool called: research for query={query}, project_name={project_name}")
+    start_time = time.time()
+    logger.info(f"Tavily research query: {query}")
     
-    # Handle case when query is a dict
-    if isinstance(query, dict):
-        logger.warning(f"Received query as dict instead of string: {query}")
-        # Extract query string from dict
-        if "query" in query:
-            query_str = query["query"]
-        elif "project_name" in query and isinstance(query["project_name"], str):
-            query_str = query["project_name"]
+    try:
+        # Validate project_name
+        if not project_name:
+            logger.warning(f"No project_name provided for Tavily research, using query as fallback")
+            # Instead of using a default, we'll use the first word of the query as project_name
+            project_name = query.split()[0].lower() if query else "default"
+        
+        # Use provided cache_key or generate one from the query
+        # This allows for section-specific caching with the same project
+        cache_key_to_use = cache_key or query
+        logger.info(f"Using cache_key: {cache_key_to_use} for project: {project_name}")
+        
+        # Initialize cache manager with the project name
+        cache_manager = CacheManager(project_name=project_name)
+        
+        # Check if we have cached results for this query or cache_key
+        cached_results = cache_manager.load("tavily", "research", cache_key_to_use)
+        
+        if cached_results:
+            logger.info(f"Using cached Tavily results for '{cache_key_to_use}'")
+            return cached_results
+        
+        # Create a Tavily search instance
+        tavily_search = TavilySearch(project_name=project_name)
+        
+        # Perform the search - pass both project_name and cache_key to research method
+        results = await tavily_search.research(query=query, project_name=project_name, cache_key=cache_key_to_use)
+        
+        # Save to cache
+        logger.info(f"Saving Tavily results to cache with key: {cache_key_to_use}")
+        cache_manager.save(results, "tavily", "research", cache_key_to_use)
+        
+        # Check if cache was successfully created
+        cache_path = os.path.join("docs", project_name.lower(), "cache", "tavily", f"research_{cache_key_to_use}.json")
+        if os.path.exists(cache_path):
+            logger.info(f"✅ Verified cache file exists at: {cache_path}")
+        else:
+            logger.warning(f"❌ Failed to create cache file at: {cache_path}")
+        
+        end_time = time.time()
+        logger.info(f"Tavily search completed in {end_time - start_time:.2f} seconds")
+        
+        return results
+    except Exception as e:
+        logger.error(f"Error in Tavily research: {str(e)}", exc_info=True)
+        return {"error": str(e), "results": []}
+
+@mcp.tool()
+async def deep_research(query: str, project_name: str = DEFAULT_PROJECT_NAME, cache_key: str = None) -> dict:
+    """
+    Perform comprehensive research on a topic using Tavily Search.
+    
+    This function uses the same shared implementation as research() to avoid duplicate API calls.
+    """
+    return await _perform_tavily_search(query, project_name, cache_key)
+
+@mcp.tool()
+async def research_topic(topic: str, project_name: str = DEFAULT_PROJECT_NAME, cache_key: str = None) -> dict:
+    """
+    Research a topic using Tavily Search.
+    
+    This function is an alias for research() to maintain backward compatibility.
+    """
+    # Handle case when topic is a dict
+    if isinstance(topic, dict):
+        logger.warning(f"Received topic as dict in research_topic: {topic}")
+        if "topic" in topic and isinstance(topic["topic"], str):
+            topic_str = topic["topic"]
+        elif "query" in topic and isinstance(topic["query"], str):
+            topic_str = topic["query"]
         else:
             # Convert dict to string as fallback
-            query_str = str(query)
-            # Remove curly braces for better search results
-            query_str = query_str.replace("{", "").replace("}", "")
+            topic_str = str(topic).strip('{}')
     else:
-        query_str = query
+        topic_str = str(topic) if topic is not None else ""
     
-    # Ensure query is a non-empty string
-    if not query_str or not isinstance(query_str, str) or len(query_str.strip()) < 2:
-        logger.error(f"Invalid query: {query_str}")
-        return {"error": f"Invalid query: {query_str}"}
-    
-    # Initialize cache manager with project-specific directory if provided
-    cache_manager = CacheManager(project_name=project_name, logger=logger)
-    
-    # Check cache first
-    cached_data = cache_manager.load("tavily", "research", query_str)
-    if cached_data:
-        logger.info(f"Using cached research data for '{query_str}'")
-        return cached_data
-    
-    try:
-        # Initialize TavilySearch with the string query
-        logger.info(f"Performing research on: '{query_str}' with project_name='{project_name}'")
-        tavily_search = TavilySearch(query=query_str, project_name=project_name)
-        
-        # Perform research
-        result = await tavily_search.research(query_str, project_name=project_name)
-        
-        # Cache the result
-        cache_manager.save(result, "tavily", "research", query_str)
-        
-        return result
-    except Exception as e:
-        error_msg = f"Error in research: {str(e)}"
-        logger.error(error_msg)
-        return {"error": error_msg, "query": query_str}
+    return await _perform_tavily_search(topic_str, project_name, cache_key)
 
-# Add a direct pattern for handling security audits and other common complex queries
-@mcp.resource("data://tavily/security/{query}")
-async def security_research(query: str) -> dict:
-    """Specialized endpoint for security-related research topics."""
-    logger.info(f"Security research for: {query}")
+@mcp.tool()
+async def research_with_project(query: str, project_name: str = DEFAULT_PROJECT_NAME, cache_key: str = None) -> dict:
+    """
+    Perform research with an explicit project name parameter.
     
-    # Extract project name from first word for caching
-    words = query.split()
-    project_name = None
-    if len(words) > 0:
-        potential_project = words[0]
-        # Check if first word appears to be a project name
-        if len(potential_project) < 10 or potential_project.isupper():
-            project_name = potential_project
-            logger.info(f"Extracted project name for security research: '{project_name}'")
+    This function is useful when you need to specify both query and project_name.
+    """
+    # Handle case when query is a dict
+    if isinstance(query, dict):
+        logger.warning(f"Received query as dict in research_with_project: {query}")
+        if "query" in query and isinstance(query["query"], str):
+            query_str = query["query"]
+        else:
+            # Convert dict to string as fallback
+            query_str = str(query).strip('{}')
+    else:
+        query_str = str(query) if query is not None else ""
     
-    # Initialize cache manager with project-specific directory if provided
-    cache_manager = CacheManager(project_name=project_name, logger=logger)
+    # Handle case when project_name is None or empty
+    if project_name is None or project_name == "":
+        project_name_str = DEFAULT_PROJECT_NAME
+        logger.warning(f"Received empty project_name in research_with_project, using default: '{project_name_str}'")
+    # Handle case when project_name is a dict
+    elif isinstance(project_name, dict):
+        logger.warning(f"Received project_name as dict in research_with_project: {project_name}")
+        if "project_name" in project_name and isinstance(project_name["project_name"], str):
+            project_name_str = project_name["project_name"]
+        else:
+            project_name_str = DEFAULT_PROJECT_NAME
+    else:
+        project_name_str = str(project_name)
     
-    # Use a more specific cache key for security research
-    cache_key = f"security_{query.lower().strip()}"
-    cached_data = cache_manager.load("tavily", "security", cache_key)
-    if cached_data:
-        logger.info(f"Using cached security research data for {query}" + (f" in project {project_name}" if project_name else ""))
-        return cached_data
-    
-    try:
-        # Add security-specific terms to the query
-        security_query = query + " security audits vulnerabilities risks"
-        logger.info(f"Enhanced security query: '{security_query}'")
-        
-        # Create TavilySearch instance 
-        searcher = TavilySearch(project_name=project_name)
-        
-        # Execute the search
-        result = await searcher.research(security_query, project_name=project_name)
-        
-        # Cache the results
-        cache_manager.save(result, "tavily", "security", cache_key)
-        logger.info(f"Cached security research data for {query}")
-        
-        return result
-    except Exception as e:
-        logger.error(f"Error in security research: {str(e)}")
-        error_response = {"error": str(e), "query": query}
-        cache_manager.save(error_response, "tavily", "security", cache_key)
-        return error_response
+    return await _perform_tavily_search(query_str, project_name_str, cache_key)
 
-@mcp.resource("data://tavily/technical/{query}")
-async def technical_research(query: str) -> dict:
-    """Specialized endpoint for technical research topics."""
-    logger.info(f"Technical research for: {query}")
+@mcp.tool()
+async def simple_research(query: str, cache_key: str = None) -> dict:
+    """
+    Perform basic research without project context.
     
-    # Extract project name from first word for caching
-    words = query.split()
-    project_name = None
-    if len(words) > 0:
-        potential_project = words[0]
-        # Check if first word appears to be a project name
-        if len(potential_project) < 10 or potential_project.isupper():
-            project_name = potential_project
-            logger.info(f"Extracted project name for technical research: '{project_name}'")
+    This is a simplified interface for research() without the project_name parameter.
+    """
+    # Handle case when query is a dict
+    if isinstance(query, dict):
+        logger.warning(f"Received query as dict in simple_research: {query}")
+        if "query" in query and isinstance(query["query"], str):
+            query_str = query["query"]
+        else:
+            # Convert dict to string as fallback
+            query_str = str(query).strip('{}')
+    else:
+        query_str = str(query) if query is not None else ""
     
-    # Initialize cache manager with project-specific directory if provided
-    cache_manager = CacheManager(project_name=project_name, logger=logger)
-    
-    # Use a more specific cache key for technical research
-    cache_key = f"technical_{query.lower().strip()}"
-    cached_data = cache_manager.load("tavily", "technical", cache_key)
-    if cached_data:
-        logger.info(f"Using cached technical research data for {query}" + (f" in project {project_name}" if project_name else ""))
-        return cached_data
-    
-    try:
-        # Add technical-specific terms to the query
-        technical_query = query + " blockchain technology architecture implementation"
-        logger.info(f"Enhanced technical query: '{technical_query}'")
-        
-        # Create TavilySearch instance 
-        searcher = TavilySearch(project_name=project_name)
-        
-        # Execute the search
-        result = await searcher.research(technical_query, project_name=project_name)
-        
-        # Cache the results
-        cache_manager.save(result, "tavily", "technical", cache_key)
-        logger.info(f"Cached technical research data for {query}")
-        
-        return result
-    except Exception as e:
-        logger.error(f"Error in technical research: {str(e)}")
-        error_response = {"error": str(e), "query": query}
-        cache_manager.save(error_response, "tavily", "technical", cache_key)
-        return error_response
+    return await _perform_tavily_search(query_str, DEFAULT_PROJECT_NAME, cache_key)
 
 if __name__ == "__main__":
     mcp.run(transport="stdio")

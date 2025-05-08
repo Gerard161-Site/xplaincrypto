@@ -53,162 +53,60 @@ class RAGRetriever:
         query_hash = hashlib.md5(normalized_query.encode()).hexdigest()
         return query_hash
     
-    async def process_query(self, query: str, data_sources: List[str] = None) -> list[str]:
+    async def process_query(self, query: str, candidate_endpoints: List[str] = None) -> List[str]:
         """
-        Process a query and return a list of MCP endpoints to call.
+        Process a query through the LLM to select appropriate endpoints.
         
         Args:
-            query: The search query
-            data_sources: Optional list of specific data sources to include
+            query: The query to process
+            candidate_endpoints: Optional list of candidate endpoints to choose from
             
         Returns:
-            List of endpoint patterns
+            A list of selected endpoints
         """
+        if not self.llm:
+            self.logger.warning("No LLM available for endpoint selection")
+            return candidate_endpoints or []
+            
         try:
-            # Log the query for debugging
-            self.logger.info(f"Processing RAG query: {query}")
+            # If no candidate endpoints provided, use all available endpoints
+            if not candidate_endpoints:
+                candidate_endpoints = self.all_endpoints
+                
+            # Use the LLM to select the best endpoints for this query
+            prompt = f"""
+            You are an AI assistant that helps select appropriate API endpoints for cryptocurrency research queries.
+            Given the user query: "{query}"
             
-            # Check cache first if available
-            if self.cache_manager:
-                cache_key = self._generate_cache_key(query)
-                cached_endpoints = self.cache_manager.load("rag", "endpoints", cache_key)
-                if cached_endpoints:
-                    self.logger.info(f"Using cached endpoints for query: {query}")
-                    return cached_endpoints
+            Select the most relevant endpoints from this list:
+            {', '.join(candidate_endpoints)}
             
-            # Filter candidate pool if specific data sources requested
-            preselected_endpoints = []
-            if data_sources:
-                self.logger.info(f"Using preselected data sources: {data_sources}")
-                for source in data_sources:
-                    if source == "coinmarketcap":
-                        preselected_endpoints.extend([
-                            "data://coinmarketcap/price/{coin}",
-                            "data://coinmarketcap/market/{coin}"
-                        ])
-                    elif source == "coingecko":
-                        preselected_endpoints.extend([
-                            "data://coingecko/price/{coin}",
-                            "data://coingecko/market/{coin}"
-                        ])
-                    elif source == "defillama":
-                        preselected_endpoints.extend([
-                            "data://defillama/tvl/{protocol}",
-                            "data://defillama/yields/{protocol}"
-                        ])
-                    elif source == "tokenomics":
-                        preselected_endpoints.extend([
-                            "data://tokenomics/{project}",
-                            "data://tokenomics/distribution/{project}"
-                        ])
-                    elif source == "web_research" or source == "tavily" or source == "research":
-                        preselected_endpoints.extend([
-                            "data://tavily/research/{query}",
-                            "data://tavily/security/{query}",
-                            "data://tavily/technical/{query}"
-                        ])
-                    
-                if preselected_endpoints:
-                    self.logger.info(f"Preselected {len(preselected_endpoints)} endpoints: {preselected_endpoints}")
-                    # Cache the preselected endpoints if cache manager is available
-                    if self.cache_manager:
-                        cache_key = self._generate_cache_key(query)
-                        self.cache_manager.save(preselected_endpoints, "rag", "endpoints", cache_key)
-                        self.logger.info(f"Cached preselected endpoints for query: {query}")
-                    return preselected_endpoints
-                    
-            # If no preselected endpoints, use both vector store and LLM for endpoint selection
-            # Get initial candidate endpoints from vector store
-            candidates = self.vector_store.query(query, top_k=10)
+            Return only the endpoint strings that are most appropriate for this query, separated by commas.
+            Do not return any explanation or additional text.
+            """
             
-            # Extract just the endpoint strings - fix unpacking error
-            candidate_endpoints = [endpoint_id for endpoint_id, _, _ in candidates]
+            response = await self.llm.ainvoke(prompt)
+            if not response:
+                self.logger.warning("Empty response from LLM")
+                return candidate_endpoints
+                
+            # Parse the response to extract endpoints
+            selected_endpoints = []
+            for line in response.strip().split('\n'):
+                for endpoint in line.split(','):
+                    cleaned = endpoint.strip()
+                    if cleaned and cleaned in candidate_endpoints:
+                        selected_endpoints.append(cleaned)
             
-            # Filter out problematic endpoints
-            filtered_candidates = []
-            for endpoint in candidate_endpoints:
-                if "://project/" in endpoint or "://multi/" in endpoint or endpoint == "data://huggingface/model/{model_id}":
-                    self.logger.warning(f"Filtering out problematic endpoint: {endpoint}")
-                    continue
-                filtered_candidates.append(endpoint)
+            if not selected_endpoints:
+                self.logger.warning("No valid endpoints found in LLM response")
+                return candidate_endpoints
                 
-            # Check if we have enough candidates, if not, use sensible defaults
-            if len(filtered_candidates) < 2:
-                default_endpoints = ["data://tavily/research/{query}", "data://huggingface/research/{query}"]
-                # Cache the default endpoints if cache manager is available
-                if self.cache_manager:
-                    cache_key = self._generate_cache_key(query)
-                    self.cache_manager.save(default_endpoints, "rag", "endpoints", cache_key)
-                    self.logger.info(f"Cached default endpoints for query: {query}")
-                return default_endpoints
+            return selected_endpoints
             
-            # Format candidate endpoints for LLM ranking
-            endpoint_data = "\n".join([f"- {endpoint}" for endpoint in filtered_candidates])
-            
-            # Create prompt for LLM to rank endpoints
-            prompt = ChatPromptTemplate.from_messages([
-                ("system", "You are a helpful assistant that selects the most relevant data endpoints for a given query. Return only the endpoints, no explanations."),
-                ("user", f"""Select 2-3 most relevant endpoints for the query: "{query}"
-                
-                Available endpoints:
-                {endpoint_data}
-                
-                Return ONLY a comma-separated list of the selected endpoints, with no explanation or additional text.""")
-            ])
-            
-            # Invoke LLM for endpoint ranking
-            try:
-                chain = prompt | self.llm
-                result = await chain.ainvoke({})
-                
-                # Extract content from the result
-                if isinstance(result, dict) and "content" in result:
-                    selected_text = result["content"]
-                else:
-                    selected_text = str(result)
-                
-                # Parse comma-separated list
-                selected_endpoints = [endpoint.strip() for endpoint in selected_text.split(",")]
-                
-                # Validate the endpoints
-                valid_selected = [endpoint for endpoint in selected_endpoints if endpoint in filtered_candidates]
-                
-                if valid_selected:
-                    self.logger.info(f"LLM selected endpoints: {valid_selected}")
-                    # Cache the selected endpoints if cache manager is available
-                    if self.cache_manager:
-                        cache_key = self._generate_cache_key(query)
-                        self.cache_manager.save(valid_selected, "rag", "endpoints", cache_key)
-                        self.logger.info(f"Cached LLM-selected endpoints for query: {query}")
-                    return valid_selected
-                else:
-                    self.logger.warning("LLM didn't select valid endpoints, returning filtered candidates")
-                    # Cache the filtered candidates if cache manager is available
-                    if self.cache_manager:
-                        cache_key = self._generate_cache_key(query)
-                        self.cache_manager.save(filtered_candidates, "rag", "endpoints", cache_key)
-                        self.logger.info(f"Cached filtered candidates for query: {query}")
-                    return filtered_candidates
-                    
-            except Exception as e:
-                self.logger.warning(f"Error in LLM endpoint selection: {str(e)}")
-                # Cache the filtered candidates if cache manager is available
-                if self.cache_manager:
-                    cache_key = self._generate_cache_key(query)
-                    self.cache_manager.save(filtered_candidates, "rag", "endpoints", cache_key)
-                    self.logger.info(f"Cached filtered candidates after LLM error for query: {query}")
-                return filtered_candidates
-                
         except Exception as e:
-            self.logger.error(f"Error in process_query: {str(e)}")
-            # Return safe defaults
-            default_endpoints = ["data://tavily/research/{query}", "data://huggingface/research/{query}"]
-            # Cache the default endpoints if cache manager is available
-            if self.cache_manager:
-                cache_key = self._generate_cache_key(query)
-                self.cache_manager.save(default_endpoints, "rag", "endpoints", cache_key)
-                self.logger.info(f"Cached default endpoints after error for query: {query}")
-            return default_endpoints
+            self.logger.error(f"Error processing query with LLM: {str(e)}", exc_info=True)
+            return candidate_endpoints
     
     async def format_endpoint_for_query(self, endpoint_pattern: str, project_name: str, query: Optional[str] = None) -> str:
         """
@@ -285,101 +183,121 @@ class RAGRetriever:
         # Return original endpoint if no specialization applies
         return endpoint
 
-    async def get_endpoints_for_project(self, query: str, project_name: Optional[str] = None) -> List[str]:
-        """Get the most relevant data endpoints for a project and query."""
+    async def get_embedding(self, text: str) -> List[float]:
+        """
+        Generate an embedding for the given text.
+        
+        Args:
+            text: The text to embed
+            
+        Returns:
+            A list of floats representing the embedding
+        """
         try:
-            # Ensure the vectorstore is initialized
-            if not self.vector_store:
-                self.vector_store = get_vector_store()
-
-            # Add project name to query if provided
-            enhanced_query = query
-            if project_name and project_name.lower() not in query.lower():
-                enhanced_query = f"{project_name} {query}"
-            
-            self.logger.info(f"RAG query: '{enhanced_query}'")
-            
-            # Check cache first if available
-            if self.cache_manager:
-                # Include project name in cache key if available
-                cache_key = self._generate_cache_key(enhanced_query)
-                if project_name:
-                    cache_key = f"{project_name.lower()}_{cache_key}"
-                
-                cached_endpoints = self.cache_manager.load("rag", "project_endpoints", cache_key)
-                if cached_endpoints:
-                    self.logger.info(f"Using cached endpoints for project query: '{enhanced_query}'")
-                    return cached_endpoints
-            
-            # Get endpoints from vectorstore
-            raw_endpoints = self.vector_store.query(enhanced_query, top_k=10)
-            
-            # Extract just the endpoint strings
-            endpoint_strings = [endpoint_id for endpoint_id, _, _ in raw_endpoints]
-            
-            # FILTER OUT PROBLEMATIC ENDPOINTS - important fix for recursion and timeout issues
-            filtered_endpoints = []
-            for endpoint in endpoint_strings:
-                # Skip invalid server endpoints that cause recursion
-                if "://project/" in endpoint or "://multi/" in endpoint or endpoint == "data://huggingface/model/{model_id}":
-                    self.logger.warning(f"Filtering out problematic endpoint: {endpoint}")
-                    continue
-                    
-                # Check for specialized endpoints
-                specialized_endpoint = self._get_specialized_endpoint(query, endpoint)
-                if specialized_endpoint != endpoint:
-                    filtered_endpoints.append(specialized_endpoint)
-                else:
-                    filtered_endpoints.append(endpoint)
-                
-            self.logger.info(f"Vector store returned {len(filtered_endpoints)} candidate endpoints")
-            
-            # Process endpoints through LLM for selection and refinement if we have enough candidates
-            if len(filtered_endpoints) > 2:
-                try:
-                    llm_selected_endpoints = await self.process_query(enhanced_query)
-                    if llm_selected_endpoints and len(llm_selected_endpoints) > 0:
-                        self.logger.info(f"LLM selected {len(llm_selected_endpoints)} endpoints")
-                        
-                        # Cache the selected endpoints if cache manager is available
-                        if self.cache_manager:
-                            cache_key = self._generate_cache_key(enhanced_query)
-                            if project_name:
-                                cache_key = f"{project_name.lower()}_{cache_key}"
-                            self.cache_manager.save(llm_selected_endpoints, "rag", "project_endpoints", cache_key)
-                            self.logger.info(f"Cached LLM-selected endpoints for project query: '{enhanced_query}'")
-                            
-                        return llm_selected_endpoints
-                    self.logger.warning("LLM didn't return valid endpoints, falling back to vector search results")
-                except Exception as e:
-                    self.logger.error(f"Error in LLM endpoint selection: {str(e)}")
-                    # Fall back to vector store results
-            
-            # Cache the filtered endpoints if cache manager is available
-            if self.cache_manager:
-                cache_key = self._generate_cache_key(enhanced_query)
-                if project_name:
-                    cache_key = f"{project_name.lower()}_{cache_key}"
-                self.cache_manager.save(filtered_endpoints, "rag", "project_endpoints", cache_key)
-                self.logger.info(f"Cached filtered endpoints for project query: '{enhanced_query}'")
-                
-            return filtered_endpoints
-            
+            # Use sentence-transformers to generate embeddings
+            return await self.vector_store.embed_text(text)
         except Exception as e:
-            self.logger.error(f"Error in get_endpoints_for_project: {str(e)}")
-            # Return a small set of fallback endpoints that should work for most queries
-            default_endpoints = ["data://tavily/research/{query}", "data://huggingface/research/{query}"]
+            self.logger.error(f"Error generating embedding: {str(e)}", exc_info=True)
+            return None
             
-            # Cache the default endpoints if cache manager is available
-            if self.cache_manager:
-                cache_key = self._generate_cache_key(query)
-                if project_name:
-                    cache_key = f"{project_name.lower()}_{cache_key}"
-                self.cache_manager.save(default_endpoints, "rag", "project_endpoints", cache_key)
-                self.logger.info(f"Cached default endpoints after error for project query: '{query}'")
+    async def refine_endpoints_with_llm(self, query: str, endpoints: List[str]) -> List[str]:
+        """
+        Use the LLM to refine and rank the endpoints based on the query.
+        
+        Args:
+            query: The original query
+            endpoints: The list of candidate endpoints
+            
+        Returns:
+            A filtered and ranked list of endpoints
+        """
+        try:
+            if not self.llm:
+                return endpoints
                 
-            return default_endpoints
+            # Process endpoints through LLM for selection and refinement
+            llm_selected_endpoints = await self.process_query(query, endpoints)
+            if llm_selected_endpoints and len(llm_selected_endpoints) > 0:
+                self.logger.info(f"LLM selected {len(llm_selected_endpoints)} endpoints")
+                return llm_selected_endpoints
+                
+            self.logger.warning("LLM didn't return valid endpoints, falling back to vector search results")
+            return endpoints
+        except Exception as e:
+            self.logger.error(f"Error in LLM endpoint refinement: {str(e)}")
+            return endpoints
+            
+    async def get_endpoints_for_project(self, query: str) -> List[str]:
+        """
+        Retrieve relevant endpoints for a given project query.
+        
+        Args:
+            query: The query to find relevant endpoints for
+            
+        Returns:
+            A list of endpoint strings that are relevant to the query
+        """
+        if not query:
+            self.logger.warning("Empty query provided to RAGRetriever")
+            return self.get_fallback_endpoints()
+            
+        try:
+            # Use semantic search to find relevant endpoints
+            self.logger.info(f"Performing RAG retrieval for query: {query}")
+            
+            # Get embeddings for the query
+            query_embedding = await self.get_embedding(query)
+            if not query_embedding:
+                self.logger.warning("Failed to generate embedding for query, using fallback endpoints")
+                return self.get_fallback_endpoints()
+                
+            # Search for similar vectors in the vector store
+            search_results = await self.vector_store.search(query_embedding)
+            if not search_results:
+                self.logger.warning("No search results found in vector store, using fallback endpoints")
+                return self.get_fallback_endpoints()
+                
+            # Extract endpoints from search results
+            candidate_endpoints = [result.get("metadata", {}).get("endpoint") for result in search_results if "metadata" in result and "endpoint" in result["metadata"]]
+            candidate_endpoints = [e for e in candidate_endpoints if e]  # Remove None/empty values
+            
+            if not candidate_endpoints:
+                self.logger.warning("No valid endpoints found in search results, using fallback endpoints")
+                return self.get_fallback_endpoints()
+                
+            # Filter out HuggingFace endpoints - we'll use them only as fallbacks
+            candidate_endpoints = [endpoint for endpoint in candidate_endpoints if "huggingface" not in endpoint]
+            
+            # Use LLM to refine the endpoint selection based on the query context
+            refined_endpoints = await self.process_query(query, candidate_endpoints)
+            
+            if refined_endpoints:
+                self.logger.info(f"Retrieved {len(refined_endpoints)} refined endpoints for query: {refined_endpoints}")
+                return refined_endpoints
+            else:
+                self.logger.warning("No endpoints after refinement, using original candidates")
+                return candidate_endpoints
+                
+        except Exception as e:
+            self.logger.error(f"Error in RAG retrieval: {str(e)}", exc_info=True)
+            return self.get_fallback_endpoints()
     
+    def get_fallback_endpoints(self) -> List[str]:
+        """
+        Get a list of fallback endpoints to use when RAG retrieval fails.
+        
+        Returns:
+            A list of fallback endpoint strings
+        """
+        # Return a minimal set of endpoints that should work for most queries
+        return [
+            "data://coingecko/price/{coin}",
+            "data://coingecko/market/{coin}",
+            "data://coinmarketcap/price/{coin}",
+            "data://defillama/tvl/{protocol}",
+            "data://tavily/research/{query}"
+        ]
+
     async def retrieve_relevant_endpoints(self, query: str, top_k: int = 5) -> dict:
         """
         Retrieve relevant endpoints for a query and organize them by category.
@@ -477,6 +395,29 @@ class RAGRetriever:
                 self.logger.info(f"Cached error result for query: '{query}'")
                 
             return error_result
+
+    @property
+    def all_endpoints(self) -> List[str]:
+        """
+        Get a list of all available endpoints.
+        
+        Returns:
+            A list of endpoint strings
+        """
+        # Return a comprehensive list of available endpoints
+        return [
+            "data://tavily/research/{query}",
+            "data://tavily/deep_research/{query}",
+            "data://coingecko/price/{coin}",
+            "data://coingecko/market/{coin}",
+            "data://coingecko/historical/{coin}",
+            "data://coinmarketcap/price/{coin}",
+            "data://coinmarketcap/market/{coin}",
+            "data://defillama/tvl/{protocol}",
+            "data://defillama/yields/{protocol}",
+            "data://huggingface/research/{query}",
+            "data://tokenomics/distribution/{project}"
+        ]
 
 class LLMDecision:
     @staticmethod
