@@ -25,29 +25,125 @@ except ImportError:
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("TokenomicsServer")
+logger.info("TokenomicsServer starting up")
 
-# Initialize cache manager and extractors
-cache_manager = None # Will be properly initialized in init_with_project with a real project name
-whitepaper_extractor = None # Will be properly initialized in init_with_project
-token_info_extractor = None # Will be properly initialized in init_with_project
+# Add a handler to ensure logs are flushed immediately
+handler = logging.StreamHandler(sys.stdout)
+handler.setLevel(logging.INFO)
+logger.addHandler(handler)
 
-mcp = FastMCP("Tokenomics")
+try:
+    from mcp.server.fastmcp import FastMCP
+    logger.info("Successfully imported FastMCP")
+    mcp = FastMCP("Tokenomics")
+    logger.info("Created FastMCP instance")
+except Exception as e:
+    logger.error(f"Error importing or creating FastMCP: {str(e)}")
+    raise
 
-# Tokenomics extractor instance will be initialized properly in init_with_project
-tokenomics_extractor = None
+# Initialize cache manager and extractors with default values
+# These will be properly initialized with project-specific values when needed
+try:
+    # Don't initialize with default project name - wait for actual project name
+    cache_manager = None
+    whitepaper_extractor = None
+    token_info_extractor = None
+    tokenomics_extractor = None
+    logger.info("Extractors and cache manager will be initialized when a project name is provided")
+except Exception as e:
+    logger.error(f"Error initializing default extractors: {str(e)}")
+    # Continue with None values, they will be initialized properly when needed
+    cache_manager = None
+    whitepaper_extractor = None
+    token_info_extractor = None
+    tokenomics_extractor = None
 
 # Function to initialize project-specific cache and extractor
 def init_with_project(project_name):
     """Initialize with project-specific cache."""
-    global cache_manager, tokenomics_extractor, token_info_extractor, whitepaper_extractor
-    if not project_name or project_name == "default":
-        raise ValueError("Valid project_name is required for Tokenomics server initialization")
+    global cache_manager, tokenomics_extractor, token_info_extractor, whitepaper_extractor, current_project
+    
+    logger.info(f"init_with_project called with project_name: {project_name}")
+    
+    # Use the provided project name, ensure it's not empty or None
+    if not project_name or project_name.lower() == "default" or project_name.lower() == "unknown":
+        logger.error(f"Invalid project_name provided: '{project_name}'")
+        raise ValueError(f"Invalid project_name provided: '{project_name}'")
+    
+    try:
+        logger.info(f"Initializing Tokenomics server with project: {project_name}")
         
-    logger.info(f"Initializing Tokenomics server with project: {project_name}")
-    cache_manager = CacheManager(project_name=project_name, logger=logger)
-    tokenomics_extractor = TokenInfoExtractor(logger=logger, project_name=project_name)
-    token_info_extractor = TokenInfoExtractor(logger=logger, project_name=project_name)
-    whitepaper_extractor = WhitepaperExtractor(logger=logger, project_name=project_name)
+        # Import required classes with better error handling
+        try:
+            from backend.utils.cache_utils import CacheManager
+            logger.info("Successfully imported CacheManager")
+        except ImportError:
+            try:
+                from utils.cache_utils import CacheManager
+                logger.info("Successfully imported CacheManager from alternative path")
+            except ImportError as e:
+                logger.error(f"Failed to import CacheManager: {str(e)}")
+                raise
+        
+        try:
+            from backend.retriever.token_info_extractor import TokenInfoExtractor
+            logger.info("Successfully imported TokenInfoExtractor")
+        except ImportError:
+            try:
+                from retriever.token_info_extractor import TokenInfoExtractor
+                logger.info("Successfully imported TokenInfoExtractor from alternative path")
+            except ImportError as e:
+                logger.error(f"Failed to import TokenInfoExtractor: {str(e)}")
+                raise
+                
+        try:
+            from backend.utils.whitepaper_extractor import WhitepaperExtractor
+            logger.info("Successfully imported WhitepaperExtractor")
+        except ImportError:
+            try:
+                from utils.whitepaper_extractor import WhitepaperExtractor
+                logger.info("Successfully imported WhitepaperExtractor from alternative path")
+            except ImportError as e:
+                logger.error(f"Failed to import WhitepaperExtractor: {str(e)}")
+                raise
+        
+        # Create instances with error handling
+        try:
+            cache_manager = CacheManager(project_name=project_name, logger=logger)
+            logger.info("Successfully created CacheManager instance")
+        except Exception as e:
+            logger.error(f"Error creating CacheManager: {str(e)}")
+            raise
+            
+        try:
+            tokenomics_extractor = TokenInfoExtractor(logger=logger, project_name=project_name)
+            logger.info("Successfully created TokenInfoExtractor instance for tokenomics_extractor")
+        except Exception as e:
+            logger.error(f"Error creating TokenInfoExtractor for tokenomics_extractor: {str(e)}")
+            raise
+            
+        try:
+            token_info_extractor = TokenInfoExtractor(logger=logger, project_name=project_name)
+            logger.info("Successfully created TokenInfoExtractor instance for token_info_extractor")
+        except Exception as e:
+            logger.error(f"Error creating TokenInfoExtractor for token_info_extractor: {str(e)}")
+            raise
+            
+        try:
+            whitepaper_extractor = WhitepaperExtractor(logger=logger, project_name=project_name)
+            logger.info("Successfully created WhitepaperExtractor instance")
+        except Exception as e:
+            logger.error(f"Error creating WhitepaperExtractor: {str(e)}")
+            raise
+            
+        # Store the current project name in a global variable for context
+        current_project = project_name
+        
+        logger.info(f"Successfully initialized all components for project: {project_name}")
+    except Exception as e:
+        logger.error(f"Error in init_with_project for {project_name}: {str(e)}", exc_info=True)
+        # Re-raise to ensure calling code knows initialization failed
+        raise
 
 async def get_whitepaper_url_from_cmc(project_name: str) -> Optional[str]:
     """
@@ -152,8 +248,9 @@ async def extract_token_distribution(project_name: str, whitepaper_url: str) -> 
         Token distribution data dictionary
     """
     # Use the cache manager instead of direct path access
-    # Get from cache manager
-    cached_data = cache_manager.load("tokenomics", "distribution", project_name.lower())
+    # Get from cache manager - use project_name as the cache key
+    cache_key = project_name.lower()
+    cached_data = cache_manager.load("tokenomics", "distribution", cache_key)
     if cached_data:
         logger.info(f"Retrieved token distribution for {project_name} from cache manager")
         return cached_data
@@ -194,8 +291,8 @@ async def extract_token_distribution(project_name: str, whitepaper_url: str) -> 
         
         # Only cache if we have actual token allocation data
         if token_allocation:
-            # Save to cache manager
-            cache_manager.save(result, "tokenomics", "distribution", project_name.lower(), ttl_seconds=86400)
+            # Save to cache manager using the project-specific cache key
+            cache_manager.save(result, "tokenomics", "distribution", cache_key, ttl_seconds=86400)
             logger.info(f"Cached token distribution data for {project_name}")
         else:
             logger.warning(f"No token allocation data found for {project_name}")
@@ -225,10 +322,13 @@ async def get_token_distribution(project: str) -> dict:
         return {"error": "Project name is required"}
     
     # Initialize with project
-    init_with_project(project)
+    try:
+        init_with_project(project)
+    except ValueError as e:
+        return {"error": str(e)}
     
-    # Check cache first
-    cache_key = f"distribution_{project.lower()}"
+    # Check cache first - use project as the cache key without redundant prefixes
+    cache_key = project.lower()
     cached_data = cache_manager.load("tokenomics", "distribution", cache_key)
     
     if cached_data:
@@ -238,6 +338,66 @@ async def get_token_distribution(project: str) -> dict:
         if not _is_standardized_format(cached_data):
             cached_data = _standardize_data_format(cached_data, "tokenomics", "distribution", project)
         
+        return cached_data
+    
+    # Get whitepaper URL first
+    whitepaper_url = await get_whitepaper_url(project)
+    if isinstance(whitepaper_url, dict) and "data" in whitepaper_url:
+        whitepaper_url = whitepaper_url["data"]
+    
+    if not whitepaper_url or (isinstance(whitepaper_url, dict) and "error" in whitepaper_url):
+        logger.warning(f"No whitepaper URL found for {project}")
+        return {"error": f"No whitepaper URL found for {project}"}
+    
+    # Extract token distribution
+    distribution_data = await extract_token_distribution(project, whitepaper_url)
+    
+    # Standardize the data format
+    standardized_data = _standardize_data_format(distribution_data, "tokenomics", "distribution", project)
+    
+    # Cache the standardized result
+    cache_manager.save(standardized_data, "tokenomics", "distribution", cache_key)
+    
+    return standardized_data
+
+@mcp.resource("data://tokenomics/distribution/{project}/{project_name}")
+async def get_token_distribution_with_project(project: str, project_name: str) -> dict:
+    """
+    Get token distribution data for a project with explicit project name parameter.
+    
+    Args:
+        project: The name or symbol of the project to research
+        project_name: The project name for project-specific caching
+        
+    Returns:
+        Token distribution data in a standardized format
+    """
+    logger.info(f"Resource called: data://tokenomics/distribution/{project}/{project_name}")
+    
+    if not project:
+        return {"error": "Project name is required"}
+        
+    if not project_name:
+        logger.warning(f"No project_name provided for {project}, using project as project_name")
+        project_name = project
+    
+    # Initialize with project_name for proper caching
+    try:
+        init_with_project(project_name)
+    except ValueError as e:
+        return {"error": str(e)}
+    
+    # Check cache first - use project as the cache key without redundant prefixes
+    cache_key = project.lower()
+    cached_data = cache_manager.load("tokenomics", "distribution", cache_key)
+    
+    if cached_data:
+        logger.info(f"Using cached token distribution for {project} in project {project_name}")
+        
+        # Ensure the data is in standardized format
+        if not _is_standardized_format(cached_data):
+            cached_data = _standardize_data_format(cached_data, "tokenomics", "distribution", project)
+            
         return cached_data
     
     # Get whitepaper URL first
@@ -438,8 +598,8 @@ async def get_whitepaper_url(project: str) -> dict:
     # Initialize with project
     init_with_project(project)
     
-    # Check cache first
-    cache_key = f"whitepaper_url_{project.lower()}"
+    # Check cache first - use a simple cache key without redundant prefixes
+    cache_key = project.lower()
     cached_data = cache_manager.load("tokenomics", "whitepaper_url", cache_key)
     
     if cached_data:
@@ -487,27 +647,65 @@ async def get_whitepaper_url(project: str) -> dict:
     
     return standardized_data
 
-@mcp.resource("data://tokenomics/distribution/{project}/{project_name}")
-async def get_token_distribution_with_project(project: str, project_name: str) -> dict:
+@mcp.resource("data://tokenomics/{project}")
+async def get_tokenomics(project: str) -> dict:
     """
-    Get token distribution data with project-specific caching.
-    """
-    logger.info(f"Resource called: data://tokenomics/distribution/{project}/{project_name}")
+    Get comprehensive tokenomics data for a project.
+    This is a convenience endpoint that combines distribution and details.
     
-    # Initialize with project-specific cache
-    init_with_project(project_name)
-    
-    # Rest of implementation similar to get_token_distribution
-    try:
-        # Get token distribution using TokenInfoExtractor
-        data = tokenomics_extractor.get_token_distribution(project)
+    Args:
+        project: The project name or symbol
         
-        # Cache the result if needed (tokenomics_extractor does this automatically now)
-        return data or {"error": f"No token distribution found for {project}"}
-    except Exception as e:
-        error_response = {"error": f"Failed to fetch token distribution data: {str(e)}"}
-        logger.error(f"Error in get_token_distribution_with_project for {project}/{project_name}: {str(e)}")
-        return error_response
+    Returns:
+        Comprehensive tokenomics data in a standardized format
+    """
+    if not project:
+        return {"error": "Project name is required"}
+    
+    # Initialize with project
+    try:
+        init_with_project(project)
+    except ValueError as e:
+        return {"error": str(e)}
+    
+    # Check cache first
+    cache_key = f"{project.lower()}"
+    cached_data = cache_manager.load("tokenomics", "tokenomics", cache_key)
+    
+    if cached_data:
+        logger.info(f"Returning cached tokenomics data for {project}")
+        return cached_data
+    
+    # First get the distribution data
+    distribution_data = await get_token_distribution(project)
+    if isinstance(distribution_data, dict) and "data" in distribution_data:
+        distribution = distribution_data.get("data", {})
+    else:
+        distribution = {}
+    
+    # Then get the details data
+    details_data = await get_project_details(project)
+    if isinstance(details_data, dict) and "data" in details_data:
+        details = details_data.get("data", {})
+    else:
+        details = {}
+    
+    # Combine the data
+    combined_data = {
+        "project_name": project,
+        "distribution": distribution,
+        "details": details,
+        "extraction_timestamp": datetime.datetime.now().isoformat(),
+        "source": "tokenomics"
+    }
+    
+    # Standardize the data format
+    standardized_data = _standardize_data_format(combined_data, "tokenomics", project, project)
+    
+    # Cache the standardized result
+    cache_manager.save(standardized_data, "tokenomics", "tokenomics", cache_key)
+    
+    return standardized_data
 
 @mcp.tool()
 async def get_distribution(project: str, project_name: str = "") -> dict:
@@ -523,13 +721,14 @@ async def get_distribution(project: str, project_name: str = "") -> dict:
     """
     logger.info(f"Tool called: get_distribution for {project}, project_name={project_name}")
     
-    if project_name:
-        init_with_project(project_name)
+    # Use project as project_name if none provided
+    if not project_name:
+        project_name = project
     
     try:
-        # Get token distribution using TokenInfoExtractor
-        data = tokenomics_extractor.get_token_distribution(project)
-        return data or {"error": f"No token distribution found for {project}"}
+        # Use the resource endpoint that handles project_name
+        result = await get_token_distribution_with_project(project, project_name)
+        return result
     except Exception as e:
         error_response = {"error": f"Failed to fetch token distribution data: {str(e)}"}
         logger.error(f"Error in get_distribution tool for {project}: {str(e)}")
@@ -549,10 +748,14 @@ async def get_details(project: str, project_name: str = "") -> dict:
     """
     logger.info(f"Tool called: get_details for {project}, project_name={project_name}")
     
-    if project_name:
-        init_with_project(project_name)
+    # Use project as project_name if none provided
+    if not project_name:
+        project_name = project
     
     try:
+        # Initialize with project_name for proper caching
+        init_with_project(project_name)
+        
         # Get project details using TokenInfoExtractor
         data = tokenomics_extractor.get_project_details(project)
         return data or {"error": f"No project details found for {project}"}
@@ -575,63 +778,20 @@ async def get_whitepaper(project: str, project_name: str = "") -> dict:
     """
     logger.info(f"Tool called: get_whitepaper for {project}, project_name={project_name}")
     
-    if project_name:
-        init_with_project(project_name)
+    # Use project as project_name if none provided
+    if not project_name:
+        project_name = project
     
     try:
+        # Initialize with project_name for proper caching
+        init_with_project(project_name)
+        
         # Get whitepaper URL using TokenInfoExtractor
         url = tokenomics_extractor._get_whitepaper_url(project)
         return {"url": url} if url else {"error": f"No whitepaper URL found for {project}"}
     except Exception as e:
         error_response = {"error": f"Failed to fetch whitepaper URL: {str(e)}"}
         logger.error(f"Error in get_whitepaper tool for {project}: {str(e)}")
-        return error_response
-
-@mcp.resource("data://tokenomics/{project}")
-async def get_tokenomics(project: str) -> dict:
-    """
-    Simplified endpoint to get tokenomics data without requiring project_name.
-    
-    This endpoint properly handles query templates from report_config.json
-    (e.g. "ondo tokenomics supply distribution") by extracting the project name
-    from the first word while preserving the entire query for context.
-    
-    Args:
-        project: The project name/symbol, possibly combined with query terms
-        
-    Returns:
-        Tokenomics data including distribution and token info
-    """
-    logger.info(f"Resource called: data://tokenomics/{project}")
-    
-    # Extract project name if it's part of a full query template
-    extracted_project = project
-    full_query = project  # Keep the full query for context
-    
-    # If the string appears to contain multiple words, extract project name
-    words = project.split()
-    if len(words) > 1:
-        potential_project = words[0]
-        # Project names are typically shorter and may be all caps
-        if len(potential_project) < 10 or potential_project.isupper():
-            extracted_project = potential_project
-            logger.info(f"Extracted project name '{extracted_project}' from combined query: '{project}'")
-    
-    # Initialize with the project name
-    init_with_project(extracted_project)
-    
-    try:
-        # Get token distribution using the tool
-        data = await get_token_distribution(extracted_project)
-        # Store the full query in the response for context
-        data["query_context"] = full_query
-        return data
-    except Exception as e:
-        error_response = {
-            "error": f"Failed to fetch tokenomics data for {extracted_project}: {str(e)}",
-            "query": full_query
-        }
-        logger.error(f"Error in tokenomics endpoint: {str(e)}")
         return error_response
 
 if __name__ == "__main__":

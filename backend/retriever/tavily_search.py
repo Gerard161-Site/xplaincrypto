@@ -268,7 +268,7 @@ class TavilySearch:
         # Always cache the result if we have a project_name
         if project_name:
             cache_manager = CacheManager(project_name=project_name, logger=self.logger)
-            cache_manager.save("tavily", "research", query, research_result)
+            cache_manager.save(research_result, "tavily", "research", query)
         
         return research_result
 
@@ -283,7 +283,7 @@ class TavilySearch:
             Dictionary with research results
         """
         # Set up common parameters
-        url = "https://api.tavily.com/research"
+        url = "https://api.tavily.com/search"  # Changed from /research to /search
         
         # Important: Use the query exactly as is without adding "cryptocurrency finance token"
         # This ensures we get relevant results for tokens/projects as specified
@@ -343,4 +343,4 @@ class TavilySearch:
             self.logger.warning(f"Async research failed: {str(e)} ({type(e).__name__})")
             # Mark Tavily as unavailable to avoid further attempts
             self._tavily_available = False
-            return {"error": f"Tavily research failed: {str(e)}"}
+            return {"error": f"Tavily search failed: {str(e)}"}

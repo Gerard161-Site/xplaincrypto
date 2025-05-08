@@ -27,29 +27,31 @@ class CacheManager:
         'writer_hf': 24,     # 24 hours for HuggingFace-generated content
     }
 
-    def __init__(self, project_name: str, logger: Optional[logging.Logger] = None, base_dir: str = "docs"):
+    def __init__(self, project_name: str = None, logger=None):
         """
         Initialize the cache manager with a project name.
         
         Args:
-            project_name: Name of the project for project-specific caching
-            logger: Optional logger instance to use instead of global logger
-            base_dir: Base directory for caching (default: "docs")
+            project_name: The project name for project-specific caching
+            logger: Optional logger instance
         """
-        # Ensure project_name is a string to avoid os.path.join() errors
-        self.project_name = str(project_name) if project_name is not None else "default"
-        self.base_dir = base_dir
-        self.logger = logger or logging.getLogger(__name__)  # Use provided logger or create a new one
+        self.logger = logger or logging.getLogger(__name__)
         
-        # Ensure the project-specific cache directory exists
-        self.cache_dir = os.path.join(self.base_dir, self.project_name, "cache")
-        os.makedirs(self.cache_dir, exist_ok=True)
-        
-        self.logger.info(f"Cache directory set to: {self.cache_dir}")
-        
-        # Log a warning if project_name was None
+        # Use a default project name if none provided
         if project_name is None:
-            self.logger.warning("None project_name provided to CacheManager, using 'default' instead")
+            self.project_name = "default"
+            self.logger.warning(f"No project_name provided to CacheManager, using '{self.project_name}'")
+        elif project_name.lower() == "default" or project_name.lower() == "unknown" or project_name.strip() == "":
+            self.logger.error(f"Invalid project_name provided to CacheManager: '{project_name}'")
+            raise ValueError(f"Invalid project_name provided to CacheManager: '{project_name}'")
+        else:
+            self.project_name = project_name.lower()
+            
+        # Create cache directory if it doesn't exist
+        self.base_cache_dir = os.path.join("docs", self.project_name, "cache")
+        os.makedirs(self.base_cache_dir, exist_ok=True)
+        
+        self.logger.info(f"Cache directory set to: {self.base_cache_dir}")
 
     def _sanitize_filename(self, name: str) -> str:
         """
@@ -78,7 +80,7 @@ class CacheManager:
             Path to the cache file
         """
         # Create source-specific directory
-        source_dir = os.path.join(self.cache_dir, source)
+        source_dir = os.path.join(self.base_cache_dir, source)
         os.makedirs(source_dir, exist_ok=True)
         
         # Sanitize the query for filename
@@ -256,14 +258,14 @@ class CacheManager:
             List of cache file paths
         """
         if source:
-            source_dir = os.path.join(self.cache_dir, source)
+            source_dir = os.path.join(self.base_cache_dir, source)
             if not os.path.exists(source_dir):
                 return []
             return [os.path.join(source_dir, f) for f in os.listdir(source_dir) 
                     if os.path.isfile(os.path.join(source_dir, f)) and f.endswith('.json')]
         else:
             cache_files = []
-            for root, _, files in os.walk(self.cache_dir):
+            for root, _, files in os.walk(self.base_cache_dir):
                 for file in files:
                     if file.endswith('.json'):
                         cache_files.append(os.path.join(root, file))

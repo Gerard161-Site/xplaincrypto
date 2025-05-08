@@ -666,7 +666,7 @@ class Researcher:
             # --- 2. Prepare Minimal Params for fetch_data --- 
             # The original fetch_data extracts main id from path, so only pass project_name if needed.
             # Crucially, DO NOT pass coin/protocol/query here if they are already in the path.
-            call_params['project_name'] = project_name # Pass original case project name
+            call_params['project_name'] = project_name
             
             # Determine tool name for cache based on the *original pattern* before param substitution
             try:
@@ -710,12 +710,24 @@ class Researcher:
             # --- 4. Fetch from MCP (using formatted endpoint and minimal params) --- 
             self.logger.info(f"No cache hit for {endpoint_pattern}. Calling fetch_data with Endpoint='{formatted_endpoint_for_call}', Params={call_params}")
             
-            # Call fetch_data with the formatted endpoint string and minimal params
-            fetched_data = await self.mcp_client.fetch_data(formatted_endpoint_for_call, params=call_params)
+            # Call fetch_data with the formatted endpoint string and minimal params with a timeout
+            try:
+                self.logger.info(f"Setting 15-second timeout for fetch_data call to {formatted_endpoint_for_call}")
+                async with asyncio.timeout(15.0):  # 15-second timeout to prevent hanging
+                    fetched_data = await self.mcp_client.fetch_data(formatted_endpoint_for_call, params=call_params)
+                    self.logger.info(f"fetch_data completed successfully for {formatted_endpoint_for_call}")
+            except asyncio.TimeoutError:
+                self.logger.error(f"TIMEOUT during fetch_data call to {formatted_endpoint_for_call}")
+                return {
+                    "error": f"Timeout fetching data from {formatted_endpoint_for_call}",
+                    "endpoint_pattern": endpoint_pattern,
+                    "data_unavailable": True,
+                    "source": "timeout"
+                }
             
             # Process the response
             processed_result = self._safe_handle_response(fetched_data, formatted_endpoint_for_call, query_param_for_cache)
-            processed_result["source"] = source # Add source info derived from original pattern
+            processed_result["source"] = source
 
             # Save the processed result to cache
             if "error" not in processed_result: # Only cache successful results

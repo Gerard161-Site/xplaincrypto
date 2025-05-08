@@ -364,5 +364,22 @@ async def search_coins(query: str, project_name: str = None) -> Dict[str, Any]:
         logger.error(error_msg)
         return {"error": error_msg, "results": []}
 
+@mcp.tool()
+async def get_history(coin: str, project_name: str = None) -> Dict[str, Any]:
+    """
+    Get historical price data for a cryptocurrency from CoinGecko.
+    
+    Args:
+        coin: Name or symbol of the cryptocurrency
+        project_name: Optional project name for project-specific caching
+        
+    Returns:
+        Dictionary containing historical price, volume, and market cap data
+    """
+    logger.info(f"Getting historical data for {coin}" + (f" in project {project_name}" if project_name else ""))
+    
+    # Call the existing resource function
+    return await get_coin_history(coin, project_name)
+
 if __name__ == "__main__":
     mcp.run(transport="stdio")

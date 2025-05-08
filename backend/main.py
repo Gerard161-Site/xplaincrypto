@@ -124,8 +124,12 @@ async def startup_event():
                 # Continue with other servers even if one fails
         
         # Ensure we have started the essential servers
-        await mcp_client_manager.initialize()
-        logger.info("MCP client manager initialized")
+        try:
+            await mcp_client_manager.initialize()
+            logger.info("MCP client manager initialized")
+        except Exception as e:
+            logger.error(f"Error during MCP client manager initialization: {str(e)}")
+            # Continue even if initialization fails - the servers are already started individually
     except Exception as e:
         logger.error(f"Failed to initialize MCP client manager: {str(e)}")
     
