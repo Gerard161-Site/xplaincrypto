@@ -16,7 +16,7 @@ import io
 import pandas as pd
 import traceback
 import json
-from ..utils.style_utils import StyleManager
+from ...utils.style_utils import StyleManager
 from abc import ABC, abstractmethod
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots

@@ -1,0 +1,1 @@
+{"data": ["research://tavily/{query}"], "metadata": {"source": "rag", "endpoint": "search", "query": "rag_search_solana_market_analysis cryptocurrency security_web_research", "cached_at": "2025-05-09T11:41:55.491262", "expires_at": "2025-05-10T11:41:55.491262", "last_accessed": "2025-05-09T22:15:17.647993", "ttl_hours": 24}}

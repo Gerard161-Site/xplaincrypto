@@ -13,7 +13,7 @@ import numpy as np
 from datetime import datetime
 import matplotlib.dates as mdates
 
-from backend.visualizations.base import BaseVisualizer
+from backend.visualizations.old.base import BaseVisualizer
 
 class TimelineVisualizer(BaseVisualizer):
     """

@@ -1,570 +1,451 @@
 import os
-import json
 import logging
+from typing import Dict, Any, List, Optional, Tuple, Union
 import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import datetime
-import requests
-import mplfinance as mpf
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
-from typing import Dict, Any, List, Optional, Tuple
 
-class CandlestickChartVisualizer:
-    """Visualizer for creating TradingView-style candlestick charts."""
+from plotly.subplots import make_subplots
+import plotly.graph_objects as go
+
+from .base_visualizer import BaseVisualizer
+
+class CandlestickChartVisualizer(BaseVisualizer):
+    """
+    Visualizer for candlestick charts displaying OHLCV price data.
+    """
     
-    def __init__(self, theme='light', pdf_optimized=True, project_name=None, logger=None):
+    def __init__(self, project_name: str, style_manager, logger: Optional[logging.Logger] = None):
+        """Initialize the candlestick chart visualizer."""
+        super().__init__(project_name, style_manager, logger)
+    
+    def create_visualization(self, viz_type: str, viz_config: Dict[str, Any], data: Dict[str, Any]) -> Tuple[bool, str, str]:
         """
-        Initialize the candlestick chart visualizer.
+        Create a candlestick chart with OHLC data.
         
         Args:
-            theme: Visual theme (light or dark)
-            pdf_optimized: Whether to optimize for PDF output
-            project_name: Project name for titles and file names
-            logger: Logger instance
-        """
-        self.theme = theme
-        self.pdf_optimized = pdf_optimized
-        self.project_name = project_name or "unknown"
-        self.logger = logger or logging.getLogger(__name__)
-        
-        # Set TradingView style colors
-        self.tv_colors = {
-            'light': {
-                'bg': '#ffffff',
-                'grid': '#eaecef',
-                'text': '#131722',
-                'border': '#d6d8e0',
-                'up': '#089981',
-                'down': '#f23645',
-                'volume_up': '#08998144',
-                'volume_down': '#f2364544',
-                'wick': '#131722',
-                'ema1': '#aa6b12',
-                'ema2': '#1848cc',
-                'watermark': '#9e9e9e'
-            },
-            'dark': {
-                'bg': '#131722',
-                'grid': '#363c4e',
-                'text': '#d1d4dc',
-                'border': '#2a2e39',
-                'up': '#26a69a',
-                'down': '#ef5350',
-                'volume_up': '#26a69a44',
-                'volume_down': '#ef535044',
-                'wick': '#d1d4dc',
-                'ema1': '#e1c564',
-                'ema2': '#ff9100',
-                'watermark': '#555555'
-            }
-        }
-        
-        # Set output directory
-        self.output_dir = f"docs/{self.project_name}"
-        os.makedirs(self.output_dir, exist_ok=True)
-    
-    def create(self, viz_type: str, config: Dict[str, Any], data: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Create a candlestick chart visualization.
-        
-        Args:
-            viz_type: Type of visualization
-            config: Visualization configuration
+            viz_type: Type of visualization to create
+            viz_config: Configuration for the visualization
             data: Data for the visualization
             
         Returns:
-            Dict with visualization result information
+            Tuple of (success: bool, file_path: str, message: str)
         """
         try:
-            self.logger.info(f"Creating candlestick chart for {self.project_name}")
+            # ENHANCED DEBUGGING - Complete data structure analysis
+            self.logger.info(f"========== CANDLESTICK DEBUG START ==========")
+            self.logger.info(f"Data keys at top level: {list(data.keys())}")
             
-            # Extract configuration
-            days = config.get('days', 30)
-            theme = config.get('theme', self.theme)
+            # Extract OHLCV data
+            ohlcv_data = None
             
-            # Get OHLCV data
-            df = self._get_ohlcv_data(data, days)
-            
-            if df is None or df.empty:
-                return {"error": "No OHLCV data available"}
-                
-            # Create the visualization
-            output_paths = self._create_tradingview_style_charts(df, days)
-            
-            if output_paths:
-                self.logger.info(f"Candlestick charts saved to {output_paths}")
-                return {
-                    "success": True,
-                    "file_paths": output_paths,
-                    "file_path": output_paths[theme if theme in output_paths else list(output_paths.keys())[0]],
-                    "title": config.get("title", f"{self.project_name} Price Chart")
-                }
-            else:
-                return {"error": "Failed to create candlestick chart"}
-                
-        except Exception as e:
-            self.logger.error(f"Error creating candlestick chart: {str(e)}", exc_info=True)
-            return {"error": f"Failed to create candlestick chart: {str(e)}"}
-            
-    def _get_ohlcv_data(self, data: Dict[str, Any], days: int) -> Optional[pd.DataFrame]:
-        """
-        Get OHLCV data for candlestick chart.
-        
-        Args:
-            data: Data containing OHLCV data or settings to fetch it
-            days: Number of days of data to get
-            
-        Returns:
-            DataFrame with OHLCV data or None if unavailable
-        """
-        # Check if OHLCV data is provided directly
-        if 'ohlcv' in data:
-            df = self._prepare_dataframe(data['ohlcv'])
-            if df is not None:
-                return df
-        
-        # Try to load data from cache
-        cache_dir = os.path.join(self.output_dir, "cache")
-        os.makedirs(cache_dir, exist_ok=True)
-        
-        cache_file = os.path.join(cache_dir, f"{self.project_name.lower()}_ohlcv_data.json")
-        
-        # Check for cached data
-        if os.path.exists(cache_file):
-            file_age = datetime.datetime.now() - datetime.datetime.fromtimestamp(os.path.getmtime(cache_file))
-            if file_age < datetime.timedelta(hours=24):
-                try:
-                    with open(cache_file, 'r') as f:
-                        data = json.load(f)
-                        self.logger.info(f"Using cached OHLCV data for {self.project_name}")
-                        # Convert to DataFrame
-                        df = pd.DataFrame(data)
-                        df['date'] = pd.to_datetime(df['date'])
-                        df.set_index('date', inplace=True)
-                        return df
-                except Exception as e:
-                    self.logger.warning(f"Error loading cached data: {str(e)}")
-        
-        # If no cached data, fetch from CoinGecko
-        try:
-            self.logger.info(f"Fetching OHLCV data for {self.project_name} from CoinGecko")
-            base_url = "https://api.coingecko.com/api/v3"
-            
-            # Get the coin ID
-            coin_id = self._get_coin_id()
-            
-            # Fetch OHLCV data
-            response = requests.get(
-                f"{base_url}/coins/{coin_id}/ohlc",
-                params={"vs_currency": "usd", "days": days}
-            )
-            
-            if response.status_code == 200:
-                # CoinGecko returns data as [timestamp, open, high, low, close]
-                raw_data = response.json()
-                
-                # Convert to DataFrame
-                df = pd.DataFrame(raw_data, columns=['date', 'open', 'high', 'low', 'close'])
-                df['date'] = pd.to_datetime(df['date'], unit='ms')
-                
-                # Get volume data separately (CoinGecko OHLC endpoint doesn't include volume)
-                vol_response = requests.get(
-                    f"{base_url}/coins/{coin_id}/market_chart",
-                    params={"vs_currency": "usd", "days": days, "interval": "daily"}
-                )
-                
-                if vol_response.status_code == 200:
-                    vol_data = vol_response.json()
-                    volumes = vol_data.get('total_volumes', [])
+            # STEP 1: Check for data in state.data.market_analysis structure
+            if 'data' in data and isinstance(data['data'], dict):
+                if 'market_analysis' in data['data'] and isinstance(data['data']['market_analysis'], dict):
+                    market_data = data['data']['market_analysis']
+                    self.logger.info(f"Found market_analysis data, checking for OHLCV in keys: {list(market_data.keys())}")
                     
-                    # Create volume DataFrame
-                    vol_df = pd.DataFrame(volumes, columns=['date', 'volume'])
-                    vol_df['date'] = pd.to_datetime(vol_df['date'], unit='ms')
+                    # Check for CoinMarketCap data
+                    if 'coinmarketcap' in market_data and isinstance(market_data['coinmarketcap'], dict):
+                        cmc_data = market_data['coinmarketcap']
+                        if 'ohlcv' in cmc_data:
+                            ohlcv_data = cmc_data['ohlcv']
+                            self.logger.info("Found OHLCV data in data.market_analysis.coinmarketcap.ohlcv")
                     
-                    # Resample volume to match OHLCV data points
-                    vol_df.set_index('date', inplace=True)
+                    # Check for CoinGecko data
+                    if not ohlcv_data and 'coingecko' in market_data and isinstance(market_data['coingecko'], dict):
+                        cg_data = market_data['coingecko']
+                        if 'ohlcv' in cg_data:
+                            ohlcv_data = cg_data['ohlcv']
+                            self.logger.info("Found OHLCV data in data.market_analysis.coingecko.ohlcv")
+                        # Check for alternative field names
+                        elif 'price_history' in cg_data:
+                            ohlcv_data = cg_data['price_history']
+                            self.logger.info("Found price_history data in data.market_analysis.coingecko.price_history")
+                        elif 'historical_data' in cg_data:
+                            ohlcv_data = cg_data['historical_data']
+                            self.logger.info("Found historical_data in data.market_analysis.coingecko.historical_data")
+            
+            # STEP 2: Check for data in state.data.executive_summary structure
+            if not ohlcv_data and 'data' in data and isinstance(data['data'], dict):
+                if 'executive_summary' in data['data'] and isinstance(data['data']['executive_summary'], dict):
+                    summary_data = data['data']['executive_summary']
+                    self.logger.info(f"Found executive_summary data, checking for OHLCV in keys: {list(summary_data.keys())}")
                     
-                    # Calculate resample frequency
-                    if len(df) > 0 and days > 0:
-                        resample_hours = max(1, int(24/max(1, len(df)/days)))
-                        vol_df = vol_df.resample(f'{resample_hours}h').mean()
+                    # Check for CoinMarketCap data
+                    if 'coinmarketcap' in summary_data and isinstance(summary_data['coinmarketcap'], dict):
+                        cmc_data = summary_data['coinmarketcap']
+                        if 'ohlcv' in cmc_data:
+                            ohlcv_data = cmc_data['ohlcv']
+                            self.logger.info("Found OHLCV data in data.executive_summary.coinmarketcap.ohlcv")
+                    
+                    # Check for CoinGecko data
+                    if not ohlcv_data and 'coingecko' in summary_data and isinstance(summary_data['coingecko'], dict):
+                        cg_data = summary_data['coingecko']
+                        if 'ohlcv' in cg_data:
+                            ohlcv_data = cg_data['ohlcv']
+                            self.logger.info("Found OHLCV data in data.executive_summary.coingecko.ohlcv")
+                        elif 'price_history' in cg_data:
+                            ohlcv_data = cg_data['price_history']
+                            self.logger.info("Found price_history data in data.executive_summary.coingecko.price_history")
+                        elif 'historical_data' in cg_data:
+                            ohlcv_data = cg_data['historical_data']
+                            self.logger.info("Found historical_data in data.executive_summary.coingecko.historical_data")
+
+            # STEP 3: Check for data in other sections of state.data
+            if not ohlcv_data and 'data' in data and isinstance(data['data'], dict):
+                self.logger.info(f"Searching all sections in data structure: {list(data['data'].keys())}")
+                # Loop through all sections to find OHLCV data
+                for section_name, section_data in data['data'].items():
+                    if not isinstance(section_data, dict):
+                        continue
+                        
+                    # Check for CoinMarketCap data in this section
+                    if 'coinmarketcap' in section_data and isinstance(section_data['coinmarketcap'], dict):
+                        cmc_data = section_data['coinmarketcap']
+                        if 'ohlcv' in cmc_data:
+                            ohlcv_data = cmc_data['ohlcv']
+                            self.logger.info(f"Found OHLCV data in data.{section_name}.coinmarketcap.ohlcv")
+                            break
+                    
+                    # Check for CoinGecko data in this section
+                    if 'coingecko' in section_data and isinstance(section_data['coingecko'], dict):
+                        cg_data = section_data['coingecko']
+                        if 'ohlcv' in cg_data:
+                            ohlcv_data = cg_data['ohlcv']
+                            self.logger.info(f"Found OHLCV data in data.{section_name}.coingecko.ohlcv")
+                            break
+                        elif 'price_history' in cg_data:
+                            ohlcv_data = cg_data['price_history']
+                            self.logger.info(f"Found price_history data in data.{section_name}.coingecko.price_history")
+                            break
+                        elif 'historical_data' in cg_data:
+                            ohlcv_data = cg_data['historical_data']
+                            self.logger.info(f"Found historical_data in data.{section_name}.coingecko.historical_data")
+                            break
+            
+            # STEP 4: Check original paths if none of the above worked
+            if ohlcv_data is None:
+                # Look for data in coinmarketcap source (checking different possible structures)
+                if 'coinmarketcap' in data and 'ohlcv' in data['coinmarketcap']:
+                    ohlcv_data = data['coinmarketcap']['ohlcv']
+                    self.logger.info("Found OHLCV data in data['coinmarketcap']['ohlcv']")
+                
+                # Also check top-level ohlcv key (common pattern in our cache files)
+                elif 'ohlcv' in data:
+                    if isinstance(data['ohlcv'], dict) and 'data' in data['ohlcv']:
+                        ohlcv_data = data['ohlcv']['data']
+                        self.logger.info("Found OHLCV data in data['ohlcv']['data']")
                     else:
-                        vol_df = vol_df.resample('1d').mean()
-                    
-                    # Merge with price data
-                    df.set_index('date', inplace=True)
-                    if len(vol_df) >= len(df):
-                        vol_df = vol_df.iloc[:len(df)]
-                    else:
-                        # Pad with mean volume if not enough data points
-                        padding = len(df) - len(vol_df)
-                        pad_data = pd.DataFrame(
-                            {'volume': [vol_df['volume'].mean()] * padding}, 
-                            index=df.index[-padding:]
-                        )
-                        vol_df = pd.concat([vol_df, pad_data])
-                        
-                    df['volume'] = vol_df['volume'].values
-                else:
-                    # If volume data fetch fails, use placeholder values
-                    self.logger.warning(f"Failed to fetch volume data for {self.project_name}. Using placeholders.")
-                    df['volume'] = 0
+                        ohlcv_data = data['ohlcv']
+                        self.logger.info("Found OHLCV data in data['ohlcv']")
                 
-                # Cache the data
-                try:
-                    with open(cache_file, 'w') as f:
-                        json.dump(df.reset_index().to_dict('records'), f)
-                    self.logger.info(f"Cached OHLCV data for {self.project_name}")
-                except Exception as e:
-                    self.logger.warning(f"Error caching data: {str(e)}")
+                # Check if it's in coingecko data
+                elif 'coingecko' in data and isinstance(data['coingecko'], dict):
+                    cg_data = data['coingecko']
+                    if 'ohlcv' in cg_data:
+                        ohlcv_data = cg_data['ohlcv']
+                        self.logger.info("Found OHLCV data in data['coingecko']['ohlcv']")
+                    elif 'price_history' in cg_data:
+                        ohlcv_data = cg_data['price_history']
+                        self.logger.info("Found price history in data['coingecko']['price_history']")
+            
+            # If no OHLCV data, return error
+            if not ohlcv_data:
+                self.logger.error(f"No OHLCV data available for candlestick chart. Available keys: {list(data.keys())}")
+                if 'data' in data and isinstance(data['data'], dict):
+                    self.logger.error(f"Available sections in data: {list(data['data'].keys())}")
+                return False, "", "No OHLCV data available for candlestick chart"
                 
-                return df
+            # Convert to DataFrame
+            self.logger.info(f"OHLCV data type: {type(ohlcv_data)}")
+            if isinstance(ohlcv_data, list):
+                df = pd.DataFrame(ohlcv_data)
             else:
-                self.logger.error(f"Error fetching OHLCV data: {response.status_code} - {response.text}")
-        except Exception as e:
-            self.logger.error(f"Error in OHLCV data fetch: {str(e)}")
-        
-        # If all else fails, generate demo data
-        self.logger.warning(f"Using generated demo data for {self.project_name}")
-        return self._generate_demo_price_data(days)
-    
-    def _get_coin_id(self) -> str:
-        """Get the CoinGecko coin ID for the project."""
-        base_url = "https://api.coingecko.com/api/v3"
-        
-        # Try to get the coin ID from CoinGecko
-        try:
-            response = requests.get(f"{base_url}/coins/list")
-            if response.status_code == 200:
-                coins = response.json()
-                for coin in coins:
-                    if coin['name'].lower() == self.project_name.lower() or coin['symbol'].lower() == self.project_name.lower():
-                        coin_id = coin['id']
-                        self.logger.info(f"Found coin ID for {self.project_name}: {coin_id}")
-                        return coin_id
-        except Exception as e:
-            self.logger.error(f"Error fetching coin list: {str(e)}")
-        
-        # If coin ID not found, try common ones
-        common_ids = {
-            "bitcoin": "bitcoin",
-            "ethereum": "ethereum", 
-            "solana": "solana",
-            "cardano": "cardano",
-            "bnb": "binancecoin",
-            "binance": "binancecoin",
-            "ondo": "ondo-finance",
-            "xrp": "ripple"
-        }
-        coin_id = common_ids.get(self.project_name.lower(), self.project_name.lower())
-        self.logger.info(f"Using assumed coin ID for {self.project_name}: {coin_id}")
-        
-        return coin_id
-    
-    def _prepare_dataframe(self, ohlcv_data: Any) -> Optional[pd.DataFrame]:
-        """Prepare a DataFrame from various OHLCV data formats."""
-        try:
-            if isinstance(ohlcv_data, pd.DataFrame):
-                df = ohlcv_data.copy()
-                if 'date' in df.columns and not df.index.name == 'date':
-                    df.set_index('date', inplace=True)
-                return df
-            elif isinstance(ohlcv_data, list):
-                if not ohlcv_data:
-                    return None
-                    
-                # Determine the format of the OHLCV data
-                if isinstance(ohlcv_data[0], dict) and all(k in ohlcv_data[0] for k in ['date', 'open', 'high', 'low', 'close']):
-                    # Format: [{date, open, high, low, close, volume}, ...]
-                    df = pd.DataFrame(ohlcv_data)
-                    df['date'] = pd.to_datetime(df['date'])
-                    df.set_index('date', inplace=True)
-                    return df
-                elif isinstance(ohlcv_data[0], list) and len(ohlcv_data[0]) >= 5:
-                    # Format: [[timestamp, open, high, low, close, volume], ...]
-                    columns = ['date', 'open', 'high', 'low', 'close']
-                    if len(ohlcv_data[0]) >= 6:
-                        columns.append('volume')
-                        
-                    df = pd.DataFrame(ohlcv_data, columns=columns)
-                    df['date'] = pd.to_datetime(df['date'], unit='ms')
-                    df.set_index('date', inplace=True)
-                    
-                    # Add volume if missing
-                    if 'volume' not in df.columns:
-                        df['volume'] = 0
-                        
-                    return df
+                # Try to convert dict to DataFrame if possible
+                df = pd.DataFrame(ohlcv_data)
             
-            return None
-        except Exception as e:
-            self.logger.error(f"Error preparing DataFrame: {str(e)}")
-            return None
-    
-    def _generate_demo_price_data(self, days: int) -> pd.DataFrame:
-        """Generate demo price data for when real data is unavailable."""
-        self.logger.info(f"Generating demo price data for {days} days")
-        
-        # Generate dates
-        end_date = datetime.datetime.now()
-        date_range = [end_date - datetime.timedelta(days=i) for i in range(days, -1, -1)]
-        
-        # Generate price data with realistic trends and volatility
-        np.random.seed(42)  # For reproducibility
-        
-        # Start with a base price
-        base_price = 100.0
-        
-        # Generate returns with a slight upward trend and realistic volatility
-        daily_returns = np.random.normal(0.002, 0.02, len(date_range))
-        
-        # Calculate cumulative returns
-        cumulative_returns = np.cumprod(1 + daily_returns)
-        
-        # Calculate prices
-        prices = base_price * cumulative_returns
-        
-        # Generate OHLC data
-        ohlc_data = []
-        for i, date in enumerate(date_range):
-            price = prices[i]
-            daily_volatility = price * 0.01  # 1% daily volatility
+            self.logger.info(f"DataFrame columns: {df.columns.tolist()}")
             
-            # Calculate open, high, low, close
-            if i == 0:
-                open_price = price * 0.99
-            else:
-                open_price = ohlc_data[i-1]['close']
+            # Ensure DataFrame has required columns
+            required_cols = ['date', 'open', 'high', 'low', 'close']
+            if not all(col in df.columns for col in required_cols):
+                self.logger.error(f"OHLCV data missing required columns. Available columns: {df.columns.tolist()}")
+                return False, "", f"OHLCV data missing required columns: {', '.join(required_cols)}"
                 
-            close_price = price
-            high_price = price + daily_volatility * np.random.uniform(0.5, 1.5)
-            low_price = price - daily_volatility * np.random.uniform(0.5, 1.5)
+            # Create figure
+            fig = go.Figure()
             
-            # Ensure high >= open, close and low <= open, close
-            high_price = max(high_price, open_price, close_price)
-            low_price = min(low_price, open_price, close_price)
-            
-            # Generate volume (higher on volatile days)
-            volume_base = base_price * 10000
-            volume = volume_base * (1 + np.abs(daily_returns[i]) * 10)
-            
-            ohlc_data.append({
-                'date': date,
-                'open': open_price,
-                'high': high_price,
-                'low': low_price,
-                'close': close_price,
-                'volume': volume
-            })
-        
-        # Convert to DataFrame
-        df = pd.DataFrame(ohlc_data)
-        df.set_index('date', inplace=True)
-        
-        return df
-    
-    def _create_tradingview_style_charts(self, df: pd.DataFrame, days: int) -> Dict[str, str]:
-        """
-        Create TradingView style candlestick charts for light and dark themes.
-        
-        Args:
-            df: DataFrame with OHLCV data
-            days: Number of days of data
-            
-        Returns:
-            Dictionary mapping themes to file paths
-        """
-        # Create output directory
-        viz_dir = os.path.join(self.output_dir, "visualizations")
-        os.makedirs(viz_dir, exist_ok=True)
-        
-        # Define file paths
-        light_filepath = os.path.join(self.output_dir, f"{self.project_name.lower()}_candlestick_chart_light.png")
-        dark_filepath = os.path.join(self.output_dir, f"{self.project_name.lower()}_candlestick_chart.png")  # Dark as default
-        
-        output_paths = {}
-        
-        # Create light theme chart
-        try:
-            colors = self.tv_colors['light']
-            
-            fig = self._create_plotly_candlestick(df, days, 'light')
-            fig.write_image(light_filepath, scale=2)
-            
-            if os.path.exists(light_filepath):
-                output_paths['light'] = light_filepath
-                self.logger.info(f"Created light theme chart: {light_filepath}")
-        except Exception as e:
-            self.logger.error(f"Error creating light theme chart: {str(e)}")
-        
-        # Create dark theme chart
-        try:
-            colors = self.tv_colors['dark']
-            
-            fig = self._create_plotly_candlestick(df, days, 'dark')
-            fig.write_image(dark_filepath, scale=2)
-            
-            if os.path.exists(dark_filepath):
-                output_paths['dark'] = dark_filepath
-                self.logger.info(f"Created dark theme chart: {dark_filepath}")
-        except Exception as e:
-            self.logger.error(f"Error creating dark theme chart: {str(e)}")
-        
-        return output_paths
-    
-    def _create_plotly_candlestick(self, df: pd.DataFrame, days: int, theme: str = 'light') -> go.Figure:
-        """
-        Create a Plotly candlestick chart with TradingView styling.
-        
-        Args:
-            df: DataFrame with OHLCV data
-            days: Number of days of data
-            theme: 'light' or 'dark'
-            
-        Returns:
-            Plotly Figure object
-        """
-        colors = self.tv_colors[theme]
-        
-        # Create subplot with 2 rows (price and volume)
-        fig = make_subplots(
-            rows=2, cols=1, 
-            row_heights=[0.8, 0.2],
-            vertical_spacing=0.05,
-            shared_xaxes=True
-        )
-        
-        # Add candlestick chart
-        fig.add_trace(
-            go.Candlestick(
-                x=df.index,
+            # Add candlestick trace
+            fig.add_trace(go.Candlestick(
+                x=df['date'],
                 open=df['open'],
                 high=df['high'],
                 low=df['low'],
                 close=df['close'],
-                increasing_line_color=colors['up'],
-                decreasing_line_color=colors['down'],
-                name="Price"
-            ),
-            row=1, col=1
-        )
-        
-        # Add volume bars
-        colors_volume = []
-        for i in range(len(df)):
-            if i > 0 and df['close'].iloc[i] >= df['close'].iloc[i-1]:
-                colors_volume.append(colors['up'])
-            else:
-                colors_volume.append(colors['down'])
+                name=self.project_name,
+                increasing_line_color=self.colors.get("positive", "#26a69a"),
+                decreasing_line_color=self.colors.get("negative", "#ef5350")
+            ))
+            
+            # Add volume as bar chart if available
+            if 'volume' in df.columns and df['volume'].notna().any():
+                # Create subplot for volume
+                fig = make_subplots(
+                    rows=2, cols=1, 
+                    shared_xaxes=True,
+                    vertical_spacing=0.1,
+                    row_heights=[0.7, 0.3],
+                    subplot_titles=[
+                        viz_config.get("title", f"{self.project_name} Price"), 
+                        "Volume"
+                    ]
+                )
                 
-        fig.add_trace(
-            go.Bar(
-                x=df.index,
-                y=df['volume'],
-                marker_color=colors_volume,
-                name="Volume",
-                opacity=0.5
-            ),
-            row=2, col=1
-        )
+                # Add candlestick to upper subplot
+                fig.add_trace(
+                    go.Candlestick(
+                        x=df['date'],
+                        open=df['open'],
+                        high=df['high'],
+                        low=df['low'],
+                        close=df['close'],
+                        name=self.project_name,
+                        increasing_line_color=self.colors.get("positive", "#26a69a"),
+                        decreasing_line_color=self.colors.get("negative", "#ef5350")
+                    ),
+                    row=1, col=1
+                )
+                
+                # Add volume to lower subplot
+                fig.add_trace(
+                    go.Bar(
+                        x=df['date'],
+                        y=df['volume'],
+                        name="Volume",
+                        marker_color=self.colors.get("accent", "#2196f3")
+                    ),
+                    row=2, col=1
+                )
+            
+            # Add moving averages - 20-day and 50-day EMAs
+            if len(df) >= 20:
+                df['EMA20'] = df['close'].ewm(span=20, adjust=False).mean()
+                fig.add_trace(
+                    go.Scatter(
+                        x=df['date'],
+                        y=df['EMA20'],
+                        name="20-day EMA",
+                        line=dict(
+                            color=self.colors.get("accent_secondary", "#f9a825"),
+                            width=1.5
+                        )
+                    ),
+                    row=1, col=1
+                )
+                
+            if len(df) >= 50:
+                df['EMA50'] = df['close'].ewm(span=50, adjust=False).mean()
+                fig.add_trace(
+                    go.Scatter(
+                        x=df['date'],
+                        y=df['EMA50'],
+                        name="50-day EMA",
+                        line=dict(
+                            color=self.colors.get("accent_tertiary", "#7b1fa2"),
+                            width=1.5
+                        )
+                    ),
+                    row=1, col=1
+                )
+            
+            # Update layout
+            title = viz_config.get("title", f"{self.project_name} Price Chart")
+            source = viz_config.get("source", "CoinMarketCap/CoinGecko")
+            
+            # Apply layout
+            fig.update_layout(
+                title=title,
+                width=self.width,
+                height=self.height,
+                paper_bgcolor=self.colors.get("background", "#ffffff"),
+                plot_bgcolor=self.colors.get("background", "#ffffff"),
+                margin=dict(l=50, r=50, t=80, b=50),
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=1.02,
+                    xanchor="right",
+                    x=1
+                ),
+                xaxis_rangeslider_visible=False,  # Hide default rangeslider
+                # Add custom rangeslider with reduced height
+                xaxis=dict(
+                    rangeselector=dict(
+                        buttons=list([
+                            dict(count=7, label="1w", step="day", stepmode="backward"),
+                            dict(count=1, label="1m", step="month", stepmode="backward"),
+                            dict(count=3, label="3m", step="month", stepmode="backward"),
+                            dict(step="all")
+                        ])
+                    )
+                )
+            )
+            
+            # Add data source annotation
+            fig.add_annotation(
+                text=f"Source: {source}",
+                xref="paper", yref="paper",
+                x=0.01, y=-0.05 if 'volume' not in df.columns else -0.15,
+                showarrow=False,
+                font=dict(size=10, color="#808080"),
+                align="left"
+            )
+            
+            # Generate output path
+            output_filename = viz_config.get("output_filename", f"{self.project_name.lower()}_candlestick")
+            output_path = os.path.join(self.output_dir, f"{output_filename}.png")
+            
+            # Ensure directory exists
+            os.makedirs(os.path.dirname(output_path), exist_ok=True)
+            
+            # Export as PNG using kaleido
+            fig.write_image(output_path, scale=2)
+            
+            return True, output_path, "Candlestick chart created successfully"
+            
+        except Exception as e:
+            error_msg = f"Error creating candlestick chart: {str(e)}"
+            self.logger.error(error_msg)
+            return False, "", error_msg
+            
+    def check_data_usability(self, data: Dict[str, Any], viz_type: str = None) -> bool:
+        """
+        Check if the data can be used for a candlestick chart.
         
-        # Calculate and add EMAs
-        df['EMA20'] = df['close'].ewm(span=20, adjust=False).mean()
-        df['EMA50'] = df['close'].ewm(span=50, adjust=False).mean()
+        Args:
+            data: Data to check
+            viz_type: Type of visualization
+            
+        Returns:
+            True if usable, False otherwise
+        """
+        if not super().check_data_usability(data, viz_type):
+            return False
         
-        fig.add_trace(
-            go.Scatter(
-                x=df.index,
-                y=df['EMA20'],
-                line=dict(color=colors['ema1'], width=1.5),
-                name="EMA 20"
-            ),
-            row=1, col=1
-        )
+        # For candlestick charts, we need OHLCV data in some form
+        self.logger.info(f"Checking data usability for candlestick chart, keys: {list(data.keys())}")
         
-        fig.add_trace(
-            go.Scatter(
-                x=df.index,
-                y=df['EMA50'],
-                line=dict(color=colors['ema2'], width=1.5),
-                name="EMA 50"
-            ),
-            row=1, col=1
-        )
+        # STEP 1: Check for data in state.data.market_analysis structure (most common location)
+        if 'data' in data and isinstance(data['data'], dict):
+            self.logger.info(f"Found data structure, looking for OHLCV in state.data with keys: {list(data['data'].keys())}")
+            
+            # Check market_analysis section
+            if 'market_analysis' in data['data'] and isinstance(data['data']['market_analysis'], dict):
+                market_data = data['data']['market_analysis']
+                self.logger.info(f"Found market_analysis section with keys: {list(market_data.keys())}")
+                
+                # Check for CoinMarketCap data
+                if 'coinmarketcap' in market_data and isinstance(market_data['coinmarketcap'], dict):
+                    cmc_data = market_data['coinmarketcap']
+                    if 'ohlcv' in cmc_data:
+                        self.logger.info("Found OHLCV data in state.data.market_analysis.coinmarketcap.ohlcv")
+                        return True
+                
+                # Check for CoinGecko data
+                if 'coingecko' in market_data and isinstance(market_data['coingecko'], dict):
+                    cg_data = market_data['coingecko']
+                    if 'ohlcv' in cg_data:
+                        self.logger.info("Found OHLCV data in state.data.market_analysis.coingecko.ohlcv")
+                        return True
+                    if 'price_history' in cg_data:
+                        self.logger.info("Found price_history data in state.data.market_analysis.coingecko.price_history")
+                        return True
+                    if 'historical_data' in cg_data:
+                        self.logger.info("Found historical_data in state.data.market_analysis.coingecko.historical_data")
+                        return True
+            
+            # STEP 2: Check executive_summary section
+            if 'executive_summary' in data['data'] and isinstance(data['data']['executive_summary'], dict):
+                summary_data = data['data']['executive_summary']
+                self.logger.info(f"Found executive_summary section with keys: {list(summary_data.keys())}")
+                
+                # Check for CoinMarketCap data
+                if 'coinmarketcap' in summary_data and isinstance(summary_data['coinmarketcap'], dict):
+                    cmc_data = summary_data['coinmarketcap']
+                    if 'ohlcv' in cmc_data:
+                        self.logger.info("Found OHLCV data in state.data.executive_summary.coinmarketcap.ohlcv")
+                        return True
+                
+                # Check for CoinGecko data
+                if 'coingecko' in summary_data and isinstance(summary_data['coingecko'], dict):
+                    cg_data = summary_data['coingecko']
+                    if 'ohlcv' in cg_data:
+                        self.logger.info("Found OHLCV data in state.data.executive_summary.coingecko.ohlcv")
+                        return True
+                    if 'price_history' in cg_data:
+                        self.logger.info("Found price_history data in state.data.executive_summary.coingecko.price_history")
+                        return True
+                    if 'historical_data' in cg_data:
+                        self.logger.info("Found historical_data in state.data.executive_summary.coingecko.historical_data")
+                        return True
+            
+            # STEP 3: Check all other sections
+            for section_name, section_data in data['data'].items():
+                if not isinstance(section_data, dict):
+                    continue
+                
+                # Check for CoinMarketCap data in this section
+                if 'coinmarketcap' in section_data and isinstance(section_data['coinmarketcap'], dict):
+                    cmc_data = section_data['coinmarketcap']
+                    if 'ohlcv' in cmc_data:
+                        self.logger.info(f"Found OHLCV data in state.data.{section_name}.coinmarketcap.ohlcv")
+                        return True
+                
+                # Check for CoinGecko data in this section
+                if 'coingecko' in section_data and isinstance(section_data['coingecko'], dict):
+                    cg_data = section_data['coingecko']
+                    if 'ohlcv' in cg_data:
+                        self.logger.info(f"Found OHLCV data in state.data.{section_name}.coingecko.ohlcv")
+                        return True
+                    if 'price_history' in cg_data:
+                        self.logger.info(f"Found price_history data in state.data.{section_name}.coingecko.price_history")
+                        return True
+                    if 'historical_data' in cg_data:
+                        self.logger.info(f"Found historical_data in state.data.{section_name}.coingecko.historical_data")
+                        return True
         
-        # Update layout for TradingView style
-        fig.update_layout(
-            title=f"{self.project_name} Price ({days} Days)",
-            title_font=dict(size=24, color=colors['text']),
-            font=dict(family="Arial, sans-serif", size=12, color=colors['text']),
-            xaxis_title=None,
-            yaxis_title="Price (USD)",
-            plot_bgcolor=colors['bg'],
-            paper_bgcolor=colors['bg'],
-            height=800,
-            width=1200,
-            legend=dict(
-                x=0.01,
-                y=0.99,
-                bgcolor=colors['bg'],
-                bordercolor=colors['border']
-            ),
-            margin=dict(l=50, r=50, t=80, b=50),
-            xaxis_rangeslider_visible=False
-        )
+        # STEP 4: Check original paths
+        # Check direct path in top-level data
+        if 'coinmarketcap' in data:
+            self.logger.info(f"Found coinmarketcap data, keys: {list(data['coinmarketcap'].keys()) if isinstance(data['coinmarketcap'], dict) else 'not a dict'}")
+            
+            # First check if OHLCV data is directly in the structure
+            if isinstance(data['coinmarketcap'], dict) and 'ohlcv' in data['coinmarketcap']:
+                self.logger.info("Found direct OHLCV data in coinmarketcap")
+                return True
+            
+            # Check if OHLCV is nested in data.ohlcv
+            if isinstance(data['coinmarketcap'], dict) and 'data' in data['coinmarketcap'] and 'ohlcv' in data['coinmarketcap']['data']:
+                self.logger.info("Found OHLCV data in coinmarketcap.data.ohlcv")
+                return True
         
-        # Update axis styles
-        fig.update_xaxes(
-            showgrid=True,
-            gridcolor=colors['grid'],
-            linecolor=colors['border'],
-            row=1, col=1
-        )
+        # Check in coingecko data    
+        if 'coingecko' in data:
+            self.logger.info(f"Found coingecko data, keys: {list(data['coingecko'].keys()) if isinstance(data['coingecko'], dict) else 'not a dict'}")
+            
+            # First check if OHLCV data is directly in the structure
+            if isinstance(data['coingecko'], dict) and 'ohlcv' in data['coingecko']:
+                self.logger.info("Found direct OHLCV data in coingecko")
+                return True
+            
+            # Check for price history
+            if isinstance(data['coingecko'], dict) and 'price_history' in data['coingecko']:
+                self.logger.info("Found price_history data in coingecko")
+                return True
         
-        fig.update_yaxes(
-            showgrid=True,
-            gridcolor=colors['grid'],
-            linecolor=colors['border'],
-            row=1, col=1,
-            tickprefix='$',
-            side='right'
-        )
+        # Check for top-level OHLCV data
+        if 'ohlcv' in data:
+            self.logger.info("Found top-level OHLCV data")
+            return True
         
-        fig.update_xaxes(
-            showgrid=True,
-            gridcolor=colors['grid'],
-            linecolor=colors['border'],
-            row=2, col=1
-        )
-        
-        fig.update_yaxes(
-            showgrid=True,
-            gridcolor=colors['grid'],
-            linecolor=colors['border'],
-            row=2, col=1,
-            side='right'
-        )
-        
-        # Add watermark
-        fig.add_annotation(
-            text=f"XplainCrypto Analysis",
-            x=0.5, y=0.5,
-            font=dict(size=36, color=colors['watermark']),
-            showarrow=False,
-            opacity=0.1,
-            xref="paper", yref="paper"
-        )
-        
-        # Add data source
-        fig.add_annotation(
-            text="Data: CoinGecko",
-            x=0.99, y=0.01,
-            font=dict(size=10, color=colors['text']),
-            showarrow=False,
-            xref="paper", yref="paper",
-            xanchor="right", yanchor="bottom"
-        )
-        
-        return fig 
+        self.logger.warning("No OHLCV data found for candlestick chart")
+        return False 

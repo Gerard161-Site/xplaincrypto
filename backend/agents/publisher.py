@@ -9,6 +9,7 @@ from reportlab.lib import colors
 from reportlab.lib.units import inch
 from backend.state import ResearchState
 from backend.utils.style_utils import StyleManager
+from backend.utils.state_manager import StateManager
 from PIL import Image as PILImage
 from backend.utils.logging_utils import log_safe
 
@@ -53,46 +54,25 @@ def publisher(state, llm, logger, config=None) -> dict:
     try:
         logger.info("Publisher agent starting")
         
-        project_name = state.get("project_name", "Unknown Project")
-        report_config = state.get("report_config", {})
+        # Initialize StateManager for consistent state access
+        state_manager = StateManager(logger=logger)
+        
+        # Get project name and report config using StateManager
+        project_name = state_manager.get_project_name(state)
+        report_config = state_manager.get_report_config(state)
         
         logger.info(f"Publisher agent processing report for project: '{project_name}'")
         
-        if isinstance(state, dict):
-            state["progress"] = f"Publishing report for {project_name}..."
-        elif hasattr(state, 'update_progress'):
-            state.update_progress(f"Publishing report for {project_name}...")
+        # Update progress using StateManager
+        state = state_manager.update_progress(state, f"Publishing report for {project_name}...")
         
-        draft_sources = ["draft", "edited_draft", "final_report"]
-        if isinstance(state, dict):
-            for source in draft_sources:
-                if source in state:
-                    content_length = len(state[source]) if isinstance(state[source], str) else 0
-                    logger.info(f"Found state['{source}'] with {content_length} chars")
-        
-        draft = None
-        possible_sources = ["edited_draft", "draft", "final_report"]
-        
-        if isinstance(state, dict):
-            for source in possible_sources:
-                if source in state and isinstance(state[source], str) and len(state[source]) > 500:
-                    draft = state[source]
-                    logger.info(f"Using content from state['{source}'] ({len(draft)} chars)")
-                    break
-                elif source in state and isinstance(state[source], str):
-                    logger.warning(f"Content in state['{source}'] is too short: {len(state[source])} chars")
-        
+        # Get draft content using StateManager
+        draft = state_manager.get_final_report(state)
         if not draft:
-            logger.info("No suitable draft found in state dict, checking attributes")
-            for source in possible_sources:
-                content = getattr(state, source, None) if hasattr(state, source) else None
-                if content and isinstance(content, str) and len(content) > 500:
-                    draft = content
-                    logger.info(f"Using content from state.{source} ({len(draft)} chars)")
-                    break
-                elif content and isinstance(content, str):
-                    logger.warning(f"Content in state.{source} is too short: {len(content)} chars")
-        
+            draft = state_manager.get_edited_draft(state)
+        if not draft:
+            draft = state_manager.get_draft(state)
+            
         if not draft or len(draft) < 500:
             logger.warning(f"No substantial draft found in state (best length: {len(draft) if draft else 0} chars)")
             
@@ -107,14 +87,12 @@ def publisher(state, llm, logger, config=None) -> dict:
             draft = minimal_draft
             logger.info(f"Generated minimal draft with {len(draft.split())} words")
             
-            if isinstance(state, dict):
-                state["draft"] = draft
-                state["edited_draft"] = draft
-            else:
-                state.draft = draft
-                state.edited_draft = draft
+            # Update state with minimal draft
+            state = state_manager.update_draft(state, draft)
+            state = state_manager.update_edited_draft(state, draft)
         
-        vis_list = state.get("visualization_list", [])
+        # Get visualization list using StateManager
+        vis_list = state_manager.get_visualization_list(state)
         
         logger.info(f"Found {len(vis_list)} visualizations in state")
         if vis_list:
@@ -414,16 +392,15 @@ def publisher(state, llm, logger, config=None) -> dict:
         
         logger.info(f"Successfully generated PDF at {output_path}")
         
-        if isinstance(state, dict):
-            state["report_path"] = output_path
-        else:
-            state.report_path = output_path
+        # Update report path in state using StateManager
+        state = state_manager.update_report_path(state, output_path)
         
         return state
     
     except Exception as e:
         logger.error(f"Error in publisher: {str(e)}", exc_info=True)
-        if isinstance(state, dict):
-            state["errors"] = state.get("errors", []) + [str(e)]
-            state["progress"] = f"Error publishing report: {str(e)}"
+        # Add error to state using StateManager
+        state_manager = StateManager(logger=logger)
+        state = state_manager.add_error(state, "publisher", str(e))
+        state = state_manager.update_progress(state, f"Error publishing report: {str(e)}")
         return state

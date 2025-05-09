@@ -1,0 +1,1 @@
+{"data": ["research://tavily/{query}"], "metadata": {"source": "rag", "endpoint": "search", "query": "rag_search_bitcoin_price cryptocurrency risks and opportunities_web_research", "cached_at": "2025-05-09T11:51:01.703213", "expires_at": "2025-05-10T11:51:01.703213", "last_accessed": "2025-05-09T13:06:13.286223", "ttl_hours": 24}}

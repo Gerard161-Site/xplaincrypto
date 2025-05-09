@@ -354,75 +354,7 @@ async def health_check():
         "active_sessions": len(active_sessions)
     }
 
-@fastapi_app.get("/api/debug/rag-mcp")
-async def debug_rag_mcp_flow(query: str = "What is the price and market cap of Bitcoin?"):
-    """Debug endpoint to test the RAG → MCP flow."""
-    try:
-        logger.info(f"Testing RAG-MCP flow with query: {query}")
-        
-        # Get the vector store
-        from backend.orchestration.rag.vector_store import get_vector_store
-        vs = get_vector_store()
-        
-        # Initialize endpoints if needed
-        from backend.orchestration.mcp.initialize_endpoints import initialize_api_endpoints
-        initialized = await initialize_api_endpoints()
-        if not initialized:
-            return {"error": "Failed to index API endpoints"}
-        
-        # Test RAG retrieval
-        from backend.orchestration.rag.retriever import RAGRetriever
-        retriever = RAGRetriever(vs)
-        endpoints = await retriever.process_query(query)
-        
-        # Test MCP router
-        from backend.orchestration.mcp.router import MCPRouter
-        router = MCPRouter(vs)
-        await router.initialize_endpoints()
-        tools = await router.route_query(query)
-        
-        # Format results
-        tool_info = []
-        for tool in tools:
-            tool_info.append({
-                "name": tool.name,
-                "description": tool.description,
-                "source": getattr(tool, "endpoint_id", "unknown")
-            })
-        
-        return {
-            "query": query,
-            "rag_endpoints": endpoints,
-            "tools_found": len(tools),
-            "tools": tool_info
-        }
-    except Exception as e:
-        logger.error(f"Error in RAG-MCP debug endpoint: {str(e)}", exc_info=True)
-        return {"error": str(e)}
-
-@fastapi_app.post("/api/debug/research")
-async def debug_research(query: str, use_mcp: bool = True):
-    """Debug endpoint to test the full research flow with a specific query."""
-    try:
-        # Create researcher instance
-        from backend.agents.researcher import Researcher
-        researcher = Researcher(use_mcp=use_mcp)
-        await researcher.initialize()
-        
-        # Execute research
-        context = {"project_name": query.split()[-1] if " " in query else query}
-        result = await researcher._execute_mcp_workflow(query, context)
-        
-        return {
-            "query": query,
-            "research_result": result,
-            "draft_length": len(result.get("draft", "")),
-            "error": result.get("error")
-        }
-    except Exception as e:
-        logger.error(f"Error in research debug endpoint: {str(e)}", exc_info=True)
-        return {"error": str(e)}
-
 if __name__ == "__main__":
+    print("Starting XplainCrypto API server...")
     import uvicorn
-    uvicorn.run("backend.main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run(app, host="0.0.0.0", port=8000)

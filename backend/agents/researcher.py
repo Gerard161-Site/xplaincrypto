@@ -13,6 +13,7 @@ try:
     from backend.orchestration.rag.retriever import RAGRetriever
     from backend.orchestration.rag.vector_store import get_vector_store
     from backend.utils.data_standardizer import DataStandardizer
+    from backend.utils.state_manager import StateManager
 except ModuleNotFoundError:
     from state import ResearchState
     from orchestration.mcp.client_manager import MCPClientManager
@@ -20,6 +21,7 @@ except ModuleNotFoundError:
     from orchestration.rag.retriever import RAGRetriever
     from orchestration.rag.vector_store import get_vector_store
     from utils.data_standardizer import DataStandardizer
+    from utils.state_manager import StateManager
 
 # Configure logger to flush immediately
 logger = logging.getLogger(__name__)
@@ -43,6 +45,10 @@ class Researcher:
         self.data = {}
         self.project_name = None
         self.state = {}
+        
+        # Initialize StateManager for consistent state access
+        self.state_manager = StateManager(logger=self.logger)
+        
         self.logger.info("Researcher constructor started")
         self.logger.info("Researcher constructor completed")
     
@@ -113,17 +119,11 @@ class Researcher:
     async def run(self, state: Union[ResearchState, Dict]) -> Union[ResearchState, Dict]:
         """Run the researcher to collect data for the given project."""
         self.logger.info("Entering Researcher.run")
-        is_state_dict = isinstance(state, dict)
         
         try:
-            self.logger.info("Processing state")
-            if is_state_dict:
-                project_name = state.get("project_name", "Unknown Project")
-                self.logger.info(f"Running researcher for {project_name}")
-                self.project_name = project_name
-            else: # Assuming ResearchState object
-                self.logger.info(f"Running researcher for {state.project_name}")
-                self.project_name = state.project_name
+            # Use StateManager to get project name consistently
+            self.project_name = self.state_manager.get_project_name(state)
+            self.logger.info(f"Running researcher for {self.project_name}")
             
             self.logger.info("Setting up cache directory")
             self.cache_dir = os.path.join("docs", self.project_name.lower(), "cache")
@@ -135,76 +135,43 @@ class Researcher:
             self.logger.info("Initialize completed")
             
             self.logger.info("Calling execute_workflow")
-            # Pass the original state (dict or object) to execute_workflow
+            # Pass the original state to execute_workflow
             result = await asyncio.wait_for(self.execute_workflow(query_or_state=state), timeout=300.0)
             self.logger.info("Completed Researcher.run")
-            return result # execute_workflow should return the modified state (dict or object)
+            return result
             
         except asyncio.TimeoutError:
             self.logger.error("Researcher.run timed out after 300 seconds")
             error_msg = "Researcher timed out"
-            if is_state_dict:
-                if "errors" not in state or not isinstance(state["errors"], list):
-                    state["errors"] = [] # Ensure errors is a list
-                state["errors"].append(error_msg)
-            else: # Assuming ResearchState object
-                if not hasattr(state, 'errors') or not isinstance(state.errors, list):
-                    state.errors = [] # Ensure errors is a list
-                state.errors.append(error_msg)
-            return state
+            # Add error to state using StateManager
+            return self.state_manager.add_error(state, "researcher", error_msg)
         except Exception as e:
             self.logger.error(f"Error in researcher run: {str(e)}", exc_info=True)
             error_msg = f"Researcher error: {str(e)}"
-            if is_state_dict:
-                if "errors" not in state or not isinstance(state["errors"], list):
-                    state["errors"] = [] # Ensure errors is a list
-                state["errors"].append(error_msg)
-            else: # Assuming ResearchState object
-                if not hasattr(state, 'errors') or not isinstance(state.errors, list):
-                    state.errors = [] # Ensure errors is a list
-                state.errors.append(error_msg)
-            return state
+            # Add error to state using StateManager
+            return self.state_manager.add_error(state, "researcher", error_msg)
     
     async def execute_workflow(self, query_or_state: Any, context: Dict[str, Any] = None) -> Any: # Return type matches input
         """Execute the research workflow using RAG to select MCP endpoints."""
         self.logger.info("Entering execute_workflow")
         context = context or {}
         
-        # Determine if input is dict or object and keep it consistent
-        is_state_dict = isinstance(query_or_state, dict)
+        # Use StateManager to get consistent access to state fields
         state = query_or_state # Use the original reference
         
-        # Load report_config from state if not in context
-        # Needs consistent access based on state type
-        if 'report_config' not in context:
-             if is_state_dict:
-                  report_config = state.get('report_config', {})
-                  if report_config: self.logger.info("Loaded report_config from state dict")
-             else:
-                  report_config = getattr(state, 'report_config', {})
-                  if report_config: self.logger.info("Loaded report_config from state object")
-        elif 'report_config' in context:
-            report_config = context['report_config']
-            self.logger.info("Loaded report_config from context")
-        else:
-            report_config = {}
-            self.logger.warning("report_config not found in state or context")
-            
-        project_name = state.get('project_name', 'Unknown Project') if is_state_dict else getattr(state, 'project_name', 'Unknown Project')
+        # Get project name and report config using StateManager
+        project_name = self.state_manager.get_project_name(state)
+        report_config = self.state_manager.get_report_config(state)
         
-        self.state_ref = state # Keep a reference for internal use if needed, but modify state directly
+        if not report_config:
+            self.logger.warning("No report_config found in state")
+            report_config = {}
+            
         self.project_name = project_name.lower()
         self.logger.info(f"Project name: {self.project_name}")
         
-        # Ensure state has necessary keys/attributes
-        if is_state_dict:
-            if "problem_sections" not in state: state["problem_sections"] = []
-            if "data" not in state: state["data"] = {}
-            if "visualization_data" not in state: state["visualization_data"] = {}
-        else:
-            if not hasattr(state, 'problem_sections'): state.problem_sections = []
-            if not hasattr(state, 'data'): state.data = {}
-            if not hasattr(state, 'visualization_data'): state.visualization_data = {}
+        # Initialize state structures if not present
+        state = self.state_manager.ensure_state_structure(state)
         
         try:
             # Track processed endpoints to avoid duplicate API calls
@@ -218,19 +185,22 @@ class Researcher:
             if "batch_data" in self.data and "tavily" in self.data["batch_data"]:
                 section_research_results = self.data["batch_data"]["tavily"]
                 
-                # Store these results in the appropriate state locations
+                # Store these results in the appropriate state locations using StateManager
                 for section_key, section_data in section_research_results.items():
-                    if is_state_dict:
-                        if section_key not in state["data"]:
-                            state["data"][section_key] = {}
-                        if "tavily" not in state["data"][section_key]:
-                            state["data"][section_key]["tavily"] = section_data
-                    else:
-                        if not hasattr(state.data, section_key):
-                            setattr(state.data, section_key, {})
-                        section_data_obj = getattr(state.data, section_key)
-                        if "tavily" not in section_data_obj:
-                            section_data_obj["tavily"] = section_data
+                    # Find the corresponding section title from report_config
+                    section_title = None
+                    for section in report_config.get("sections", []):
+                        if section.get("title", "").lower().replace(" ", "_") == section_key:
+                            section_title = section.get("title")
+                            break
+                    
+                    if section_title:
+                        # Update state for this section
+                        current_section_data = self.state_manager.get_section_data(state, section_title) or {}
+                        current_section_data["tavily"] = section_data
+                        
+                        # Store the updated section data using StateManager
+                        state = self.state_manager.update_section_data(state, section_title, current_section_data)
             
             # Process each section from report_config to get non-research data
             # Research data was already handled by _batch_process_tavily via _batch_process_project_data
@@ -239,9 +209,6 @@ class Researcher:
                 if not section_title:
                     continue
                     
-                # Convert section title to section_key format (lowercase with underscores)
-                section_key = section_title.lower().replace(" ", "_")
-                
                 # Get required data sources, filtering out web_research as it's handled already
                 required_sources = [source for source in section.get("data_sources", [])
                                     if source != "web_research"]
@@ -293,55 +260,39 @@ class Researcher:
                         # Mark as processed to avoid duplicate calls
                         self.processed_endpoints.add(endpoint)
                         
-                        # Store result in state
-                        if is_state_dict:
-                            if section_key not in state["data"]:
-                                state["data"][section_key] = {}
-                            
+                        # Store result in state using StateManager
+                        if result:
                             # Extract source from endpoint
                             source = endpoint.split("://")[1].split("/")[0] if "://" in endpoint else "unknown"
-                            if source not in state["data"][section_key]:
-                                state["data"][section_key][source] = result
-                        else:
-                            # Similar logic for object-style state
-                            if not hasattr(state.data, section_key):
-                                setattr(state.data, section_key, {})
                             
-                            # Extract source from endpoint
-                            source = endpoint.split("://")[1].split("/")[0] if "://" in endpoint else "unknown"
-                            section_data = getattr(state.data, section_key)
-                            if source not in section_data:
-                                section_data[source] = result
+                            # Get current section data
+                            current_section_data = self.state_manager.get_section_data(state, section_title) or {}
+                            current_section_data[source] = result
+                            
+                            # Update state with new section data
+                            state = self.state_manager.update_section_data(state, section_title, current_section_data)
                     except Exception as e:
                         self.logger.error(f"Error processing endpoint {endpoint} for section '{section_title}': {str(e)}")
                         # Add to problem sections if there's an error
-                        if is_state_dict and section_title not in state["problem_sections"]:
-                            state["problem_sections"].append(section_title)
-                        elif not is_state_dict and section_title not in state.problem_sections:
-                            state.problem_sections.append(section_title)
+                        problem_sections = self.state_manager.get_problem_sections(state) or []
+                        if not any(ps.get("title") == section_title for ps in problem_sections):
+                            problem_sections.append({"title": section_title, "missing_fields": [source]})
+                            state = self.state_manager.update_problem_sections(state, problem_sections)
             
-            # Consolidate all fetched data into state
-            self.logger.info("Consolidating fetched data into state...")
+            # Consolidate all fetched data into state (for any non-section specific data)
+            self.logger.info("Consolidating additional fetched data into state...")
             
             # Process each key in self.data
             for key, value in self.data.items():
                 if key != "batch_data":  # We've already processed batch_data above
                     # Handle other data sources
                     for field_key, field_data in value.items():
-                        # Store in state.data for general access
-                        if is_state_dict:
-                            if key not in state["data"]:
-                                state["data"][key] = {}
-                            state["data"][key][field_key] = field_data
-                        else:
-                            if not hasattr(state.data, key):
-                                setattr(state.data, key, {})
-                            source_data = getattr(state.data, key)
-                            source_data[field_key] = field_data
+                        # For general data not tied to a specific section
+                        state = self.state_manager.update_data_field(state, key, field_key, field_data)
             
             # Report problem sections
-            problem_count = len(state["problem_sections"] if is_state_dict else state.problem_sections)
-            self.logger.info(f"Problem sections reported: {problem_count}")
+            problem_sections = self.state_manager.get_problem_sections(state) or []
+            self.logger.info(f"Problem sections reported: {len(problem_sections)}")
             
             # Standardize data for visualizations using DataStandardizer
             self.logger.info("Standardizing data for visualizations")
@@ -358,15 +309,8 @@ class Researcher:
             
         except Exception as e:
             self.logger.error(f"Error in execute_workflow: {str(e)}", exc_info=True)
-            if is_state_dict:
-                if "errors" not in state:
-                    state["errors"] = []
-                state["errors"].append(str(e))
-            else:
-                if not hasattr(state, 'errors'):
-                    state.errors = []
-                state.errors.append(str(e))
-            return state
+            # Add error to state using StateManager
+            return self.state_manager.add_error(state, "researcher", f"Error in execute_workflow: {str(e)}")
 
     async def _invoke_tool_for_endpoint(self, endpoint_pattern: str, project_name: str, query: Optional[str] = None, cache_key: Optional[str] = None) -> Dict[str, Any]:
         """Formats endpoint pattern INCLUDING identifiers in the path and calls fetch_data."""

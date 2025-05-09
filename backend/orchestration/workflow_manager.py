@@ -5,6 +5,21 @@ import time
 import asyncio
 from typing import Dict, Any, Optional, List, TypedDict
 from copy import deepcopy
+from pathlib import Path
+
+# Import StateManager
+from backend.utils.state_manager import StateManager
+from backend.services.reporting.error_reporter import ErrorReporter
+from backend.services.reporting.progress_tracker import ProgressTracker
+from backend.utils.cache_utils import CacheManager
+
+# Import agent functions
+from backend.agents.researcher import researcher
+from backend.agents.writer import writer
+from backend.agents.editor import editor
+from backend.agents.reviewer import reviewer
+from backend.agents.publisher import publisher
+from backend.agents.visualizer import visualizer_async
 
 class WorkflowState(TypedDict):
     project_name: str
@@ -36,10 +51,12 @@ class WorkflowManager:
         self.llm_model = None
         self.progress_tracker = progress_tracker
         self.error_reporter = error_reporter
+        self.state_manager = StateManager(logger=logger)
         if progress_tracker:
             self.logger.info("ProgressTracker initialized in WorkflowManager")
         if error_reporter:
             self.logger.info("ErrorReporter initialized in WorkflowManager")
+        self.logger.info("StateManager initialized in WorkflowManager")
 
     def _load_report_config(self) -> Dict[str, Any]:
         try:
@@ -104,6 +121,39 @@ class WorkflowManager:
                     context={"feature": "async_initialization"}
                 )
             return False
+
+    async def execute_research_workflow(self, query: str, context: Dict[str, Any] = None) -> Dict[str, Any]:
+        """
+        Execute the research workflow for a given query.
+        
+        Args:
+            query: The research query
+            context: Optional context information
+            
+        Returns:
+            The result of the research workflow
+        """
+        self.logger.info(f"Executing research workflow for query: {query}")
+        
+        # Set default context if none provided
+        context = context or {}
+        
+        # Create a project name from the query
+        project_name = context.get("project_name") or query.lower().replace(" ", "_")
+        
+        # Execute the workflow with necessary parameters
+        result = await self.execute_workflow(
+            project_name=project_name,
+            fast_mode=context.get("fast_mode", False),
+            mode=context.get("mode", "report"),
+            visualization_request=context.get("visualization_request")
+        )
+        
+        # Add query information to result
+        result["query"] = query
+        result["context"] = context
+        
+        return result
 
     async def execute_workflow(self, project_name: str, fast_mode: bool = False, mode: str = "report", visualization_request: Optional[Dict] = None) -> Dict[str, Any]:
         from backend.agents.researcher import researcher
@@ -214,3 +264,111 @@ class WorkflowManager:
         updated_state['merged_output'] = merged_output
         self.logger.info(f"Merged state keys: {list(updated_state.keys())}")
         return updated_state
+
+    def _report_error(self, state: Dict[str, Any], stage: str, error: str) -> Dict[str, Any]:
+        """Report an error using the error reporter and StateManager."""
+        if self.error_reporter:
+            self.error_reporter.report_error(stage, error)
+        
+        return self.state_manager.add_error(state, stage, error)
+
+    async def run_workflow(self, project_name: str, query: str = None, fast_mode: bool = False):
+        """
+        Run the main workflow for a project.
+        
+        Args:
+            project_name: Name of the project
+            query: Query to research (optional)
+            fast_mode: If True, run in fast mode with optimization
+            
+        Returns:
+            Dict with workflow results
+        """
+        self.logger.info(f"Starting asynchronous workflow execution for {project_name}")
+        
+        # Initialize LLM if not already done
+        if not self.llm:
+            await self.initialize_llm()
+        
+        # Create initial state
+        state = {
+            "project_name": project_name,
+            "query": query or project_name,
+            "fast_mode": fast_mode,
+            "progress": [],
+            "errors": {},
+            "data": {},
+            "sections": {},
+            "visualizations": {},
+            "visualization_list": [],
+            "visualization_data": {}
+        }
+        
+        try:
+            # Step 1: Research phase
+            self.logger.info("Running Researcher")
+            self.progress_tracker.update_progress(f"Researching {project_name}...")
+            try:
+                state = await asyncio.wait_for(
+                    researcher(state, llm=self.llm, logger=self.logger),
+                    timeout=1800,  # 30 min timeout
+                )
+            except asyncio.TimeoutError:
+                return self._report_error(state, "researcher", "Research phase timed out after 30 minutes")
+            
+            # Step 2: Writer phase
+            if not state.get("errors", {}).get("researcher"):
+                self.logger.info("Running Writer")
+                try:
+                    state = await writer(state, llm=self.llm, logger=self.logger)
+                except Exception as e:
+                    return self._report_error(state, "writer", f"Writer phase failed: {str(e)}")
+            
+            # Step 3: Visualizer phase - uses data already in state from researcher
+            self.logger.info("Running Visualizer")
+            try:
+                state = await visualizer_async(state, llm=self.llm, logger=self.logger)
+            except Exception as e:
+                return self._report_error(state, "visualizer", f"Visualizer phase failed: {str(e)}")
+            
+            # Step 4: Merge results
+            state = self._merge_results(state)
+            
+            # Step 5: Reviewer phase
+            self.logger.info("Running Reviewer")
+            try:
+                state = await reviewer(state, llm=self.llm, logger=self.logger)
+            except Exception as e:
+                return self._report_error(state, "reviewer", f"Reviewer phase failed: {str(e)}")
+            
+            # Step 6: Editor phase
+            self.logger.info("Running Editor")
+            try:
+                state = await editor(state, llm=self.llm, logger=self.logger)
+            except Exception as e:
+                return self._report_error(state, "editor", f"Editor phase failed: {str(e)}")
+            
+            # Step 7: Publisher phase
+            self.logger.info("Running Publisher")
+            try:
+                state = await publisher(state, llm=self.llm, logger=self.logger)
+            except Exception as e:
+                return self._report_error(state, "publisher", f"Publisher phase failed: {str(e)}")
+            
+            return {
+                "status": "success",
+                "result": state,
+                "report_path": state.get("report_path"),
+                "visualization_list": state.get("visualization_list", []),
+                "report_content": state.get("final_report", ""),
+                "errors": state.get("errors", {})
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Workflow execution failed: {str(e)}")
+            self.error_reporter.report("workflow", f"Workflow execution failed: {str(e)}")
+            return {
+                "status": "error",
+                "error": str(e),
+                "errors": state.get("errors", {})
+            }

@@ -1,0 +1,1 @@
+{"data": ["data://coinmarketcap/overview/{coin}"], "metadata": {"source": "rag", "endpoint": "search", "query": "rag_search_solana_market_analysis technical architecture blockchain_coinmarketcap", "cached_at": "2025-05-09T11:42:34.316516", "expires_at": "2025-05-10T11:42:34.316516", "last_accessed": "2025-05-09T11:45:54.051425", "ttl_hours": 24}}

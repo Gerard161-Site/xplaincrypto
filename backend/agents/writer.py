@@ -17,6 +17,7 @@ from backend.utils.number_formatter import NumberFormatter
 from backend.utils.inference import openai_retry_decorator
 from backend.utils.cache_utils import CacheManager
 import time
+from backend.utils.state_manager import StateManager
 
 class WriterAgent:
     def __init__(self, llm: ChatOpenAI, logger: logging.Logger, hf_api_token: Optional[str] = None):
@@ -82,6 +83,9 @@ class WriterAgent:
         if not isinstance(data_sources, dict):
             self.logger.warning("Invalid data_sources format in state, treating as empty")
             data_sources = {}
+        
+        # Log data source sizes to help debug context window issues
+        self._log_data_source_sizes(data_sources)
             
         # Get problem sections information
         problem_sections = []
@@ -94,22 +98,27 @@ class WriterAgent:
         problem_section_titles = {ps["title"] for ps in problem_sections if "title" in ps}
         self.logger.info(f"Problem section titles: {problem_section_titles}")
         
+        # Initialize StateManager for this operation
+        state_manager = StateManager(logger=self.logger)
+        
         # Get report configuration
-        report_config = None
-        if isinstance(state, dict):
-            report_config = state.get("report_config", {})
-        else:
-            report_config = getattr(state, "report_config", {})
+        report_config = state_manager.get_report_config(state)
+        
+        self.logger.info(f"Writer agent starting for project: {project_name}")
+        self.logger.info(f"Using report config version: {report_config.get('version', 'unknown')}")
+        
+        # Update progress using StateManager
+        state = state_manager.update_progress(state, f"Writing draft report for {project_name}...")
         
         if not report_config:
-            self.logger.error("No report configuration found")
-            return "Error: No report configuration found"
+            self.logger.error("No report_config found in state")
+            return state_manager.add_error(state, "writer", "No report_config found in state")
         
         # Get sections from report config
         sections = report_config.get("sections", [])
         if not sections:
-            self.logger.error("No sections found in report configuration")
-            return "Error: No sections found in report configuration"
+            self.logger.error("No sections found in report_config")
+            return state_manager.add_error(state, "writer", "No sections found in report_config")
         
         # Preprocess key metrics once - improves performance vs. doing in each section
         key_metrics = self._format_key_metrics(self._extract_key_metrics(data_sources))
@@ -437,63 +446,79 @@ class WriterAgent:
     @openai_retry_decorator
     async def _generate_section_content(self, section: Dict, research_summary: str, key_metrics: Dict, data_sources: Dict, project_name: str, is_problem_section: bool = False) -> str:
         """
-        Generate content for a section using optimized LLM parameters.
-        Prioritizes using existing research data and enforces minimum word counts.
+        Generate content for a single section using available data and the LLM.
         
         Args:
             section: Section configuration
-            research_summary: Existing content for the section if available
-            key_metrics: Preprocessed key metrics from all data sources
+            research_summary: Existing research summary if available
+            key_metrics: Preprocessed key metrics
             data_sources: All available data sources
             project_name: Name of the project
-            is_problem_section: Whether this section has explicitly marked data issues
+            is_problem_section: Whether this is a problem section with limited data
             
         Returns:
             Generated content for the section
         """
-        section_title = section["title"]
+        section_title = section.get("title", "")
         description = section.get("prompt", "")
         min_words = section.get("min_words", 400)
         max_words = section.get("max_words", 700)
         
-        # Check if we have existing content that meets minimum requirements
-        if research_summary.strip() and len(research_summary.split()) >= min_words:
-            self.logger.info(f"Using existing research content for {section_title} ({len(research_summary.split())} words)")
-            return research_summary
-            
-        # If not enough existing content, try to generate from research data
-        # First check if we have any web_research data for this section
-        section_research = ""
-        if "web_research" in data_sources:
-            for query, content in data_sources["web_research"].items():
-                # Check if the query is relevant to this section
-                query_lower = query.lower()
-                if (section_title.lower() in query_lower or 
-                    any(keyword in query_lower for keyword in section_title.lower().split())):
-                    section_research += f"{content}\n\n"
+        self.logger.info(f"Generating content for section: {section_title} (target: {min_words}-{max_words} words)")
         
-        # Gather other relevant data for this section
-        data_for_section = {}
-        if "data_sources" in section:
-            for source_name in section["data_sources"]:
-                if source_name in data_sources:
-                    data_for_section[source_name] = data_sources[source_name]
+        # Check for existing research summary
+        if research_summary and len(research_summary.strip()) > 0:
+            self.logger.info(f"Found existing research summary for {section_title}: {len(research_summary.split())} words")
         
-        # If we have good research data, use it even if this section is in problem_sections
-        has_research_data = len(section_research.strip().split()) >= 100
+        # Use focused data chunk for this section to avoid context window limits
+        chunked_data = self._chunk_data_for_section(section_title, data_sources)
         
-        # Only use fallback if this is explicitly a problem section AND we don't have research data
-        if is_problem_section and not has_research_data:
-            self.logger.info(f"Using HuggingFace fallback for problem section: {section_title}")
-            return await self._generate_content_for_problem_section(
+        # Create a context dictionary with relevant information
+        context = {}
+        
+        # Add section-specific data
+        data_fields = section.get("data_fields", [])
+        fallback_fields = section.get("fallback_fields", [])
+        
+        # Add data fields if available
+        for field in data_fields:
+            # Check for field in key metrics first (most concise)
+            if field in key_metrics:
+                context[field] = key_metrics[field]
+                continue
+                
+            # Then look in all data sources
+            for source, source_data in chunked_data.items():
+                if isinstance(source_data, dict):
+                    for key, value in source_data.items():
+                        if isinstance(value, dict) and field in value:
+                            context[f"{source}.{key}.{field}"] = value[field]
+                            break
+        
+        # Add fallback fields if available
+        for field in fallback_fields:
+            if field in key_metrics and field not in context:
+                context[field] = key_metrics[field]
+        
+        # Add web research if available
+        if "web_research" in chunked_data:
+            context["research"] = chunked_data["web_research"]
+        
+        # Count available context data to determine strategy
+        context_items = len(context)
+        
+        self.logger.info(f"Content generation context for '{section_title}': {context_items} items with strategy: {'problem-section' if is_problem_section else 'standard'}")
+        
+        # For very limited data, use more flexible generation approach
+        if context_items < 3 and not is_problem_section:
+            self.logger.info(f"Limited data for section '{section_title}', using lightweight approach")
+            return await self._generate_limited_content(
                 project_name=project_name,
-                section=section,
-                data_sources=data_sources,
-                key_metrics=key_metrics
+                section_title=section_title,
+                description=description,
+                relevant_data=context,
+                min_words=min_words
             )
-        
-        # Use either the research summary or the compiled section research
-        context = research_summary.strip() if research_summary.strip() else section_research
         
         # Use gpt-3.5-turbo for all sections to improve performance
         section_llm = ChatOpenAI(
@@ -1131,244 +1156,600 @@ class WriterAgent:
     async def _generate_limited_content(self, project_name: str, section_title: str, description: str, 
                                       relevant_data: Dict, min_words: int) -> str:
         """
-        Generate content with limited verified data points while still meeting word count requirements.
+        Generate section content with very limited data, optimizing for model context window.
+        Used for sections with minimal data to avoid overwhelming the model with irrelevant information.
         
         Args:
             project_name: Name of the project
-            section_title: Title of the section
-            description: Description of the section
-            relevant_data: Dictionary of relevant data points
-            min_words: Minimum word count required
+            section_title: Section title
+            description: Section description
+            relevant_data: Limited relevant data for this section
+            min_words: Minimum word count target
             
         Returns:
-            Generated section content
+            Generated content
         """
-        self.logger.info(f"Generating limited content for {section_title} with {len(relevant_data)} data points")
+        self.logger.info(f"Using limited content generation for section '{section_title}' with {len(relevant_data)} data points")
         
-        # First try with gpt-3.5-turbo for better performance
+        # Create a specific, highly focused prompt
+        prompt = f"""
+Write a detailed analysis for the '{section_title}' section of a report on the {project_name} cryptocurrency project.
+
+SECTION PURPOSE:
+{description}
+
+AVAILABLE DATA:
+{json.dumps(relevant_data, indent=2) if relevant_data else "Limited data available for this section."}
+
+INSTRUCTIONS:
+1. Write a comprehensive section of at least {min_words} words
+2. Include all relevant information from the provided data
+3. Use a formal, analytical tone suitable for investors
+4. Organize with logical subheadings as needed
+5. IMPORTANT: If data is limited, acknowledge this explicitly rather than inventing facts
+6. Focus on what can be reasonably inferred from available information
+7. Format in Markdown
+
+OUTPUT:
+"""
+        
         try:
-            llm = ChatOpenAI(
-                model="gpt-3.5-turbo",
-                temperature=0.7,
-                max_tokens=2000
-            )
-            
-            prompt = ChatPromptTemplate.from_template(
-                """
-                Create a detailed section on {section_title} for {project_name}.
-                
-                CRITICAL REQUIREMENTS:
-                1. This section MUST contain AT LEAST {min_words} words
-                2. Focus on: {description}
-                3. Use only verified data - DO NOT fabricate information about {project_name}
-                
-                Available verified data:
-                {relevant_data_json}
-                
-                INSTRUCTIONS:
-                - Start with the limited verified data above
-                - Expand with educational content about this topic area in cryptocurrency
-                - Include industry standards and best practices
-                - Clearly mark where you transition from verified project data to general information
-                - GENERATE AT LEAST {min_words} WORDS TOTAL
-                
-                If verified data is limited, address this transparently while still providing valuable 
-                general information about similar aspects in other crypto projects.
-                """
-            )
-            
-            chain = prompt | llm | StrOutputParser()
-            
-            content = await chain.ainvoke({
-                "section_title": section_title,
-                "project_name": project_name,
-                "min_words": min_words,
-                "description": description,
-                "relevant_data_json": json.dumps(relevant_data, indent=2)
-            })
+            response = await self.llm.ainvoke(prompt)
+            content = response.content.strip()
             
             word_count = len(content.split())
-            self.logger.info(f"Generated limited content for {section_title}: {word_count} words")
+            self.logger.info(f"Generated content for '{section_title}' using limited approach: {word_count} words")
             
-            # If not enough words, try once more with explicit instructions
+            # If content is too short, note the limitation in content
             if word_count < min_words:
-                self.logger.warning(f"Limited content too short ({word_count}/{min_words}). Using GPT-4.")
-                
-                gpt4_llm = ChatOpenAI(
-                    model="gpt-4", 
-                    temperature=0.7,
-                    max_tokens=3000
-                )
-                
-                retry_prompt = ChatPromptTemplate.from_template(
-                    """
-                    Create a COMPREHENSIVE educational section on {section_title} for {project_name}.
-                    
-                    CRITICAL REQUIREMENTS:
-                    1. This section MUST contain AT LEAST {min_words} words of detailed content
-                    2. Focus on: {description}
-                    3. Be intellectually honest and accurate
-                    
-                    Available verified data:
-                    {relevant_data_json}
-                    
-                    INSTRUCTIONS:
-                    - Begin with available verified data (if any)
-                    - Clearly acknowledge data limitations for {project_name}
-                    - Provide detailed educational content about this aspect in cryptocurrency projects
-                    - Discuss industry standards, methodologies, and best practices
-                    - Include implications for investors
-                    - Maintain a professional, educational tone
-                    - YOUR RESPONSE MUST BE AT LEAST {min_words} WORDS
-                    
-                    You must produce a substantive, educational section even with limited project-specific data.
-                    """
-                )
-                
-                retry_chain = retry_prompt | gpt4_llm | StrOutputParser()
-                
-                retry_content = await retry_chain.ainvoke({
-                    "section_title": section_title,
-                    "project_name": project_name,
-                    "min_words": min_words,
-                    "description": description,
-                    "relevant_data_json": json.dumps(relevant_data, indent=2)
-                })
-                
-                retry_word_count = len(retry_content.split())
-                
-                # Use the better content (prefer higher word count but must meet minimum)
-                if retry_word_count >= min_words or retry_word_count > word_count:
-                    self.logger.info(f"Using GPT-4 content for {section_title}: {retry_word_count} words")
-                    return retry_content
+                self.logger.warning(f"Generated content for '{section_title}' is below target length ({word_count}/{min_words})")
+                content += f"\n\n*Note: Limited data was available for a comprehensive analysis of {section_title}.*"
             
-            # Return original content if it's good enough
-            if word_count >= min_words:
-                return content
-                
-            # If we got here, the content is still too short, create a hybrid with fallback
-            fallback = self._generate_fallback_content(project_name, section_title)
-            hybrid_content = f"{content}\n\n{fallback}"
-            
-            self.logger.info(f"Using hybrid content for {section_title}: {len(hybrid_content.split())} words")
-            return hybrid_content
-            
+            return content
         except Exception as e:
-            self.logger.error(f"Error generating limited content: {str(e)}")
+            self.logger.error(f"Error generating limited content for '{section_title}': {str(e)}")
             return self._generate_fallback_content(project_name, section_title)
 
-@openai_retry_decorator
-async def writer(state: Dict, llm: ChatOpenAI, logger: logging.Logger, config: Optional[Dict[str, Any]] = None) -> Dict:
-    """
-    Asynchronous writer function for generating research reports from state data.
-    
-    Args:
-        state: Dictionary containing research state
-        llm: Language model instance to use for generation
-        logger: Logger instance
-        config: Optional configuration dictionary
+    def _log_data_source_sizes(self, data_sources: Dict) -> None:
+        """
+        Log the size of each data source to help identify context window issues.
         
-    Returns:
-        Updated state dictionary with draft content
-    """
-    # Performance tracking
-    start_time = time.time()
-    
-    # Create a copy of the state to avoid modifying the original
-    updated_state = state.copy() if isinstance(state, dict) else state
-    
-    try:
-        # Get project name
-        project_name = state.get('project_name', 'Unknown Project') if isinstance(state, dict) else getattr(state, 'project_name', 'Unknown Project')
-        logger.info(f"Async writer creating draft for {project_name}")
-        
-        # Create writer agent
-        writer_agent = WriterAgent(
-            llm=llm,
-            logger=logger,
-            hf_api_token=os.getenv("HUGGINGFACE_API_KEY")
-        )
-        
-        # Generate draft
-        draft_content = await writer_agent.write_draft(state)
-        
-        # Update state with draft
-        if isinstance(updated_state, dict):
-            updated_state['draft'] = draft_content
-        else:
-            updated_state.draft = draft_content
-            
-        elapsed_time = time.time() - start_time
-        logger.info(f"Successfully created draft with {len(draft_content.split())} words in {elapsed_time:.2f} seconds")
-        return updated_state
-        
-    except Exception as e:
-        logger.error(f"Error in async writer: {str(e)}", exc_info=True)
-        
-        # Record error in state
-        if isinstance(updated_state, dict):
-            if "errors" not in updated_state:
-                updated_state["errors"] = {}
-            updated_state["errors"]["writer"] = f"Failed to create draft: {str(e)}"
-        
-        return updated_state
-
-async def writer_sync(state: Dict, llm: ChatOpenAI, logger: logging.Logger, config: Optional[Dict[str, Any]] = None) -> Dict:
-    """
-    Synchronous version of the writer function for compatibility with workflow_manager.
-    This wraps the asynchronous WriterAgent functionality in a synchronous interface.
-    """
-    # Performance tracking
-    start_time = time.time()
-    
-    # Return a copy of the state to avoid modifying the original
-    updated_state = state.copy() if isinstance(state, dict) else state
-    
-    # Ensure errors is a dictionary
-    if isinstance(updated_state, dict):
-        if "errors" not in updated_state:
-            updated_state["errors"] = {}
-        elif not isinstance(updated_state["errors"], dict):
-            updated_state["errors"] = {}
-    
-    try:
-        project_name = state.get("project_name", "Unknown Project") if isinstance(state, dict) else getattr(state, "project_name", "Unknown Project")
-        logger.info(f"Writer sync creating draft for {project_name}")
-        
-        # Create writer agent instance with optimized parameters
-        writer_agent = WriterAgent(
-            llm=llm,
-            logger=logger,
-            hf_api_token=os.getenv("HUGGINGFACE_API_KEY")
-        )
-        
+        Args:
+            data_sources: Dictionary of all data sources
+        """
         try:
-            # Run the async agent directly
-            draft_content = await writer_agent.write_draft(state)
+            self.logger.info("Data source size analysis:")
+            total_size = 0
             
-            # Update state with draft content
-            if isinstance(updated_state, dict):
-                updated_state["draft"] = draft_content
-                updated_state["progress"] = f"Draft created for {project_name}"
-            else:
-                updated_state.draft = draft_content
-                if hasattr(updated_state, 'update_progress'):
-                    updated_state.update_progress(f"Draft created for {project_name}")
-                else:
-                    updated_state.progress = f"Draft created for {project_name}"
-                    
-            elapsed_time = time.time() - start_time
-            logger.info(f"Successfully created draft with {len(draft_content.split())} words in {elapsed_time:.2f} seconds")
-            return updated_state
+            for source_name, source_data in data_sources.items():
+                source_json = json.dumps(source_data)
+                source_size = len(source_json)
+                total_size += source_size
+                token_estimate = source_size / 4  # Rough estimate of token count
+                
+                self.logger.info(f"  - {source_name}: {source_size} bytes (~{int(token_estimate)} tokens)")
+                
+                # Flag large sources that could cause context window issues
+                if token_estimate > 30000:
+                    self.logger.warning(f"  ⚠️ Source {source_name} may exceed context window limits")
+            
+            self.logger.info(f"Total data size: {total_size} bytes (~{int(total_size/4)} tokens)")
+            
+            # Warn if total size approaches context window
+            if total_size/4 > 100000:
+                self.logger.warning(f"⚠️ Total data exceeds 100k tokens, will use data chunking for context window management")
+        except Exception as e:
+            self.logger.error(f"Error analyzing data source sizes: {e}")
+
+    def _chunk_data_for_section(self, section_title: str, data_sources: Dict, max_tokens: int = 60000) -> Dict:
+        """
+        Create a smaller, focused version of data sources for a specific section to avoid context window limits.
+        
+        Args:
+            section_title: Title of section being processed
+            data_sources: Complete data sources dictionary
+            max_tokens: Maximum approximate token limit
+            
+        Returns:
+            Reduced data sources focused on the current section
+        """
+        try:
+            # Make a clean copy to preserve original
+            chunked_data = {}
+            
+            # Get normalized section name for better matching
+            normalized_section = section_title.lower().replace(" ", "_")
+            
+            # First pass: Include only section-specific data
+            bytes_used = 0
+            
+            # 1. Include web research specifically for this section
+            if "web_research" in data_sources and isinstance(data_sources["web_research"], dict):
+                chunked_data["web_research"] = {}
+                for query, content in data_sources["web_research"].items():
+                    # Only include research relevant to this section
+                    if normalized_section in query.lower().replace(" ", "_"):
+                        chunked_data["web_research"][query] = content
+                        bytes_used += len(json.dumps(content))
+            
+            # 2. Include data whose keys match the section name
+            for source, source_data in data_sources.items():
+                if source != "web_research" and isinstance(source_data, dict):
+                    for key, value in source_data.items():
+                        # Check if key is relevant to this section
+                        if normalized_section in key.lower().replace(" ", "_"):
+                            if source not in chunked_data:
+                                chunked_data[source] = {}
+                            chunked_data[source][key] = value
+                            bytes_used += len(json.dumps(value))
+            
+            # 3. Include key metrics for all sections
+            if "coinmarketcap" in data_sources:
+                for key in ["market_cap", "current_price", "volume_24h"]:
+                    for file_name, file_data in data_sources["coinmarketcap"].items():
+                        if isinstance(file_data, dict) and key in file_data:
+                            if "coinmarketcap" not in chunked_data:
+                                chunked_data["coinmarketcap"] = {}
+                            if file_name not in chunked_data["coinmarketcap"]:
+                                chunked_data["coinmarketcap"][file_name] = {}
+                            chunked_data["coinmarketcap"][file_name][key] = file_data[key]
+                            bytes_used += len(json.dumps(file_data[key]))
+            
+            # Validate we have reasonable data size
+            token_estimate = bytes_used / 4
+            self.logger.info(f"Chunked data for section '{section_title}': ~{int(token_estimate)} tokens")
+            
+            if token_estimate < 100:
+                self.logger.warning(f"Very little data found for section '{section_title}', will use fallbacks")
+            
+            return chunked_data
             
         except Exception as e:
-            logger.error(f"Error in writer_sync async execution: {str(e)}", exc_info=True)
-            if isinstance(updated_state, dict):
-                updated_state["errors"]["writer"] = str(e)
-            return updated_state
+            self.logger.error(f"Error chunking data for section '{section_title}': {e}")
+            return {}
+
+    async def _generate_content_from_prompt(self, section: Dict, data_sources: Dict, project_name: str) -> str:
+        """
+        Generate content for a section based on a prompt template.
+        
+        Args:
+            section: Section configuration
+            data_sources: All available data sources
+            project_name: Name of the project
             
+        Returns:
+            Generated content
+        """
+        # Min words is now higher to ensure reviewer doesn't need to add as much content
+        section_title = section.get("title", "Unknown Section")
+        min_words = section.get("min_words", 500)  # Increased from default 400
+        max_words = section.get("max_words", 800)  # Increased from default 700
+        description = section.get("prompt", "")
+        
+        self.logger.info(f"Generating content from prompt for {section_title} (target: {min_words}-{max_words} words)")
+        
+        # Extract relevant data for this section
+        chunked_data = self._chunk_data_for_section(section_title, data_sources)
+        
+        # Extract key metrics for this section
+        key_metrics = self._extract_key_metrics(data_sources)
+        
+        try:
+            # Get visualization info
+            visualization_info = ""
+            visualizations = section.get("visualizations", [])
+            if visualizations:
+                visualization_info = "This section will include the following visualizations:\n"
+                for viz in visualizations:
+                    # Use direct section.get for visualization_types as report_config is not available
+                    viz_type = section.get("visualization_types", {}).get(viz, {})
+                    viz_title = viz_type.get("title", viz)
+                    viz_type = viz_type.get("type", "unknown")
+                    visualization_info += f"- {viz_title} ({viz_type})\n"
+            else:
+                self.logger.info(f"Section '{section_title}' has no visualizations")
+            
+            # Get adjusted max words
+            adjusted_max_words = int(max_words * 1.15)
+            
+            # Construct a prompt for the section
+            prompt = f"""
+Write a detailed, comprehensive section on "{section_title}" for a research report about {project_name}.
+
+SECTION PURPOSE:
+{description}
+
+SECTION DATA:
+{json.dumps(chunked_data, indent=2) if chunked_data else "Limited data available for this section."}
+
+KEY METRICS:
+{json.dumps(key_metrics, indent=2) if key_metrics else "No key metrics available."}
+
+{visualization_info}
+
+REQUIREMENTS:
+1. Write a comprehensive analysis of {min_words}-{adjusted_max_words} words
+2. Include specific metrics, figures, and data points from the provided context
+3. Organize content with logical subheadings
+4. Analyze both positive aspects and risk factors
+5. Format your response in Markdown with appropriate headings, lists, and emphasis
+6. NEVER fabricate data - only use what's provided or general industry knowledge
+7. If specific data is missing, acknowledge the limitation rather than inventing figures
+8. Write in a formal, analytical style suitable for serious investors and researchers
+
+This section should be thoroughly researched, data-driven, and insightful.
+"""
+            
+            response = await self.llm.ainvoke(prompt)
+            content = response.content.strip()
+            
+            word_count = len(content.split())
+            self.logger.info(f"Generated content for '{section_title}': {word_count} words")
+            
+            # If content is too short, try one more time with explicit instructions for more detail
+            if word_count < min_words:
+                self.logger.warning(f"Content for '{section_title}' is too short ({word_count}/{min_words} words), regenerating with more detail")
+                
+                # More detailed prompt emphasizing comprehensive content
+                retry_prompt = f"""
+The previous content you generated for the "{section_title}" section was only {word_count} words, but we need AT LEAST {min_words} words of comprehensive content.
+
+Write a MORE DETAILED and THOROUGH section on "{section_title}" for a research report about {project_name}.
+
+SECTION PURPOSE:
+{description}
+
+SECTION DATA:
+{json.dumps(chunked_data, indent=2) if chunked_data else "Limited data available for this section."}
+
+KEY METRICS:
+{json.dumps(key_metrics, indent=2) if key_metrics else "No key metrics available."}
+
+{visualization_info}
+
+CRITICAL REQUIREMENTS:
+1. Write AT LEAST {min_words} words of substantive, educational content (up to {adjusted_max_words} words)
+2. Add more depth, examples, and analytical insights
+3. Include detailed discussion of implications for investors
+4. Cover historical context and future outlook
+5. Compare with industry standards or competitors when relevant
+6. Present balanced analysis with both strengths and limitations
+7. Even with limited data, provide valuable context about this aspect in cryptocurrency projects
+8. Format in Markdown with clear organization
+
+YOUR RESPONSE MUST CONTAIN AT LEAST {min_words} WORDS of substantive content. Quality and depth are essential.
+"""
+                
+                retry_response = await self.llm.ainvoke(retry_prompt)
+                retry_content = retry_response.content.strip()
+                retry_word_count = len(retry_content.split())
+                
+                self.logger.info(f"Regenerated content for {section_title}: {retry_word_count} words (previous: {word_count})")
+                
+                # Use the better content
+                if retry_word_count > word_count:
+                    return retry_content
+            
+            return content
+            
+        except Exception as e:
+            self.logger.error(f"Error generating content for section '{section_title}': {str(e)}")
+            return f"**{section_title}**\n\nError generating content: {str(e)}"
+
+@openai_retry_decorator
+async def writer(state: Dict[str, Any], llm: ChatOpenAI, logger: logging.Logger, config=None) -> Dict[str, Any]:
+    """
+    Generate a research report draft based on collected data.
+    Uses StateManager for consistent state access.
+    """
+    try:
+        # Initialize StateManager for consistent state access
+        state_manager = StateManager(logger=logger)
+        
+        # Get project name and report config using StateManager
+        project_name = state_manager.get_project_name(state)
+        report_config = state_manager.get_report_config(state)
+        
+        logger.info(f"Writer agent starting for project: {project_name}")
+        logger.info(f"Using report config version: {report_config.get('version', 'unknown')}")
+        
+        # Update progress using StateManager
+        state = state_manager.update_progress(state, f"Writing draft report for {project_name}...")
+        
+        if not report_config:
+            logger.error("No report_config found in state")
+            return state_manager.add_error(state, "writer", "No report_config found in state")
+        
+        sections = report_config.get("sections", [])
+        if not sections:
+            logger.error("No sections found in report_config")
+            return state_manager.add_error(state, "writer", "No sections found in report_config")
+        
+        # Get all state data to analyze size
+        all_data = state_manager.get_data(state)
+        
+        # Log data sizes to identify potential context window issues
+        logger.info("Analyzing data sizes for writer context window management")
+        total_size = 0
+        large_sources = []
+        
+        for source_name, source_data in all_data.items():
+            try:
+                source_json = json.dumps(source_data)
+                source_size = len(source_json)
+                total_size += source_size
+                token_estimate = source_size / 4  # Rough estimate of token count
+                
+                logger.info(f"Data source {source_name}: ~{int(token_estimate)} tokens")
+                
+                # Flag large sources for potential splitting
+                if token_estimate > 30000:
+                    logger.warning(f"Large data source detected: {source_name} (~{int(token_estimate)} tokens)")
+                    large_sources.append(source_name)
+            except Exception as e:
+                logger.error(f"Error analyzing data source {source_name}: {str(e)}")
+        
+        logger.info(f"Total data size: ~{int(total_size/4)} tokens")
+        
+        # Get key metrics using StateManager
+        key_metrics = state_manager.get_key_metrics(state)
+        
+        # Create a draft report structure
+        draft = f"# {project_name} Research Report\n\n"
+        
+        # Process each section
+        for section in sections:
+            section_title = section.get("title", "")
+            if not section_title:
+                continue
+            
+            logger.info(f"Processing section: {section_title}")
+            
+            # Get section data using StateManager
+            section_data = state_manager.get_section_data(state, section_title)
+            
+            # Get section prompt from report_config
+            section_prompt = section.get("prompt", f"Write a section about {section_title} for {project_name}")
+            
+            # Use the min and max words from the section configuration
+            min_words = section.get("min_words", 400)  # Default if not specified
+            max_words = section.get("max_words", 700)  # Default if not specified
+            
+            # Allow 15% more words than max to give the editor room to trim
+            adjusted_max_words = int(max_words * 1.15)
+            
+            # Get visualizations for this section
+            visualizations = section.get("visualizations", [])
+            visualization_info = ""
+            
+            if visualizations:
+                logger.info(f"Section '{section_title}' has {len(visualizations)} visualizations: {', '.join(visualizations)}")
+                visualization_info = "This section will include the following visualizations:\n"
+                for viz in visualizations:
+                    viz_type = section.get("visualization_types", {}).get(viz, {})
+                    viz_title = viz_type.get("title", viz)
+                    viz_type = viz_type.get("type", "unknown")
+                    visualization_info += f"- {viz_title} ({viz_type})\n"
+            else:
+                logger.info(f"Section '{section_title}' has no visualizations")
+            
+            # Log the target word count from config
+            logger.info(f"Section '{section_title}' config: {min_words}-{max_words} words (allowing up to {adjusted_max_words} for editing)")
+            
+            # Add section title to draft
+            draft += f"## {section_title}\n\n"
+            
+            # Check if we have section content already
+            if section_data and "content" in section_data:
+                logger.info(f"Using existing content for section: {section_title}")
+                draft += section_data["content"] + "\n\n"
+                continue
+            
+            # Create focused subset of data that's relevant to this section
+            focused_data = _create_focused_data_for_section(all_data, section_title, logger)
+            
+            # Prepare context for the LLM
+            context = {
+                "project_name": project_name,
+                "section_title": section_title,
+                "key_metrics": key_metrics,
+                "section_data": focused_data or {}
+            }
+            
+            # Generate section content with LLM
+            try:
+                # Construct a prompt for the section
+                prompt = f"""
+Write a detailed, comprehensive section on "{section_title}" for a research report about {project_name}.
+
+SECTION PURPOSE:
+{section_prompt}
+
+SECTION DATA:
+{json.dumps(focused_data, indent=2) if focused_data else "Limited data available for this section."}
+
+KEY METRICS:
+{json.dumps(key_metrics, indent=2) if key_metrics else "No key metrics available."}
+
+{visualization_info}
+
+REQUIREMENTS:
+1. Write a comprehensive analysis of {min_words}-{adjusted_max_words} words
+2. Include specific metrics, figures, and data points from the provided context
+3. Organize content with logical subheadings
+4. Analyze both positive aspects and risk factors
+5. Format your response in Markdown with appropriate headings, lists, and emphasis
+6. NEVER fabricate data - only use what's provided or general industry knowledge
+7. If specific data is missing, acknowledge the limitation rather than inventing figures
+8. Write in a formal, analytical style suitable for serious investors and researchers
+
+This section should be thoroughly researched, data-driven, and insightful.
+"""
+                
+                # Use GPT-4 for all content generation to improve quality
+                gpt4_llm = ChatOpenAI(
+                    model="gpt-4",  # Use GPT-4 for better quality
+                    temperature=0.7,
+                    max_tokens=3500
+                )
+                
+                # Generate content with more capable model
+                response = gpt4_llm.invoke(prompt)
+                section_content = response.content.strip()
+                
+                # Verify we have substantial content
+                word_count = len(section_content.split())
+                logger.info(f"Generated content for section {section_title}: {word_count} words")
+                
+                # If content is too short, try again with stronger emphasis on length
+                if word_count < min_words:
+                    logger.warning(f"Generated content for {section_title} is too short: {word_count}/{min_words} words. Regenerating...")
+                    
+                    retry_prompt = f"""
+The previous content you generated for the "{section_title}" section was only {word_count} words, but we need AT LEAST {min_words} words of comprehensive content.
+
+Write a MORE DETAILED and THOROUGH section on "{section_title}" for a research report about {project_name}.
+
+SECTION PURPOSE:
+{section_prompt}
+
+SECTION DATA:
+{json.dumps(focused_data, indent=2) if focused_data else "Limited data available for this section."}
+
+KEY METRICS:
+{json.dumps(key_metrics, indent=2) if key_metrics else "No key metrics available."}
+
+{visualization_info}
+
+CRITICAL REQUIREMENTS:
+1. Write AT LEAST {min_words} words of substantive, educational content (up to {adjusted_max_words} words)
+2. Add more depth, examples, and analytical insights
+3. Include detailed discussion of implications for investors
+4. Cover historical context and future outlook
+5. Compare with industry standards or competitors when relevant
+6. Present balanced analysis with both strengths and limitations
+7. Even with limited data, provide valuable context about this aspect in cryptocurrency projects
+8. Format in Markdown with clear organization
+
+YOUR RESPONSE MUST CONTAIN AT LEAST {min_words} WORDS of substantive content. Quality and depth are essential.
+"""
+                    
+                    retry_response = gpt4_llm.invoke(retry_prompt)
+                    retry_content = retry_response.content.strip()
+                    retry_word_count = len(retry_content.split())
+                    
+                    logger.info(f"Regenerated content for {section_title}: {retry_word_count} words (previous: {word_count})")
+                    
+                    if retry_word_count > word_count:
+                        section_content = retry_content
+                
+                # Add to draft
+                draft += section_content + "\n\n"
+                
+                # Update section data in state using StateManager
+                if section_data:
+                    section_data["content"] = section_content
+                    state = state_manager.update_section_data(state, section_title, section_data)
+                else:
+                    state = state_manager.update_section_data(state, section_title, {"content": section_content})
+                
+            except Exception as e:
+                logger.error(f"Error generating content for section {section_title}: {str(e)}")
+                draft += f"*Error generating content for {section_title}: {str(e)}*\n\n"
+                state = state_manager.add_error(state, f"writer_{section_title}", str(e))
+        
+        # Add references section if available
+        references = state_manager.get_references(state)
+        if references:
+            draft += "## References\n\n"
+            for ref in references:
+                draft += f"- {ref['title']}: [{ref['url']}]({ref['url']})\n"
+            draft += "\n"
+        
+        # Add disclaimer
+        draft += "## Disclaimer\n\n"
+        draft += "This research report is for informational purposes only. It does not constitute investment advice, "
+        draft += "nor is it an offer to buy or sell any cryptocurrency or financial product. "
+        draft += "The information contained in this report has been compiled from sources believed to be reliable, "
+        draft += "but no representation or warranty, express or implied, is made as to its accuracy, completeness or correctness. "
+        draft += "All opinions and estimates are given as of the date hereof and are subject to change without notice.\n\n"
+        draft += f"*Generated on {datetime.now().strftime('%Y-%m-%d')}*\n\n"
+        
+        # Save draft to state using StateManager
+        state = state_manager.update_draft(state, draft)
+        
+        # Update progress using StateManager
+        state = state_manager.update_progress(state, f"Draft report completed for {project_name}")
+        
+        return state
+        
     except Exception as e:
-        logger.error(f"Error in writer_sync setup: {str(e)}", exc_info=True)
-        if isinstance(updated_state, dict):
-            updated_state["errors"]["writer_setup"] = str(e)
-        return updated_state
+        logger.error(f"Error in writer agent: {str(e)}", exc_info=True)
+        
+        # Initialize StateManager if not done already
+        if 'state_manager' not in locals():
+            state_manager = StateManager(logger=logger)
+            
+        # Add error to state using StateManager
+        return state_manager.add_error(state, "writer", str(e))
+
+def _create_focused_data_for_section(all_data: Dict, section_title: str, logger: logging.Logger) -> Dict:
+    """
+    Create a smaller, focused version of data sources for a specific section to avoid context window limits.
+    
+    Args:
+        all_data: Complete data sources dictionary
+        section_title: Title of section being processed
+        logger: Logger instance
+        
+    Returns:
+        Reduced data sources focused on the current section
+    """
+    try:
+        # Make a clean copy to preserve original
+        focused_data = {}
+        
+        # Get normalized section name for better matching
+        normalized_section = section_title.lower().replace(" ", "_")
+        
+        # First pass: Include only section-specific data
+        
+        # 1. Include web research specifically for this section
+        if "web_research" in all_data and isinstance(all_data["web_research"], dict):
+            focused_data["web_research"] = {}
+            for query, content in all_data["web_research"].items():
+                # Only include research relevant to this section
+                if normalized_section in query.lower().replace(" ", "_"):
+                    focused_data["web_research"][query] = content
+        
+        # 2. Include data whose keys match the section name
+        for source, source_data in all_data.items():
+            if source != "web_research" and isinstance(source_data, dict):
+                for key, value in source_data.items():
+                    # Check if key is relevant to this section
+                    if normalized_section in key.lower().replace(" ", "_"):
+                        if source not in focused_data:
+                            focused_data[source] = {}
+                        focused_data[source][key] = value
+        
+        # 3. Include key metrics for all sections
+        if "coinmarketcap" in all_data:
+            for key in ["market_cap", "current_price", "volume_24h"]:
+                for file_name, file_data in all_data["coinmarketcap"].items():
+                    if isinstance(file_data, dict) and key in file_data:
+                        if "coinmarketcap" not in focused_data:
+                            focused_data["coinmarketcap"] = {}
+                        if file_name not in focused_data["coinmarketcap"]:
+                            focused_data["coinmarketcap"][file_name] = {}
+                        focused_data["coinmarketcap"][file_name][key] = file_data[key]
+        
+        # Log what we found
+        sources_included = list(focused_data.keys())
+        logger.info(f"Focused data for section '{section_title}' includes sources: {sources_included}")
+        
+        return focused_data
+        
+    except Exception as e:
+        logger.error(f"Error creating focused data for section '{section_title}': {str(e)}")
+        # Return empty dict on error to avoid breaking the flow
+        return {}

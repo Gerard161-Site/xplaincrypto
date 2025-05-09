@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 import networkx as nx
 from pyvis.network import Network
 
-from backend.visualizations.base import BaseVisualizer
+from backend.visualizations.old.base import BaseVisualizer
 
 class FlowchartVisualizer(BaseVisualizer):
     """

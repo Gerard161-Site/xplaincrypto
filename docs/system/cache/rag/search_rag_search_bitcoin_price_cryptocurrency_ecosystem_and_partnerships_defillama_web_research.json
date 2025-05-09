@@ -1,0 +1,1 @@
+{"data": ["research://tavily/{query}", "data://defillama/tvl/{coin}"], "metadata": {"source": "rag", "endpoint": "search", "query": "rag_search_bitcoin_price cryptocurrency ecosystem and partnerships_defillama_web_research", "cached_at": "2025-05-09T11:50:57.225708", "expires_at": "2025-05-10T11:50:57.225708", "last_accessed": "2025-05-09T13:06:07.003300", "ttl_hours": 24}}

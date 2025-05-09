@@ -4,40 +4,107 @@ import re
 from typing import Dict, Any, Optional, List
 from langchain_openai import ChatOpenAI
 from backend.state import ResearchState
+from backend.utils.state_manager import StateManager
 
 class Reviewer:
     def __init__(self, llm: Optional[ChatOpenAI] = None, logger: Optional[logging.Logger] = None):
         self.llm = llm
         self.logger = logger or logging.getLogger(__name__)
         self.project_name = None
+        
+        # Initialize StateManager for consistent state access
+        self.state_manager = StateManager(logger=self.logger)
     
     def _extract_sections(self, draft: str) -> Dict[str, str]:
-        """Extract sections from the draft to process them separately."""
+        """
+        Extract main sections (level 1 headers) from the draft to process them separately.
+        Keeps subsections (level 2+ headers) within their parent section.
+        """
         sections = {}
         
-        # Get section headers
-        headers = re.findall(r'^(#+)\s+(.*?)$', draft, re.MULTILINE)
-        if not headers:
-            # No sections found, treat the entire document as one section
-            sections["Full Document"] = draft
-            return sections
+        # First check if we have level 1 headers (# Title)
+        main_headers_l1 = re.findall(r'^#\s+([^#\n]+?)$', draft, re.MULTILINE)
         
-        # Extract content for each section
-        for i, (level, title) in enumerate(headers):
-            if i < len(headers) - 1:
-                # Find the content between this header and the next
-                pattern = fr'^{re.escape(level)}\s+{re.escape(title)}$.*?(?=^{re.escape(headers[i+1][0])}\s+{re.escape(headers[i+1][1])}$)'
-                content = re.search(pattern, draft, re.MULTILINE | re.DOTALL)
-                if content:
-                    sections[title] = content.group(0).strip()
-            else:
-                # Last section goes to the end of the document
-                pattern = fr'^{re.escape(level)}\s+{re.escape(title)}$.*'
-                content = re.search(pattern, draft, re.MULTILINE | re.DOTALL)
-                if content:
-                    sections[title] = content.group(0).strip()
+        if main_headers_l1:
+            self.logger.info(f"Found {len(main_headers_l1)} main sections (level 1 headers) to review")
+            
+            # Extract content for each main section by finding content between # headers
+            for i, title in enumerate(main_headers_l1):
+                if i < len(main_headers_l1) - 1:
+                    # Find content between this header and the next main header
+                    pattern = fr'^#\s+{re.escape(title)}$.*?(?=^#\s+{re.escape(main_headers_l1[i+1])}$)'
+                    content = re.search(pattern, draft, re.MULTILINE | re.DOTALL)
+                    if content:
+                        sections[title] = content.group(0).strip()
+                else:
+                    # Last section goes to the end of the document
+                    pattern = fr'^#\s+{re.escape(title)}$.*'
+                    content = re.search(pattern, draft, re.MULTILINE | re.DOTALL)
+                    if content:
+                        sections[title] = content.group(0).strip()
+        else:
+            # No level 1 headers, try level 2 headers as fallback
+            main_headers_l2 = re.findall(r'^##\s+([^#\n]+?)$', draft, re.MULTILINE)
+            
+            if not main_headers_l2:
+                self.logger.warning("No section headers found in draft. Processing as a single document.")
+                sections["Full Document"] = draft
+                return sections
+            
+            self.logger.info(f"No level 1 headers found, using {len(main_headers_l2)} level 2 headers instead")
+            
+            # Extract content for level 2 headers
+            for i, title in enumerate(main_headers_l2):
+                if i < len(main_headers_l2) - 1:
+                    # Find content between this header and the next level 2 header
+                    pattern = fr'^##\s+{re.escape(title)}$.*?(?=^##\s+{re.escape(main_headers_l2[i+1])}$)'
+                    content = re.search(pattern, draft, re.MULTILINE | re.DOTALL)
+                    if content:
+                        sections[title] = content.group(0).strip()
+                else:
+                    # Last section goes to the end of the document
+                    pattern = fr'^##\s+{re.escape(title)}$.*'
+                    content = re.search(pattern, draft, re.MULTILINE | re.DOTALL)
+                    if content:
+                        sections[title] = content.group(0).strip()
                     
-        return sections
+        # Quick validation to ensure we extracted substantial content and combine very small sections
+        processed_sections = {}
+        current_combined = ""
+        current_title = ""
+        
+        for title, content in sorted(sections.items()):
+            word_count = len(content.split())
+            self.logger.info(f"Extracted section '{title}' with {word_count} words")
+            
+            # Handle very small sections
+            if word_count < 200:
+                if not current_combined:
+                    current_combined = content
+                    current_title = title
+                else:
+                    current_combined += "\n\n" + content
+                    current_title += " + " + title
+            else:
+                # Add any pending combined section first
+                if current_combined:
+                    processed_sections[current_title] = current_combined
+                    current_combined = ""
+                    current_title = ""
+                
+                # Add this section
+                processed_sections[title] = content
+        
+        # Add any remaining combined section
+        if current_combined:
+            processed_sections[current_title] = current_combined
+            
+        # If we still have too few sections, fall back to treating as one document
+        if len(processed_sections) < 3:
+            self.logger.warning(f"Only extracted {len(processed_sections)} valid sections after combining. Processing as a single document.")
+            processed_sections = {"Full Document": draft}
+            
+        return processed_sections
     
     def _combine_sections(self, sections: Dict[str, str]) -> str:
         """Combine the reviewed sections back into a full document."""
@@ -47,34 +114,18 @@ class Reviewer:
     async def run(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """Run the reviewer to polish the draft report."""
         try:
-            # Get project name from state
-            self.project_name = state.get("project_name", "Unknown Project")
+            # Get project name from state using StateManager
+            self.project_name = self.state_manager.get_project_name(state)
             self.logger.info(f"Running reviewer for {self.project_name}")
             
-            # Create temp state for backward compatibility
-            temp_state = ResearchState(project_name=self.project_name)
-            for key, value in state.items():
-                if hasattr(temp_state, key):
-                    setattr(temp_state, key, value)
+            # Initialize or update progress using StateManager
+            state = self.state_manager.update_progress(state, f"Reviewing draft report for {self.project_name}...")
             
-            # Initialize or update progress
-            if "progress" not in state:
-                state["progress"] = {}
-            
-            # Ensure progress is a dictionary
-            if not isinstance(state["progress"], dict):
-                state["progress"] = {}
-                
-            # Update progress for reviewer
-            state["progress"]["reviewer"] = f"Reviewing draft report for {self.project_name}..."
-            
-            if not hasattr(temp_state, 'draft') or not temp_state.draft:
+            # Get draft from state using StateManager
+            draft = self.state_manager.get_draft(state)
+            if not draft:
                 self.logger.error("No draft available for review")
-                state["errors"] = state.get("errors", {})
-                state["errors"]["reviewer"] = "No draft available for review"
-                return state
-            
-            draft = temp_state.draft
+                return self.state_manager.add_error(state, "reviewer", "No draft available for review")
             
             metrics_note = """
 IMPORTANT INSTRUCTIONS:
@@ -107,7 +158,7 @@ IMPORTANT INSTRUCTIONS:
                 total_words = sum(len(content.split()) for content in sections.values())
                 if total_words < 100:
                     self.logger.warning(f"Draft is too short to review properly: {total_words} words")
-                    state["final_report"] = draft
+                    state = self.state_manager.update_final_report(state, draft)
                     return state
                 
                 # Review each section separately
@@ -156,30 +207,30 @@ IMPORTANT INSTRUCTIONS:
                 self.logger.info(f"Completed review: {len(reviewed_draft.split())} words from original {len(draft.split())} words")
                 
                 # Add references if they're missing
-                if "## References" not in reviewed_draft and hasattr(temp_state, 'references') and temp_state.references:
-                    references = "\n\n## References\n" + "\n".join(
-                        [f"- {ref['title']}: [{ref['url']}]({ref['url']})" for ref in temp_state.references]
+                references = self.state_manager.get_references(state)
+                if "## References" not in reviewed_draft and references:
+                    references_section = "\n\n## References\n" + "\n".join(
+                        [f"- {ref['title']}: [{ref['url']}]({ref['url']})" for ref in references]
                     )
-                    reviewed_draft += references
+                    reviewed_draft += references_section
                 
-                # Update state with final report
-                state["final_report"] = reviewed_draft
-                state["progress"]["reviewer"] = f"Final report polished for {self.project_name}"
+                # Update state with final report using StateManager
+                state = self.state_manager.update_final_report(state, reviewed_draft)
+                state = self.state_manager.update_progress(state, f"Final report polished for {self.project_name}")
                 
                 return state
                 
             except Exception as e:
                 self.logger.error(f"Error reviewing draft: {str(e)}", exc_info=True)
-                state["errors"] = state.get("errors", {})
-                state["errors"]["reviewer"] = str(e)
-                state["final_report"] = draft  # Return original draft on error
+                # Add error to state using StateManager
+                state = self.state_manager.add_error(state, "reviewer", str(e))
+                state = self.state_manager.update_final_report(state, draft)  # Use original draft on error
                 return state
                 
         except Exception as e:
             self.logger.error(f"Error in reviewer run: {str(e)}", exc_info=True)
-            state["errors"] = state.get("errors", {})
-            state["errors"]["reviewer"] = str(e)
-            return state
+            # Add error to state using StateManager
+            return self.state_manager.add_error(state, "reviewer", str(e))
 
 def reviewer_sync(state: Dict, llm: Optional[ChatOpenAI] = None, logger: Optional[logging.Logger] = None, config: Optional[Dict[str, Any]] = None) -> Dict:
     """
@@ -195,15 +246,15 @@ def reviewer_sync(state: Dict, llm: Optional[ChatOpenAI] = None, logger: Optiona
     Returns:
         Updated state with reviewed report
     """
-    # Return a copy of the state to avoid modifying the original
-    updated_state = state.copy() if isinstance(state, dict) else state
-    
     # Use our own logger if not provided
     if not logger:
         logger = logging.getLogger(__name__)
     
+    # Create a state manager
+    state_manager = StateManager(logger=logger)
+    
     # Get project name from state
-    project_name = state.get("project_name", "Unknown Project") if isinstance(state, dict) else getattr(state, "project_name", "Unknown Project")
+    project_name = state_manager.get_project_name(state)
     logger.info(f"Starting reviewer_sync for project: {project_name}")
     
     try:
@@ -224,29 +275,17 @@ def reviewer_sync(state: Dict, llm: Optional[ChatOpenAI] = None, logger: Optiona
                 return result
             else:
                 logger.warning(f"Reviewer returned non-dict result: {type(result)}")
-                if isinstance(updated_state, dict):
-                    if "errors" not in updated_state:
-                        updated_state["errors"] = {}
-                    updated_state["errors"]["reviewer"] = f"Invalid result type: {type(result)}"
-                return updated_state
+                return state_manager.add_error(state, "reviewer", f"Invalid result type: {type(result)}")
             
         except Exception as e:
             # Handle errors in asyncio execution
             logger.error(f"Error in reviewer_sync asyncio execution: {str(e)}", exc_info=True)
-            if isinstance(updated_state, dict):
-                if "errors" not in updated_state:
-                    updated_state["errors"] = {}
-                updated_state["errors"]["reviewer_asyncio"] = str(e)
-            return updated_state
+            return state_manager.add_error(state, "reviewer_asyncio", str(e))
             
     except Exception as e:
         # Handle errors in reviewer creation or other setup
         logger.error(f"Error in reviewer_sync setup: {str(e)}", exc_info=True)
-        if isinstance(updated_state, dict):
-            if "errors" not in updated_state:
-                updated_state["errors"] = {}
-            updated_state["errors"]["reviewer_setup"] = str(e)
-        return updated_state
+        return state_manager.add_error(state, "reviewer_setup", str(e))
 
 # Legacy standalone function for backward compatibility
 async def reviewer(state: Dict, llm: ChatOpenAI, logger: logging.Logger, config: Optional[Dict[str, Any]] = None) -> Dict:
@@ -263,8 +302,6 @@ async def reviewer(state: Dict, llm: ChatOpenAI, logger: logging.Logger, config:
         return updated_state
     except Exception as e:
         logger.error(f"Error in legacy reviewer function: {str(e)}", exc_info=True)
-        # Ensure state has error field
-        if not hasattr(state, 'errors'):
-            state["errors"] = {}
-        state["errors"]["reviewer"] = str(e)
-        return state
+        # Add error to state using StateManager
+        state_manager = StateManager(logger=logger)
+        return state_manager.add_error(state, "reviewer", str(e))

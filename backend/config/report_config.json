@@ -186,14 +186,14 @@
                     "chain_distribution_chart": {
                     "type": "pie_chart",
                     "data_source": "defillama",
-                    "data_field": "chains",
+                    "data_field": "currentChainTvls",
                     "title": "Chain Distribution",
                     "description_template": "{chain_description}"
                     },
                     "candlestick_chart": {
                     "type": "candlestick_chart",
                     "data_source": "coinmarketcap",
-                    "data_field": "ohlcv_data",
+                    "data_field": "ohlcv",
                     "title": "Price Trends",
                     "description_template": "{price_description}"
                     },
@@ -204,10 +204,24 @@
                     "title": "Trading Volume",
                     "description_template": "{volume_description}"
                     },
-                    "competitor_comparison_chart": {
+                    "tvl_chart": {
                     "type": "line_chart",
+                    "data_source": "defillama",
+                    "data_field": "tvl_history",
+                    "title": "TVL History",
+                    "description_template": "{tvl_description}"
+                    },
+                    "price_chart": {
+                    "type": "candlestick_chart",
+                    "data_source": "coinmarketcap",
+                    "data_field": "ohlcv",
+                    "title": "Price Chart (30-day)",
+                    "description_template": "{price_description}"
+                    },
+                    "competitor_comparison_chart": {
+                    "type": "comparison_chart",
                     "data_source": "multi",
-                    "data_field": "comparison_data",
+                    "data_field": "competitors",
                     "title": "Competitor Comparison",
                     "description_template": "{comparison_description}"
                     },
@@ -224,6 +238,13 @@
                     "data_field": "",
                     "title": "Adoption Metrics",
                     "description_template": "Adoption metrics for {project_name}"
+                    },
+                    "tokenomics_chart": {
+                    "type": "pie_chart",
+                    "data_source": "tokenomics",
+                    "data_field": "token_distribution",
+                    "title": "Token Distribution",
+                    "description_template": "{tokenomics_description}"
                     },
                     "tvl_milestone_chart": {
                     "type": "line_chart",
@@ -245,6 +266,13 @@
                     "data_field": "tvl_history",
                     "title": "Monthly Growth",
                     "description_template": "{growth_description}"
+                    },
+                    "metrics_table": {
+                    "type": "table",
+                    "data_source": "multi",
+                    "data_field": "metrics_table",
+                    "title": "Key Metrics",
+                    "description_template": "Key metrics for {project_name}"
                     }
             }
         }

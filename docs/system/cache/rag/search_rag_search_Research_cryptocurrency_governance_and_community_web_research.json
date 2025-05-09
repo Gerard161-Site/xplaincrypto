@@ -1,0 +1,1 @@
+{"data": ["research://tavily/{query}"], "metadata": {"source": "rag", "endpoint": "search", "query": "rag_search_Research cryptocurrency governance and community_web_research", "cached_at": "2025-05-09T11:34:46.819852", "expires_at": "2025-05-10T11:34:46.819852", "last_accessed": "2025-05-09T11:34:46.819852", "ttl_hours": 24}}

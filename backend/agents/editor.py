@@ -4,46 +4,48 @@ import logging
 import re
 from backend.state import ResearchState
 from backend.utils.inference import openai_retry_decorator
+from backend.utils.state_manager import StateManager
 from typing import Dict
 from datetime import datetime
 
 @openai_retry_decorator
-def editor(state: Dict, llm: ChatOpenAI, logger: logging.Logger, config=None) -> Dict:
+async def editor(state: Dict, llm: ChatOpenAI, logger: logging.Logger, config=None) -> Dict:
     """Edit the report draft to ensure clarity, depth, and investment-grade quality."""
     try:
         logger.info("Editor agent starting")
         
-        # Get project name
-        project_name = state.get("project_name", "Unknown Project")
+        # Initialize StateManager for consistent state access
+        state_manager = StateManager(logger=logger)
         
-        # Get draft from state
-        draft = state.get("draft", "")
+        # Get project name using StateManager
+        project_name = state_manager.get_project_name(state)
+        logger.info(f"Editor agent processing {project_name}")
+        
+        # Get draft from state using StateManager
+        draft = state_manager.get_draft(state)
         if not draft:
             logger.error("No draft found in state")
             # Instead of raising an error, create a minimal draft
             draft = f"# {project_name} Research Report\n\n"
-            draft += f"*Generated on {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*\n\n"
+            draft += f"*Generated on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*\n\n"
             draft += "## Executive Summary\n\n"
             draft += f"{project_name} is a cryptocurrency project. Due to technical limitations, a full analysis could not be generated.\n\n"
             draft += "## Tokenomics\n\n"
             draft += f"Tokenomics data for {project_name} is not available in this report.\n\n"
             draft += "## Disclaimer\n\nThis report was generated with limited data. Please consult additional sources for investment decisions."
             
-            # Update state with the minimal draft
-            state["draft"] = draft
-            state["edited_draft"] = draft
-            state["final_report"] = draft
+            # Update state with the minimal draft using StateManager
+            state = state_manager.update_draft(state, draft)
+            state = state_manager.update_edited_draft(state, draft)
+            state = state_manager.update_final_report(state, draft)
             
             logger.info(f"Created minimal draft with {len(draft.split())} words")
             return state
 
         logger.info(f"Performing comprehensive editing for {project_name}")
         
-        # Update progress
-        if hasattr(state, 'update_progress'):
-            state.update_progress(f"Editing draft for {project_name}...")
-        else:
-            state["progress"] = f"Editing draft for {project_name}..."
+        # Update progress using StateManager
+        state = state_manager.update_progress(state, f"Editing draft for {project_name}...")
 
         # Fix initial formatting
         fixed_draft = fix_section_formatting(draft)
@@ -98,7 +100,8 @@ Focus on:
         """
         
         logger.debug("Enhancing report structure and expanding content")
-        structured_draft = llm.invoke(structure_prompt).content
+        structured_response = await llm.ainvoke(structure_prompt)
+        structured_draft = structured_response.content
 
         # Stage 2: Improve Quality and Consistency
         quality_prompt = f"""Polish this {project_name} research report for professional quality and factual consistency.
@@ -117,7 +120,8 @@ Focus on:
         """
         
         logger.debug("Improving quality and ensuring consistency")
-        polished_draft = llm.invoke(quality_prompt).content
+        polished_response = await llm.ainvoke(quality_prompt)
+        polished_draft = polished_response.content
 
         # Stage 3: Final Polish and Balance
         final_prompt = f"""Perform a final review and polish of this {project_name} cryptocurrency research report to ensure investment-grade quality.
@@ -155,7 +159,8 @@ Focus on:
         
         if not headers:
             # No sections found, treat as one document
-            final_draft = llm.invoke(final_prompt).content
+            final_response = await llm.ainvoke(final_prompt)
+            final_draft = final_response.content
         else:
             # Process each section individually
             logger.info(f"Processing {len(headers)} sections separately to avoid context limit issues")
@@ -196,66 +201,73 @@ Focus on:
                     
                 section_prompt = f"""Polish and improve this section on '{title}' for a {project_name} cryptocurrency research report:
 
-{content}
-
-This section should be at least {min_words} words and meet investment-grade quality standards.
-
 {base_instructions}
 
-If this section contains placeholder text like "Data unavailable" or is shorter than {min_words} words, 
-replace it with substantive, detailed content based on general knowledge of similar cryptocurrency projects.
+Focus on:
+1. Ensuring this section has AT LEAST {min_words} words of substantive content
+2. Maintaining the section title exactly as is
+3. Improving clarity, precision, and professional tone
+4. Ensuring balanced analysis with both strengths and risks
+5. Adding depth where content is thin without fabricating specific data
+6. Ensuring consistency with other sections
 
-Return ONLY the improved section content in markdown format with the same heading level.
+{content}
 """
+                
                 try:
-                    edited_content = llm.invoke(section_prompt).content
-                    edited_sections[title] = edited_content
-                    logger.info(f"Successfully edited section '{title}': {len(edited_content.split())} words")
+                    edited_response = await llm.ainvoke(section_prompt)
+                    edited_sections[title] = edited_response.content
+                    logger.info(f"Successfully edited section '{title}': {len(edited_response.content.split())} words")
                 except Exception as e:
                     logger.error(f"Error editing section '{title}': {str(e)}")
                     edited_sections[title] = content
             
-            # Combine sections in original order
-            final_draft = "\n\n".join([edited_sections.get(title, sections[title]) for title in [h[1] for h in headers]])
-            
-        # Save to both draft and final_report in the state dictionary
-        state["draft"] = final_draft
-        state["edited_draft"] = final_draft  # Explicitly save to edited_draft key
-        state["final_report"] = final_draft
+            # Combine edited sections in original order
+            final_draft = ""
+            for level, title in headers:
+                if title in edited_sections:
+                    final_draft += edited_sections[title] + "\n\n"
         
+        # Add disclaimer if missing
+        if "Disclaimer" not in final_draft:
+            final_draft += "\n\n## Disclaimer\n\n"
+            final_draft += "This research report is for informational purposes only. It does not constitute investment advice, "
+            final_draft += "nor is it an offer to buy or sell any cryptocurrency or financial product. "
+            final_draft += "The information contained in this report has been compiled from sources believed to be reliable, "
+            final_draft += "but no representation or warranty, express or implied, is made as to its accuracy, completeness or correctness. "
+            final_draft += "All opinions and estimates are given as of the date hereof and are subject to change without notice.\n\n"
+            final_draft += f"*Generated on {datetime.now().strftime('%Y-%m-%d')}*\n\n"
+        
+        # Add generation date if missing
+        if "*Generated on" not in final_draft:
+            final_draft += f"\n\n*Generated on {datetime.now().strftime('%Y-%m-%d')}*\n\n"
+        
+        # Log summary of changes
         edited_words = len(final_draft.split())
-        word_diff = edited_words - original_words
+        logger.info(f"Editing completed: {original_words} words → {edited_words} words ({edited_words - original_words:+d} words)")
         
-        # Add verification logging
-        logger.info(f"Edited draft content updated - Preview: {final_draft[:300]}...")
-        logger.info(f"Section headers: {re.findall(r'^# (.+)', final_draft, re.MULTILINE)[:10]}")
-        logger.info(f"Stored edited content in state['draft'], state['edited_draft'], and state['final_report'] keys")
+        # Save edited content to state using StateManager
+        state = state_manager.update_edited_draft(state, final_draft)
         
-        # Save emergency backup copy to disk
+        # Save emergency backup of edited content
+        import os
+        os.makedirs(f"docs/{project_name}", exist_ok=True)
+        backup_path = f"docs/{project_name}/edited_content_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
         try:
-            import os
-            from datetime import datetime
-            backup_dir = os.path.join("docs", project_name.lower().replace(" ", "_"))
-            os.makedirs(backup_dir, exist_ok=True)
-            backup_path = os.path.join(backup_dir, f"edited_content_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md")
-            with open(backup_path, "w", encoding="utf-8") as f:
+            with open(backup_path, "w") as f:
                 f.write(final_draft)
             logger.info(f"Saved emergency backup of edited content to {backup_path}")
         except Exception as e:
-            logger.warning(f"Could not save content backup file: {str(e)}")
+            logger.warning(f"Could not save backup of edited content: {str(e)}")
         
-        logger.info(f"Editing completed: {original_words} words → {edited_words} words ({word_diff:+d} words)")
+        # Update progress using StateManager
+        state = state_manager.update_progress(state, "Comprehensive editing completed.")
         
-        # Update progress
-        if hasattr(state, 'update_progress'):
-            state.update_progress("Comprehensive editing completed.")
-        else:
-            state["progress"] = "Comprehensive editing completed."
-            
         return state
+        
     except Exception as e:
-        logger.error(f"Editor agent encountered an error: {str(e)}", exc_info=True)
-        raise
+        logger.error(f"Error in editor: {str(e)}", exc_info=True)
+        return state
 
 def fix_section_formatting(draft):
     """Fix common formatting issues with section headers."""

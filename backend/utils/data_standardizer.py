@@ -73,6 +73,11 @@ class DataStandardizer:
             
             # Standardize data for each visualization
             for viz in visualizations:
+                # Check if viz is a dictionary before trying to access it
+                if not isinstance(viz, dict):
+                    self.logger.warning(f"Visualization in section '{section_title}' is not a dictionary: {viz}")
+                    continue
+                    
                 viz_type = viz.get("type", "")
                 viz_id = viz.get("id", "")
                 data_source = viz.get("data_source", "")
