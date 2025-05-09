@@ -221,13 +221,26 @@ async def research(query: str, project_name: str = None, cache_key: str = None) 
         
         if cached_results:
             logger.info(f"Using cached Tavily results for '{cache_key_to_use}'")
+            # Ensure we always return a dictionary
+            if not isinstance(cached_results, dict):
+                logger.warning(f"Cached results for '{cache_key_to_use}' is not a dictionary. Converting.")
+                return {"results": [{"content": str(cached_results)}]}
             return cached_results
         
         # Create a Tavily search instance
         tavily_search = TavilySearch(project_name=project_name)
         
-        # Perform the search - pass both project_name and cache_key to research method
+        # Perform the search - pass project_name and cache_key to research method
         results = await tavily_search.research(query=query, project_name=project_name, cache_key=cache_key_to_use)
+        
+        # Ensure results is a dictionary
+        if not isinstance(results, dict):
+            logger.warning(f"Tavily results for '{query}' is not a dictionary. Converting.")
+            results = {"results": [{"content": str(results)}]}
+        else:
+            # Make sure results has a "results" key even if empty
+            if "results" not in results:
+                results["results"] = []
         
         # Save to cache
         logger.info(f"Saving Tavily results to cache with key: {cache_key_to_use}")
