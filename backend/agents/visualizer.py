@@ -234,6 +234,29 @@ class Visualizer:
     def _get_data_for_visualization(self, viz_id: str, viz_config: Dict[str, Any], state: Dict[str, Any], section_title: str = "Unknown") -> Dict[str, Any]:
         data_source = viz_config.get("data_source", "")
         data_field = viz_config.get("data_field", "")
+        
+        # First check if we have standardized data for this visualization
+        normalized_section = section_title.lower().replace(" ", "_")
+        
+        # Try to get standardized data from state.visualization_data
+        if state:
+            if isinstance(state, dict):
+                if "visualization_data" in state and normalized_section in state["visualization_data"]:
+                    section_viz_data = state["visualization_data"][normalized_section]
+                    if viz_id in section_viz_data:
+                        self.logger.info(f"Found standardized data for visualization {viz_id} in section {section_title}")
+                        self.data_sources_used[f"{section_title}_{viz_id}"] = "standardized"
+                        return section_viz_data[viz_id]
+            elif hasattr(state, "visualization_data"):
+                viz_data = state.visualization_data
+                if hasattr(viz_data, normalized_section):
+                    section_viz_data = getattr(viz_data, normalized_section)
+                    if isinstance(section_viz_data, dict) and viz_id in section_viz_data:
+                        self.logger.info(f"Found standardized data for visualization {viz_id} in section {section_title}")
+                        self.data_sources_used[f"{section_title}_{viz_id}"] = "standardized"
+                        return section_viz_data[viz_id]
+        
+        # If no standardized data found, fall back to original data extraction logic
         if not data_source:
             self.logger.error(f"No data_source specified for visualization {viz_id}")
             return {"data_unavailable": True, "message": "No data source specified"}
@@ -276,14 +299,6 @@ class Visualizer:
                         if expected_source in viz_data:
                             self.logger.info(f"Found data in state.visualization_data.{expected_source}")
                             data[expected_source] = viz_data[expected_source]
-                            data_source_used = "state"
-                            break
-                if not data and hasattr(state, "data") and state.data:
-                    state_data = state.data
-                    for expected_source in self._get_expected_sources(data_source):
-                        if expected_source in state_data:
-                            self.logger.info(f"Found data in state.data.{expected_source}")
-                            data[expected_source] = state_data[expected_source]
                             data_source_used = "state"
                             break
         if not data and data_source:

@@ -2,22 +2,50 @@
 
 This document outlines the optimization plan for improving the XplainCrypto application's performance, resource usage, and reliability.
 
-## Phase 1: API Call Optimization (Completed)
+## Phase 1: API Call Optimization ✅ COMPLETED
+- Implemented RAG-based endpoint selection to reduce unnecessary API calls
+- Added proper caching for API responses to avoid redundant calls
+- Fixed duplicate API calls in researcher.py
+- Ensured proper section-specific cache file naming
 
-### Batch Processing for API Calls
-- ✅ Implemented `_batch_process_project_data` method in Researcher class that analyzes report_config.json and identifies all required data sources
-- ✅ Created source-specific batch processing methods for CoinGecko, CoinMarketCap, DeFiLlama, and Tokenomics
-- ✅ Enhanced the existing `_run_parallel_tavily_searches` method to process all section queries in batches
-- ✅ Consolidated Tavily API calls by making `research` and `deep_research` use the same underlying implementation and cache
-- ✅ Each data source is queried exactly once per project research session, with consolidated API calls
-- ✅ Implemented proper endpoint tracking to prevent duplicate API calls across different sections
-- ✅ Ensured HuggingFace is only used as a fallback when primary sources fail, not as a primary source
-- ✅ Fixed MCP integration by using direct tool calls instead of hardcoded endpoints
+## Phase 2: Data Standardization 🔄 IN PROGRESS
+- ✅ Created DataStandardizer utility class for consistent data formats
+- ✅ Integrated DataStandardizer with Researcher agent
+- ✅ Updated Visualizer agent to use standardized data
+- ✅ Added cache integration for standardized data
+- 🔄 Working on visualization type support (bar_chart, etc.)
+- 🔄 Improving cache file writing and reading
+- ⏱️ TODO: Add more robust data validation
+- ⏱️ TODO: Implement dynamic TTL caching
+- ⏱️ TODO: Complete testing and documentation
 
-### Caching Improvements
-- ✅ Standardized cache paths and formats across all data sources
-- ✅ Added cache expiration based on data type (24h for most data, 1h for price data)
-- ✅ Implemented cache hit/miss logging for debugging and optimization
+## Phase 3: Visualization Enhancement ⏱️ PLANNED
+- Implement consistent styling across all visualization types
+- Add support for interactive visualizations
+- Improve error handling for missing or malformed data
+- Add fallback visualization options for data gaps
+- Implement responsive design for different report formats
+
+## Phase 4: Report Generation Optimization ⏱️ PLANNED
+- Implement parallel processing for report sections
+- Add incremental report generation
+- Improve PDF rendering performance
+- Implement template-based report generation
+- Add support for custom report formats
+
+## Phase 5: System-Wide Performance Improvements ⏱️ PLANNED
+- Implement distributed processing for large reports
+- Add background processing for non-critical tasks
+- Optimize memory usage for large datasets
+- Implement request throttling for external APIs
+- Add performance monitoring and logging
+
+## Phase 6: User Experience Enhancements ⏱️ PLANNED
+- Add real-time progress tracking
+- Implement cancellation and pause/resume for long-running tasks
+- Add preview generation for reports
+- Implement user preferences for report styling
+- Add export options for different formats
 
 ## Phase 2: State Management Optimization (In Progress)
 

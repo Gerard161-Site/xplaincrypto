@@ -12,12 +12,14 @@ try:
     from backend.utils.cache_utils import CacheManager
     from backend.orchestration.rag.retriever import RAGRetriever
     from backend.orchestration.rag.vector_store import get_vector_store
+    from backend.utils.data_standardizer import DataStandardizer
 except ModuleNotFoundError:
     from state import ResearchState
     from orchestration.mcp.client_manager import MCPClientManager
     from utils.cache_utils import CacheManager
     from orchestration.rag.retriever import RAGRetriever
     from orchestration.rag.vector_store import get_vector_store
+    from utils.data_standardizer import DataStandardizer
 
 # Configure logger to flush immediately
 logger = logging.getLogger(__name__)
@@ -340,6 +342,16 @@ class Researcher:
             # Report problem sections
             problem_count = len(state["problem_sections"] if is_state_dict else state.problem_sections)
             self.logger.info(f"Problem sections reported: {problem_count}")
+            
+            # Standardize data for visualizations using DataStandardizer
+            self.logger.info("Standardizing data for visualizations")
+            try:
+                data_standardizer = DataStandardizer(logger=self.logger)
+                state = data_standardizer.standardize_state_data(state, report_config)
+                self.logger.info("Data standardization complete")
+            except Exception as e:
+                self.logger.error(f"Error standardizing data: {str(e)}", exc_info=True)
+                # Continue even if standardization fails - we'll use raw data
             
             self.logger.info("Completed execute_workflow")
             return state
