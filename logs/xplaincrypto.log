@@ -1,302 +1,79 @@
-2025-05-09 07:51:22,996 - XplainCrypto - logging_config.setup_logging - INFO - Logging initialized: file level=INFO, console level=20
-2025-05-09 07:51:22,997 - XplainCrypto - workflow_manager._load_report_config - INFO - Loaded report configuration with 13 sections
-2025-05-09 07:51:22,997 - XplainCrypto - workflow_manager.__init__ - INFO - ProgressTracker initialized in WorkflowManager
-2025-05-09 07:51:22,998 - XplainCrypto - workflow_manager.__init__ - INFO - ErrorReporter initialized in WorkflowManager
-2025-05-09 07:51:23,000 - XplainCrypto - main.startup_event - INFO - Starting application initialization
-2025-05-09 07:51:23,397 - XplainCrypto - main.startup_event - INFO - Starting 6 MCP servers...
-2025-05-09 07:51:23,397 - XplainCrypto - main.startup_event - INFO - Starting MCP server: coingecko
-2025-05-09 07:51:24,401 - XplainCrypto - main.startup_event - INFO - Successfully started MCP server: coingecko
-2025-05-09 07:51:24,402 - XplainCrypto - main.startup_event - INFO - Starting MCP server: coinmarketcap
-2025-05-09 07:51:25,405 - XplainCrypto - main.startup_event - INFO - Successfully started MCP server: coinmarketcap
-2025-05-09 07:51:25,406 - XplainCrypto - main.startup_event - INFO - Starting MCP server: defillama
-2025-05-09 07:51:26,409 - XplainCrypto - main.startup_event - INFO - Successfully started MCP server: defillama
-2025-05-09 07:51:26,409 - XplainCrypto - main.startup_event - INFO - Starting MCP server: tavily
-2025-05-09 07:51:27,446 - XplainCrypto - main.startup_event - INFO - Successfully started MCP server: tavily
-2025-05-09 07:51:27,446 - XplainCrypto - main.startup_event - INFO - Starting MCP server: huggingface
-2025-05-09 07:51:28,487 - XplainCrypto - main.startup_event - INFO - Successfully started MCP server: huggingface
-2025-05-09 07:51:28,487 - XplainCrypto - main.startup_event - INFO - Starting MCP server: tokenomics
-2025-05-09 07:51:29,491 - XplainCrypto - main.startup_event - INFO - Successfully started MCP server: tokenomics
-2025-05-09 07:51:29,491 - XplainCrypto - main.startup_event - INFO - MCP client manager initialized
-2025-05-09 07:51:29,491 - XplainCrypto - main.startup_event - INFO - Initializing other components
-2025-05-09 07:51:29,491 - XplainCrypto - main.startup_event - INFO - Application initialization complete
-2025-05-09 07:51:31,678 - XplainCrypto - main.connect - INFO - Client connected: IznZcMvBgWIKtvG0AAAC
-2025-05-09 07:51:34,567 - XplainCrypto - main.message - INFO - Received message from client IznZcMvBgWIKtvG0AAAC: {'project_name': 'ONDO', 'fast_mode': False}
-2025-05-09 07:51:39,521 - XplainCrypto - workflow_manager.execute_workflow - INFO - Starting asynchronous workflow execution for ONDO
-2025-05-09 07:51:39,544 - XplainCrypto - workflow_manager.initialize_llm - INFO - Initialized LLM with model gpt-4o-mini
-2025-05-09 07:51:39,545 - XplainCrypto - workflow_manager.execute_workflow - INFO - Running Researcher
-2025-05-09 07:51:39,545 - XplainCrypto - researcher.researcher - INFO - Using async researcher function
-2025-05-09 07:51:39,545 - XplainCrypto - researcher.researcher - INFO - Creating Researcher instance for async function
-2025-05-09 07:51:39,545 - XplainCrypto - researcher.__init__ - INFO - Researcher constructor started
-2025-05-09 07:51:39,546 - XplainCrypto - researcher.__init__ - INFO - Researcher constructor completed
-2025-05-09 07:51:39,546 - XplainCrypto - researcher.researcher - INFO - Calling initialize for async function
-2025-05-09 07:51:39,546 - XplainCrypto - researcher.initialize - INFO - Starting Researcher.initialize
-2025-05-09 07:51:39,546 - XplainCrypto - researcher.initialize - INFO - Initializing RAG components
-2025-05-09 07:51:39,546 - XplainCrypto - researcher.initialize - INFO - Getting vector store synchronously
-2025-05-09 07:51:45,920 - XplainCrypto - researcher.initialize - INFO - Vector store object created
-2025-05-09 07:51:45,920 - XplainCrypto - researcher.initialize - INFO - Vector store appears healthy
-2025-05-09 07:51:45,921 - XplainCrypto - researcher.initialize - INFO - Initializing RAGRetriever
-2025-05-09 07:51:45,936 - XplainCrypto - researcher.initialize - INFO - RAGRetriever initialized
-2025-05-09 07:51:45,936 - XplainCrypto - researcher.initialize - INFO - Initializing MCP client
-2025-05-09 07:51:45,936 - XplainCrypto - researcher.initialize - INFO - Using existing MCP client manager
-2025-05-09 07:51:45,936 - XplainCrypto - researcher.initialize - INFO - All MCP servers already running
-2025-05-09 07:51:45,936 - XplainCrypto - researcher.initialize - INFO - RAG and MCP components initialized successfully
-2025-05-09 07:51:45,936 - XplainCrypto - researcher.initialize - INFO - Completed Researcher.initialize
-2025-05-09 07:51:45,936 - XplainCrypto - researcher.researcher - INFO - Calling run for async function
-2025-05-09 07:51:45,936 - XplainCrypto - researcher.run - INFO - Entering Researcher.run
-2025-05-09 07:51:45,936 - XplainCrypto - researcher.run - INFO - Processing state
-2025-05-09 07:51:45,936 - XplainCrypto - researcher.run - INFO - Running researcher for ONDO
-2025-05-09 07:51:45,936 - XplainCrypto - researcher.run - INFO - Setting up cache directory
-2025-05-09 07:51:45,937 - XplainCrypto - researcher.run - INFO - Cache directory set to: docs/ondo/cache
-2025-05-09 07:51:45,937 - XplainCrypto - researcher.run - INFO - Calling initialize
-2025-05-09 07:51:45,937 - XplainCrypto - researcher.initialize - INFO - Starting Researcher.initialize
-2025-05-09 07:51:45,937 - XplainCrypto - researcher.initialize - INFO - Initializing RAG components
-2025-05-09 07:51:45,937 - XplainCrypto - researcher.initialize - INFO - Getting vector store synchronously
-2025-05-09 07:51:48,245 - XplainCrypto - researcher.initialize - INFO - Vector store object created
-2025-05-09 07:51:48,245 - XplainCrypto - researcher.initialize - INFO - Vector store appears healthy
-2025-05-09 07:51:48,245 - XplainCrypto - researcher.initialize - INFO - Initializing RAGRetriever
-2025-05-09 07:51:48,261 - XplainCrypto - researcher.initialize - INFO - RAGRetriever initialized
-2025-05-09 07:51:48,261 - XplainCrypto - researcher.initialize - INFO - Initializing MCP client
-2025-05-09 07:51:48,262 - XplainCrypto - researcher.initialize - INFO - Using existing MCP client manager
-2025-05-09 07:51:48,262 - XplainCrypto - researcher.initialize - INFO - All MCP servers already running
-2025-05-09 07:51:48,262 - XplainCrypto - researcher.initialize - INFO - RAG and MCP components initialized successfully
-2025-05-09 07:51:48,262 - XplainCrypto - researcher.initialize - INFO - Completed Researcher.initialize
-2025-05-09 07:51:48,263 - XplainCrypto - researcher.run - INFO - Initialize completed
-2025-05-09 07:51:48,263 - XplainCrypto - researcher.run - INFO - Calling execute_workflow
-2025-05-09 07:51:48,263 - XplainCrypto - researcher.execute_workflow - INFO - Entering execute_workflow
-2025-05-09 07:51:48,263 - XplainCrypto - researcher.execute_workflow - INFO - Loaded report_config from state dict
-2025-05-09 07:51:48,263 - XplainCrypto - researcher.execute_workflow - INFO - Project name: ondo
-2025-05-09 07:51:48,264 - XplainCrypto - researcher._batch_process_project_data - INFO - Starting batch processing of all API data for project: ONDO
-2025-05-09 07:51:48,264 - XplainCrypto - researcher._batch_process_project_data - INFO - Batch processing will fetch from coinmarketcap: ['ohlcv_data', 'volume_history', 'volume_history']
-2025-05-09 07:51:48,264 - XplainCrypto - researcher._batch_process_project_data - INFO - Batch processing will fetch from defillama: ['chains', 'tvl_history', 'tvl_history', 'tvl_history']
-2025-05-09 07:51:48,264 - XplainCrypto - researcher._batch_process_project_data - INFO - Batch processing will fetch from tokenomics: ['whitepaper_url', 'token_distribution']
-2025-05-09 07:51:48,264 - XplainCrypto - researcher._batch_process_project_data - INFO - Batch processing will fetch from tavily: ['*']
-2025-05-09 07:51:48,264 - XplainCrypto - researcher._batch_process_project_data - INFO - Executing 4 batch processing tasks in parallel
-2025-05-09 07:51:48,264 - XplainCrypto - researcher._batch_process_coinmarketcap - INFO - Batch processing CoinMarketCap data for ONDO
-2025-05-09 07:51:48,264 - XplainCrypto - researcher._batch_process_coinmarketcap - INFO - Calling CoinMarketCap tool directly for ONDO
-2025-05-09 07:51:48,264 - XplainCrypto - researcher._batch_process_defillama - INFO - Batch processing DeFiLlama data for ONDO
-2025-05-09 07:51:48,264 - XplainCrypto - researcher._batch_process_defillama - INFO - Calling DeFiLlama tool directly for ONDO
-2025-05-09 07:51:48,264 - XplainCrypto - researcher._batch_process_tokenomics - INFO - Batch processing Tokenomics data for ONDO
-2025-05-09 07:51:48,264 - XplainCrypto - researcher._batch_process_tokenomics - INFO - Calling Tokenomics tool directly for ONDO
-2025-05-09 07:51:48,264 - XplainCrypto - researcher._batch_process_tavily - INFO - Batch processing Tavily data for ONDO
-2025-05-09 07:51:48,264 - XplainCrypto - researcher._batch_process_tavily - INFO - Extracted 13 sections from report_config
-2025-05-09 07:51:48,264 - XplainCrypto - researcher._batch_process_tavily - INFO - Processing 13 sections: ['executive_summary', 'introduction', 'tokenomics_and_distribution', 'market_analysis', 'technical_analysis', 'developer_tools_and_user_experience', 'security', 'liquidity_and_adoption_metrics', 'governance_and_community', 'ecosystem_and_partnerships', 'risks_and_opportunities', 'team_and_development_activity', 'conclusion']
-2025-05-09 07:51:48,265 - XplainCrypto - researcher._batch_process_tavily - INFO - Processing 13 sections with Tavily
-2025-05-09 07:51:48,265 - XplainCrypto - researcher._batch_process_tavily - INFO - Processing section 'executive_summary' with query: 'ONDO cryptocurrency executive summary'
-2025-05-09 07:51:48,265 - XplainCrypto - researcher._batch_process_tavily - INFO - Fetching fresh Tavily data for section 'executive_summary'
-2025-05-09 07:51:48,901 - XplainCrypto - researcher._batch_process_coinmarketcap - INFO - Successfully retrieved CoinMarketCap data for ONDO
-2025-05-09 07:51:49,148 - XplainCrypto - researcher._batch_process_defillama - INFO - Successfully retrieved DeFiLlama data for ONDO
-2025-05-09 07:51:49,392 - XplainCrypto - researcher._batch_process_tokenomics - INFO - Successfully retrieved Tokenomics data for ONDO
-2025-05-09 07:51:51,789 - XplainCrypto - researcher._batch_process_tavily - WARNING - Tavily result for section 'executive_summary' is not a dictionary. Converting.
-2025-05-09 07:51:51,790 - XplainCrypto - researcher._batch_process_tavily - INFO - Successfully retrieved and cached Tavily data for section 'executive_summary'
-2025-05-09 07:51:51,790 - XplainCrypto - researcher._batch_process_tavily - INFO - Processing section 'introduction' with query: 'ONDO cryptocurrency introduction'
-2025-05-09 07:51:51,790 - XplainCrypto - researcher._batch_process_tavily - INFO - Fetching fresh Tavily data for section 'introduction'
-2025-05-09 07:51:54,575 - XplainCrypto - researcher._batch_process_tavily - WARNING - Tavily result for section 'introduction' is not a dictionary. Converting.
-2025-05-09 07:51:54,576 - XplainCrypto - researcher._batch_process_tavily - INFO - Successfully retrieved and cached Tavily data for section 'introduction'
-2025-05-09 07:51:54,576 - XplainCrypto - researcher._batch_process_tavily - INFO - Processing section 'tokenomics_and_distribution' with query: 'ONDO cryptocurrency tokenomics and distribution'
-2025-05-09 07:51:54,576 - XplainCrypto - researcher._batch_process_tavily - INFO - Fetching fresh Tavily data for section 'tokenomics_and_distribution'
-2025-05-09 07:51:57,860 - XplainCrypto - researcher._batch_process_tavily - WARNING - Tavily result for section 'tokenomics_and_distribution' is not a dictionary. Converting.
-2025-05-09 07:51:57,860 - XplainCrypto - researcher._batch_process_tavily - INFO - Successfully retrieved and cached Tavily data for section 'tokenomics_and_distribution'
-2025-05-09 07:51:57,860 - XplainCrypto - researcher._batch_process_tavily - INFO - Processing section 'market_analysis' with query: 'ONDO cryptocurrency market analysis'
-2025-05-09 07:51:57,860 - XplainCrypto - researcher._batch_process_tavily - INFO - Fetching fresh Tavily data for section 'market_analysis'
-2025-05-09 07:52:01,236 - XplainCrypto - researcher._batch_process_tavily - WARNING - Tavily result for section 'market_analysis' is not a dictionary. Converting.
-2025-05-09 07:52:01,236 - XplainCrypto - researcher._batch_process_tavily - INFO - Successfully retrieved and cached Tavily data for section 'market_analysis'
-2025-05-09 07:52:01,236 - XplainCrypto - researcher._batch_process_tavily - INFO - Processing section 'technical_analysis' with query: 'ONDO cryptocurrency technical analysis'
-2025-05-09 07:52:01,236 - XplainCrypto - researcher._batch_process_tavily - INFO - Fetching fresh Tavily data for section 'technical_analysis'
-2025-05-09 07:52:04,961 - XplainCrypto - researcher._batch_process_tavily - WARNING - Tavily result for section 'technical_analysis' is not a dictionary. Converting.
-2025-05-09 07:52:04,961 - XplainCrypto - researcher._batch_process_tavily - INFO - Successfully retrieved and cached Tavily data for section 'technical_analysis'
-2025-05-09 07:52:04,961 - XplainCrypto - researcher._batch_process_tavily - INFO - Processing section 'developer_tools_and_user_experience' with query: 'ONDO cryptocurrency developer tools and user experience'
-2025-05-09 07:52:04,961 - XplainCrypto - researcher._batch_process_tavily - INFO - Fetching fresh Tavily data for section 'developer_tools_and_user_experience'
-2025-05-09 07:52:08,322 - XplainCrypto - researcher._batch_process_tavily - WARNING - Tavily result for section 'developer_tools_and_user_experience' is not a dictionary. Converting.
-2025-05-09 07:52:08,323 - XplainCrypto - researcher._batch_process_tavily - INFO - Successfully retrieved and cached Tavily data for section 'developer_tools_and_user_experience'
-2025-05-09 07:52:08,323 - XplainCrypto - researcher._batch_process_tavily - INFO - Processing section 'security' with query: 'ONDO cryptocurrency security'
-2025-05-09 07:52:08,323 - XplainCrypto - researcher._batch_process_tavily - INFO - Fetching fresh Tavily data for section 'security'
-2025-05-09 07:52:12,011 - XplainCrypto - researcher._batch_process_tavily - WARNING - Tavily result for section 'security' is not a dictionary. Converting.
-2025-05-09 07:52:12,011 - XplainCrypto - researcher._batch_process_tavily - INFO - Successfully retrieved and cached Tavily data for section 'security'
-2025-05-09 07:52:12,011 - XplainCrypto - researcher._batch_process_tavily - INFO - Processing section 'liquidity_and_adoption_metrics' with query: 'ONDO cryptocurrency liquidity and adoption metrics'
-2025-05-09 07:52:12,011 - XplainCrypto - researcher._batch_process_tavily - INFO - Fetching fresh Tavily data for section 'liquidity_and_adoption_metrics'
-2025-05-09 07:52:15,552 - XplainCrypto - researcher._batch_process_tavily - WARNING - Tavily result for section 'liquidity_and_adoption_metrics' is not a dictionary. Converting.
-2025-05-09 07:52:15,552 - XplainCrypto - researcher._batch_process_tavily - INFO - Successfully retrieved and cached Tavily data for section 'liquidity_and_adoption_metrics'
-2025-05-09 07:52:15,552 - XplainCrypto - researcher._batch_process_tavily - INFO - Processing section 'governance_and_community' with query: 'ONDO cryptocurrency governance and community'
-2025-05-09 07:52:15,552 - XplainCrypto - researcher._batch_process_tavily - INFO - Fetching fresh Tavily data for section 'governance_and_community'
-2025-05-09 07:52:20,389 - XplainCrypto - researcher._batch_process_tavily - WARNING - Tavily result for section 'governance_and_community' is not a dictionary. Converting.
-2025-05-09 07:52:20,389 - XplainCrypto - researcher._batch_process_tavily - INFO - Successfully retrieved and cached Tavily data for section 'governance_and_community'
-2025-05-09 07:52:20,389 - XplainCrypto - researcher._batch_process_tavily - INFO - Processing section 'ecosystem_and_partnerships' with query: 'ONDO cryptocurrency ecosystem and partnerships'
-2025-05-09 07:52:20,390 - XplainCrypto - researcher._batch_process_tavily - INFO - Fetching fresh Tavily data for section 'ecosystem_and_partnerships'
-2025-05-09 07:52:23,745 - XplainCrypto - researcher._batch_process_tavily - WARNING - Tavily result for section 'ecosystem_and_partnerships' is not a dictionary. Converting.
-2025-05-09 07:52:23,745 - XplainCrypto - researcher._batch_process_tavily - INFO - Successfully retrieved and cached Tavily data for section 'ecosystem_and_partnerships'
-2025-05-09 07:52:23,745 - XplainCrypto - researcher._batch_process_tavily - INFO - Processing section 'risks_and_opportunities' with query: 'ONDO cryptocurrency risks and opportunities'
-2025-05-09 07:52:23,746 - XplainCrypto - researcher._batch_process_tavily - INFO - Fetching fresh Tavily data for section 'risks_and_opportunities'
-2025-05-09 07:52:26,673 - XplainCrypto - researcher._batch_process_tavily - WARNING - Tavily result for section 'risks_and_opportunities' is not a dictionary. Converting.
-2025-05-09 07:52:26,673 - XplainCrypto - researcher._batch_process_tavily - INFO - Successfully retrieved and cached Tavily data for section 'risks_and_opportunities'
-2025-05-09 07:52:26,673 - XplainCrypto - researcher._batch_process_tavily - INFO - Processing section 'team_and_development_activity' with query: 'ONDO cryptocurrency team and development activity'
-2025-05-09 07:52:26,673 - XplainCrypto - researcher._batch_process_tavily - INFO - Fetching fresh Tavily data for section 'team_and_development_activity'
-2025-05-09 07:52:30,252 - XplainCrypto - researcher._batch_process_tavily - WARNING - Tavily result for section 'team_and_development_activity' is not a dictionary. Converting.
-2025-05-09 07:52:30,252 - XplainCrypto - researcher._batch_process_tavily - INFO - Successfully retrieved and cached Tavily data for section 'team_and_development_activity'
-2025-05-09 07:52:30,252 - XplainCrypto - researcher._batch_process_tavily - INFO - Processing section 'conclusion' with query: 'ONDO cryptocurrency conclusion'
-2025-05-09 07:52:30,252 - XplainCrypto - researcher._batch_process_tavily - INFO - Fetching fresh Tavily data for section 'conclusion'
-2025-05-09 07:52:33,264 - XplainCrypto - researcher._batch_process_tavily - WARNING - Tavily result for section 'conclusion' is not a dictionary. Converting.
-2025-05-09 07:52:33,264 - XplainCrypto - researcher._batch_process_tavily - INFO - Successfully retrieved and cached Tavily data for section 'conclusion'
-2025-05-09 07:52:33,265 - XplainCrypto - researcher._batch_process_tavily - INFO - ✅ Verified cache for 'executive_summary' exists at: docs/ondo/cache/tavily/research_executive_summary.json
-2025-05-09 07:52:33,265 - XplainCrypto - researcher._batch_process_tavily - INFO - ✅ Verified cache for 'introduction' exists at: docs/ondo/cache/tavily/research_introduction.json
-2025-05-09 07:52:33,265 - XplainCrypto - researcher._batch_process_tavily - INFO - ✅ Verified cache for 'tokenomics_and_distribution' exists at: docs/ondo/cache/tavily/research_tokenomics_and_distribution.json
-2025-05-09 07:52:33,265 - XplainCrypto - researcher._batch_process_tavily - INFO - ✅ Verified cache for 'market_analysis' exists at: docs/ondo/cache/tavily/research_market_analysis.json
-2025-05-09 07:52:33,265 - XplainCrypto - researcher._batch_process_tavily - INFO - ✅ Verified cache for 'technical_analysis' exists at: docs/ondo/cache/tavily/research_technical_analysis.json
-2025-05-09 07:52:33,265 - XplainCrypto - researcher._batch_process_tavily - INFO - ✅ Verified cache for 'developer_tools_and_user_experience' exists at: docs/ondo/cache/tavily/research_developer_tools_and_user_experience.json
-2025-05-09 07:52:33,266 - XplainCrypto - researcher._batch_process_tavily - INFO - ✅ Verified cache for 'security' exists at: docs/ondo/cache/tavily/research_security.json
-2025-05-09 07:52:33,266 - XplainCrypto - researcher._batch_process_tavily - INFO - ✅ Verified cache for 'liquidity_and_adoption_metrics' exists at: docs/ondo/cache/tavily/research_liquidity_and_adoption_metrics.json
-2025-05-09 07:52:33,266 - XplainCrypto - researcher._batch_process_tavily - INFO - ✅ Verified cache for 'governance_and_community' exists at: docs/ondo/cache/tavily/research_governance_and_community.json
-2025-05-09 07:52:33,266 - XplainCrypto - researcher._batch_process_tavily - INFO - ✅ Verified cache for 'ecosystem_and_partnerships' exists at: docs/ondo/cache/tavily/research_ecosystem_and_partnerships.json
-2025-05-09 07:52:33,266 - XplainCrypto - researcher._batch_process_tavily - INFO - ✅ Verified cache for 'risks_and_opportunities' exists at: docs/ondo/cache/tavily/research_risks_and_opportunities.json
-2025-05-09 07:52:33,266 - XplainCrypto - researcher._batch_process_tavily - INFO - ✅ Verified cache for 'team_and_development_activity' exists at: docs/ondo/cache/tavily/research_team_and_development_activity.json
-2025-05-09 07:52:33,266 - XplainCrypto - researcher._batch_process_tavily - INFO - ✅ Verified cache for 'conclusion' exists at: docs/ondo/cache/tavily/research_conclusion.json
-2025-05-09 07:52:33,267 - XplainCrypto - researcher._batch_process_project_data - INFO - Completed batch processing for project: ONDO
-2025-05-09 07:52:33,267 - XplainCrypto - researcher.execute_workflow - INFO - Processing section: 'Executive Summary' | Required sources: ['coinmarketcap', 'defillama']
-2025-05-09 07:52:33,267 - XplainCrypto - researcher.execute_workflow - INFO - Section 'Executive Summary': Running RAG with query: 'ONDO executive summary overview'
-2025-05-09 07:52:33,792 - XplainCrypto - researcher.execute_workflow - INFO - RAG retrieved 3 endpoints for section query: ['data://coingecko/price/{coin}', 'data://coinmarketcap/price/{coin}', 'data://defillama/tvl/{protocol}']
-2025-05-09 07:52:33,792 - XplainCrypto - researcher.execute_workflow - INFO - Section 'Executive Summary': Invoking tool for endpoint: data://coingecko/price/{coin}
-2025-05-09 07:52:33,792 - XplainCrypto - researcher._invoke_tool_for_endpoint - INFO - Using standardized cache path: docs/ondo/cache/coingecko/price_ondo.json
-2025-05-09 07:52:33,792 - XplainCrypto - researcher._invoke_tool_for_endpoint - INFO - No cache hit for data://coingecko/price/{coin}. Calling fetch_data with Endpoint='data://coingecko/price/ondo', Params={'project_name': 'ONDO'}
-2025-05-09 07:52:33,792 - XplainCrypto - researcher._invoke_tool_for_endpoint - INFO - Setting 15-second timeout for fetch_data call to data://coingecko/price/ondo
-2025-05-09 07:52:35,657 - XplainCrypto - researcher._invoke_tool_for_endpoint - INFO - fetch_data completed successfully for data://coingecko/price/ondo
-2025-05-09 07:52:35,657 - XplainCrypto - researcher._invoke_tool_for_endpoint - INFO - Saved fetched data to cache for data://coingecko/price/{coin} (key: coingecko_price_ondo)
-2025-05-09 07:52:35,657 - XplainCrypto - researcher.execute_workflow - INFO - Section 'Executive Summary': Invoking tool for endpoint: data://coinmarketcap/price/{coin}
-2025-05-09 07:52:35,657 - XplainCrypto - researcher._invoke_tool_for_endpoint - INFO - Using standardized cache path: docs/ondo/cache/coinmarketcap/price_ondo.json
-2025-05-09 07:52:35,657 - XplainCrypto - researcher._invoke_tool_for_endpoint - INFO - No cache hit for data://coinmarketcap/price/{coin}. Calling fetch_data with Endpoint='data://coinmarketcap/price/ondo', Params={'project_name': 'ONDO'}
-2025-05-09 07:52:35,658 - XplainCrypto - researcher._invoke_tool_for_endpoint - INFO - Setting 15-second timeout for fetch_data call to data://coinmarketcap/price/ondo
-2025-05-09 07:52:37,777 - XplainCrypto - researcher._invoke_tool_for_endpoint - INFO - fetch_data completed successfully for data://coinmarketcap/price/ondo
-2025-05-09 07:52:37,778 - XplainCrypto - researcher._invoke_tool_for_endpoint - INFO - Saved fetched data to cache for data://coinmarketcap/price/{coin} (key: coinmarketcap_price_ondo)
-2025-05-09 07:52:37,778 - XplainCrypto - researcher.execute_workflow - INFO - Section 'Executive Summary': Invoking tool for endpoint: data://defillama/tvl/{protocol}
-2025-05-09 07:52:37,778 - XplainCrypto - researcher._invoke_tool_for_endpoint - INFO - Using standardized cache path: docs/ondo/cache/defillama/tvl_ondo.json
-2025-05-09 07:52:37,783 - XplainCrypto - researcher._invoke_tool_for_endpoint - INFO - Using cached data for data://defillama/tvl/{protocol} (key: defillama_tvl_ondo)
-2025-05-09 07:52:37,783 - XplainCrypto - researcher.execute_workflow - INFO - Processing section: 'Introduction' | Required sources: ['web_research', 'coinmarketcap']
-2025-05-09 07:52:37,783 - XplainCrypto - researcher.execute_workflow - INFO - Section 'Introduction': Running RAG with query: 'ONDO introduction background mission'
-2025-05-09 07:52:37,901 - XplainCrypto - researcher.execute_workflow - INFO - RAG retrieved 4 endpoints for section query: ['data://coingecko/price/{coin}', 'data://coinmarketcap/price/{coin}', 'data://defillama/tvl/{protocol}', 'research://tavily/{query}']
-2025-05-09 07:52:37,901 - XplainCrypto - researcher.execute_workflow - INFO - Endpoint data://coingecko/price/{coin} already processed. Skipping.
-2025-05-09 07:52:37,901 - XplainCrypto - researcher.execute_workflow - INFO - Endpoint data://coinmarketcap/price/{coin} already processed. Skipping.
-2025-05-09 07:52:37,901 - XplainCrypto - researcher.execute_workflow - INFO - Endpoint data://defillama/tvl/{protocol} already processed. Skipping.
-2025-05-09 07:52:37,901 - XplainCrypto - researcher.execute_workflow - INFO - Section 'Introduction': Invoking tool for endpoint: research://tavily/{query}
-2025-05-09 07:52:37,901 - XplainCrypto - researcher._invoke_tool_for_endpoint - INFO - Using standardized cache path: docs/ondo/cache/tavily/research_ondo.json
-2025-05-09 07:52:37,901 - XplainCrypto - researcher._invoke_tool_for_endpoint - INFO - No cache hit for research://tavily/{query}. Calling fetch_data with Endpoint='research://tavily/ondo', Params={'project_name': 'ONDO'}
-2025-05-09 07:52:37,901 - XplainCrypto - researcher._invoke_tool_for_endpoint - INFO - Setting 15-second timeout for fetch_data call to research://tavily/ondo
-2025-05-09 07:52:41,859 - XplainCrypto - researcher._invoke_tool_for_endpoint - INFO - fetch_data completed successfully for research://tavily/ondo
-2025-05-09 07:52:41,861 - XplainCrypto - researcher._invoke_tool_for_endpoint - INFO - Saved fetched data to cache for research://tavily/{query} (key: tavily_research_ondo)
-2025-05-09 07:52:41,861 - XplainCrypto - researcher.execute_workflow - INFO - Processing section: 'Tokenomics and Distribution' | Required sources: ['web_research', 'coinmarketcap', 'tokenomics']
-2025-05-09 07:52:41,861 - XplainCrypto - researcher.execute_workflow - INFO - Section 'Tokenomics and Distribution': Running RAG with query: 'ONDO tokenomics supply distribution utility'
-2025-05-09 07:52:41,978 - XplainCrypto - researcher.execute_workflow - INFO - RAG retrieved 4 endpoints for section query: ['data://coingecko/price/{coin}', 'data://coinmarketcap/price/{coin}', 'data://defillama/tvl/{protocol}', 'research://tavily/{query}']
-2025-05-09 07:52:41,978 - XplainCrypto - researcher.execute_workflow - INFO - Endpoint data://coingecko/price/{coin} already processed. Skipping.
-2025-05-09 07:52:41,978 - XplainCrypto - researcher.execute_workflow - INFO - Endpoint data://coinmarketcap/price/{coin} already processed. Skipping.
-2025-05-09 07:52:41,978 - XplainCrypto - researcher.execute_workflow - INFO - Endpoint data://defillama/tvl/{protocol} already processed. Skipping.
-2025-05-09 07:52:41,978 - XplainCrypto - researcher.execute_workflow - INFO - Endpoint research://tavily/{query} already processed. Skipping.
-2025-05-09 07:52:41,978 - XplainCrypto - researcher.execute_workflow - INFO - Processing section: 'Market Analysis' | Required sources: ['web_research', 'coinmarketcap', 'defillama']
-2025-05-09 07:52:41,978 - XplainCrypto - researcher.execute_workflow - INFO - Section 'Market Analysis': Running RAG with query: 'ONDO market performance competitors'
-2025-05-09 07:52:42,094 - XplainCrypto - researcher.execute_workflow - INFO - RAG retrieved 4 endpoints for section query: ['data://coingecko/price/{coin}', 'data://coinmarketcap/price/{coin}', 'data://defillama/tvl/{protocol}', 'research://tavily/{query}']
-2025-05-09 07:52:42,094 - XplainCrypto - researcher.execute_workflow - INFO - Endpoint data://coingecko/price/{coin} already processed. Skipping.
-2025-05-09 07:52:42,094 - XplainCrypto - researcher.execute_workflow - INFO - Endpoint data://coinmarketcap/price/{coin} already processed. Skipping.
-2025-05-09 07:52:42,094 - XplainCrypto - researcher.execute_workflow - INFO - Endpoint data://defillama/tvl/{protocol} already processed. Skipping.
-2025-05-09 07:52:42,094 - XplainCrypto - researcher.execute_workflow - INFO - Endpoint research://tavily/{query} already processed. Skipping.
-2025-05-09 07:52:42,094 - XplainCrypto - researcher.execute_workflow - INFO - Processing section: 'Technical Analysis' | Required sources: ['web_research', 'coinmarketcap']
-2025-05-09 07:52:42,094 - XplainCrypto - researcher.execute_workflow - INFO - Section 'Technical Analysis': Running RAG with query: 'ONDO technical architecture blockchain'
-2025-05-09 07:52:42,211 - XplainCrypto - researcher.execute_workflow - INFO - RAG retrieved 4 endpoints for section query: ['data://coingecko/price/{coin}', 'data://coinmarketcap/price/{coin}', 'data://defillama/tvl/{protocol}', 'research://tavily/{query}']
-2025-05-09 07:52:42,211 - XplainCrypto - researcher.execute_workflow - INFO - Endpoint data://coingecko/price/{coin} already processed. Skipping.
-2025-05-09 07:52:42,211 - XplainCrypto - researcher.execute_workflow - INFO - Endpoint data://coinmarketcap/price/{coin} already processed. Skipping.
-2025-05-09 07:52:42,211 - XplainCrypto - researcher.execute_workflow - INFO - Endpoint data://defillama/tvl/{protocol} already processed. Skipping.
-2025-05-09 07:52:42,211 - XplainCrypto - researcher.execute_workflow - INFO - Endpoint research://tavily/{query} already processed. Skipping.
-2025-05-09 07:52:42,211 - XplainCrypto - researcher.execute_workflow - INFO - Processing section: 'Developer Tools and User Experience' | Required sources: ['web_research']
-2025-05-09 07:52:42,211 - XplainCrypto - researcher.execute_workflow - INFO - Section 'Developer Tools and User Experience': Running RAG with query: 'ONDO developer tools user experience'
-2025-05-09 07:52:42,328 - XplainCrypto - researcher.execute_workflow - INFO - RAG retrieved 4 endpoints for section query: ['data://coingecko/price/{coin}', 'data://coinmarketcap/price/{coin}', 'data://defillama/tvl/{protocol}', 'research://tavily/{query}']
-2025-05-09 07:52:42,328 - XplainCrypto - researcher.execute_workflow - INFO - Endpoint data://coingecko/price/{coin} already processed. Skipping.
-2025-05-09 07:52:42,328 - XplainCrypto - researcher.execute_workflow - INFO - Endpoint data://coinmarketcap/price/{coin} already processed. Skipping.
-2025-05-09 07:52:42,328 - XplainCrypto - researcher.execute_workflow - INFO - Endpoint data://defillama/tvl/{protocol} already processed. Skipping.
-2025-05-09 07:52:42,328 - XplainCrypto - researcher.execute_workflow - INFO - Endpoint research://tavily/{query} already processed. Skipping.
-2025-05-09 07:52:42,328 - XplainCrypto - researcher.execute_workflow - INFO - Processing section: 'Security' | Required sources: ['web_research']
-2025-05-09 07:52:42,328 - XplainCrypto - researcher.execute_workflow - INFO - Section 'Security': Running RAG with query: 'ONDO security audits vulnerabilities'
-2025-05-09 07:52:42,445 - XplainCrypto - researcher.execute_workflow - INFO - RAG retrieved 4 endpoints for section query: ['data://coingecko/price/{coin}', 'data://coinmarketcap/price/{coin}', 'data://defillama/tvl/{protocol}', 'research://tavily/{query}']
-2025-05-09 07:52:42,445 - XplainCrypto - researcher.execute_workflow - INFO - Endpoint data://coingecko/price/{coin} already processed. Skipping.
-2025-05-09 07:52:42,445 - XplainCrypto - researcher.execute_workflow - INFO - Endpoint data://coinmarketcap/price/{coin} already processed. Skipping.
-2025-05-09 07:52:42,445 - XplainCrypto - researcher.execute_workflow - INFO - Endpoint data://defillama/tvl/{protocol} already processed. Skipping.
-2025-05-09 07:52:42,445 - XplainCrypto - researcher.execute_workflow - INFO - Endpoint research://tavily/{query} already processed. Skipping.
-2025-05-09 07:52:42,445 - XplainCrypto - researcher.execute_workflow - INFO - Processing section: 'Liquidity and Adoption Metrics' | Required sources: ['web_research', 'coinmarketcap', 'defillama']
-2025-05-09 07:52:42,445 - XplainCrypto - researcher.execute_workflow - INFO - Section 'Liquidity and Adoption Metrics': Running RAG with query: 'ONDO liquidity adoption metrics'
-2025-05-09 07:52:42,561 - XplainCrypto - researcher.execute_workflow - INFO - RAG retrieved 4 endpoints for section query: ['data://coingecko/price/{coin}', 'data://coinmarketcap/price/{coin}', 'data://defillama/tvl/{protocol}', 'research://tavily/{query}']
-2025-05-09 07:52:42,562 - XplainCrypto - researcher.execute_workflow - INFO - Endpoint data://coingecko/price/{coin} already processed. Skipping.
-2025-05-09 07:52:42,562 - XplainCrypto - researcher.execute_workflow - INFO - Endpoint data://coinmarketcap/price/{coin} already processed. Skipping.
-2025-05-09 07:52:42,562 - XplainCrypto - researcher.execute_workflow - INFO - Endpoint data://defillama/tvl/{protocol} already processed. Skipping.
-2025-05-09 07:52:42,562 - XplainCrypto - researcher.execute_workflow - INFO - Endpoint research://tavily/{query} already processed. Skipping.
-2025-05-09 07:52:42,562 - XplainCrypto - researcher.execute_workflow - INFO - Processing section: 'Governance and Community' | Required sources: ['web_research']
-2025-05-09 07:52:42,562 - XplainCrypto - researcher.execute_workflow - INFO - Section 'Governance and Community': Running RAG with query: 'ONDO governance voting community'
-2025-05-09 07:52:42,677 - XplainCrypto - researcher.execute_workflow - INFO - RAG retrieved 4 endpoints for section query: ['data://coingecko/price/{coin}', 'data://coinmarketcap/price/{coin}', 'data://defillama/tvl/{protocol}', 'research://tavily/{query}']
-2025-05-09 07:52:42,678 - XplainCrypto - researcher.execute_workflow - INFO - Endpoint data://coingecko/price/{coin} already processed. Skipping.
-2025-05-09 07:52:42,678 - XplainCrypto - researcher.execute_workflow - INFO - Endpoint data://coinmarketcap/price/{coin} already processed. Skipping.
-2025-05-09 07:52:42,678 - XplainCrypto - researcher.execute_workflow - INFO - Endpoint data://defillama/tvl/{protocol} already processed. Skipping.
-2025-05-09 07:52:42,678 - XplainCrypto - researcher.execute_workflow - INFO - Endpoint research://tavily/{query} already processed. Skipping.
-2025-05-09 07:52:42,678 - XplainCrypto - researcher.execute_workflow - INFO - Processing section: 'Ecosystem and Partnerships' | Required sources: ['web_research', 'defillama']
-2025-05-09 07:52:42,678 - XplainCrypto - researcher.execute_workflow - INFO - Section 'Ecosystem and Partnerships': Running RAG with query: 'ONDO ecosystem partnerships integrations'
-2025-05-09 07:52:42,794 - XplainCrypto - researcher.execute_workflow - INFO - RAG retrieved 4 endpoints for section query: ['data://coingecko/price/{coin}', 'data://coinmarketcap/price/{coin}', 'data://defillama/tvl/{protocol}', 'research://tavily/{query}']
-2025-05-09 07:52:42,794 - XplainCrypto - researcher.execute_workflow - INFO - Endpoint data://coingecko/price/{coin} already processed. Skipping.
-2025-05-09 07:52:42,794 - XplainCrypto - researcher.execute_workflow - INFO - Endpoint data://coinmarketcap/price/{coin} already processed. Skipping.
-2025-05-09 07:52:42,794 - XplainCrypto - researcher.execute_workflow - INFO - Endpoint data://defillama/tvl/{protocol} already processed. Skipping.
-2025-05-09 07:52:42,794 - XplainCrypto - researcher.execute_workflow - INFO - Endpoint research://tavily/{query} already processed. Skipping.
-2025-05-09 07:52:42,794 - XplainCrypto - researcher.execute_workflow - INFO - Processing section: 'Risks and Opportunities' | Required sources: ['web_research']
-2025-05-09 07:52:42,794 - XplainCrypto - researcher.execute_workflow - INFO - Section 'Risks and Opportunities': Running RAG with query: 'ONDO risks opportunities analysis'
-2025-05-09 07:52:42,911 - XplainCrypto - researcher.execute_workflow - INFO - RAG retrieved 4 endpoints for section query: ['data://coingecko/price/{coin}', 'data://coinmarketcap/price/{coin}', 'data://defillama/tvl/{protocol}', 'research://tavily/{query}']
-2025-05-09 07:52:42,911 - XplainCrypto - researcher.execute_workflow - INFO - Endpoint data://coingecko/price/{coin} already processed. Skipping.
-2025-05-09 07:52:42,911 - XplainCrypto - researcher.execute_workflow - INFO - Endpoint data://coinmarketcap/price/{coin} already processed. Skipping.
-2025-05-09 07:52:42,911 - XplainCrypto - researcher.execute_workflow - INFO - Endpoint data://defillama/tvl/{protocol} already processed. Skipping.
-2025-05-09 07:52:42,911 - XplainCrypto - researcher.execute_workflow - INFO - Endpoint research://tavily/{query} already processed. Skipping.
-2025-05-09 07:52:42,912 - XplainCrypto - researcher.execute_workflow - INFO - Processing section: 'Team and Development Activity' | Required sources: ['web_research']
-2025-05-09 07:52:42,912 - XplainCrypto - researcher.execute_workflow - INFO - Section 'Team and Development Activity': Running RAG with query: 'ONDO team development activity'
-2025-05-09 07:52:43,029 - XplainCrypto - researcher.execute_workflow - INFO - RAG retrieved 4 endpoints for section query: ['data://coingecko/price/{coin}', 'data://coinmarketcap/price/{coin}', 'data://defillama/tvl/{protocol}', 'research://tavily/{query}']
-2025-05-09 07:52:43,029 - XplainCrypto - researcher.execute_workflow - INFO - Endpoint data://coingecko/price/{coin} already processed. Skipping.
-2025-05-09 07:52:43,029 - XplainCrypto - researcher.execute_workflow - INFO - Endpoint data://coinmarketcap/price/{coin} already processed. Skipping.
-2025-05-09 07:52:43,029 - XplainCrypto - researcher.execute_workflow - INFO - Endpoint data://defillama/tvl/{protocol} already processed. Skipping.
-2025-05-09 07:52:43,029 - XplainCrypto - researcher.execute_workflow - INFO - Endpoint research://tavily/{query} already processed. Skipping.
-2025-05-09 07:52:43,029 - XplainCrypto - researcher.execute_workflow - INFO - Processing section: 'Conclusion' | Required sources: []
-2025-05-09 07:52:43,029 - XplainCrypto - researcher.execute_workflow - INFO - Section 'Conclusion': Running RAG with query: 'ONDO conclusion investment insights'
-2025-05-09 07:52:43,146 - XplainCrypto - researcher.execute_workflow - INFO - RAG retrieved 3 endpoints for section query: ['data://coingecko/price/{coin}', 'data://coinmarketcap/price/{coin}', 'data://defillama/tvl/{protocol}']
-2025-05-09 07:52:43,146 - XplainCrypto - researcher.execute_workflow - INFO - Endpoint data://coingecko/price/{coin} already processed. Skipping.
-2025-05-09 07:52:43,146 - XplainCrypto - researcher.execute_workflow - INFO - Endpoint data://coinmarketcap/price/{coin} already processed. Skipping.
-2025-05-09 07:52:43,146 - XplainCrypto - researcher.execute_workflow - INFO - Endpoint data://defillama/tvl/{protocol} already processed. Skipping.
-2025-05-09 07:52:43,146 - XplainCrypto - researcher.execute_workflow - INFO - Consolidating fetched data into state... (Refinement likely needed)
-2025-05-09 07:52:43,146 - XplainCrypto - researcher.execute_workflow - INFO - Problem sections reported: 0
-2025-05-09 07:52:43,146 - XplainCrypto - researcher.execute_workflow - INFO - Completed execute_workflow
-2025-05-09 07:52:43,147 - XplainCrypto - researcher.run - INFO - Completed Researcher.run
-2025-05-09 07:52:43,149 - XplainCrypto - workflow_manager.execute_workflow - INFO - Researcher completed
-2025-05-09 07:52:43,149 - XplainCrypto - workflow_manager.execute_workflow - INFO - Running Writer
-2025-05-09 07:52:43,150 - XplainCrypto - writer.writer - INFO - Async writer creating draft for ONDO
-2025-05-09 07:52:43,150 - XplainCrypto - writer.__init__ - INFO - Using Hugging Face API with summarization models
-2025-05-09 07:52:43,150 - XplainCrypto - writer.write_draft - INFO - Writing draft for ONDO
-2025-05-09 07:52:43,150 - XplainCrypto - cache_utils.__init__ - INFO - Cache directory set to: docs/ondo/cache
-2025-05-09 07:52:43,151 - XplainCrypto - cache_manager.load_config - INFO - Loaded cache config: max_size=500MB, max_files_per_project=1000, cleanup_threshold=400MB
-2025-05-09 07:52:43,151 - XplainCrypto - writer.write_draft - INFO - Problem section titles: set()
-2025-05-09 07:52:43,151 - XplainCrypto - writer.write_draft - INFO - Processing 13 sections in 5 batches of 3
-2025-05-09 07:52:43,151 - XplainCrypto - writer.write_draft - INFO - Processing batch 1/5 with 3 sections
-2025-05-09 07:52:43,151 - XplainCrypto - writer.check_for_problem_section - INFO - Section 'Executive Summary' is NOT in problem_section_titles: set()
-2025-05-09 07:52:43,151 - XplainCrypto - writer.generate_section_content - INFO - Using standard content generation for section: Executive Summary
-2025-05-09 07:52:43,176 - XplainCrypto - writer.check_for_problem_section - INFO - Section 'Introduction' is NOT in problem_section_titles: set()
-2025-05-09 07:52:43,176 - XplainCrypto - writer.generate_section_content - INFO - Using standard content generation for section: Introduction
-2025-05-09 07:52:43,188 - XplainCrypto - writer.check_for_problem_section - INFO - Section 'Tokenomics and Distribution' is NOT in problem_section_titles: set()
-2025-05-09 07:52:43,189 - XplainCrypto - writer.generate_section_content - INFO - Using standard content generation for section: Tokenomics and Distribution
-2025-05-09 07:52:46,270 - XplainCrypto - writer._generate_section_content - INFO - Generated initial content for Introduction: 285 words
-2025-05-09 07:52:46,271 - XplainCrypto - writer.generate_section_content - ERROR - Error generating content for Introduction: 'CacheManager' object has no attribute 'save_to_cache'
-2025-05-09 07:52:46,271 - XplainCrypto - writer._generate_fallback_content - WARNING - Using basic fallback content for Introduction
-2025-05-09 07:52:46,439 - XplainCrypto - writer._generate_section_content - INFO - Generated initial content for Executive Summary: 260 words
-2025-05-09 07:52:46,439 - XplainCrypto - writer.generate_section_content - ERROR - Error generating content for Executive Summary: 'CacheManager' object has no attribute 'save_to_cache'
-2025-05-09 07:52:46,439 - XplainCrypto - writer._generate_fallback_content - WARNING - Using basic fallback content for Executive Summary
-2025-05-09 07:52:48,330 - XplainCrypto - writer._generate_section_content - INFO - Generated initial content for Tokenomics and Distribution: 401 words
-2025-05-09 07:52:48,330 - XplainCrypto - writer.generate_section_content - ERROR - Error generating content for Tokenomics and Distribution: 'CacheManager' object has no attribute 'save_to_cache'
-2025-05-09 07:52:48,330 - XplainCrypto - writer._generate_fallback_content - WARNING - Using basic fallback content for Tokenomics and Distribution
-2025-05-09 07:52:48,330 - XplainCrypto - writer.write_draft - INFO - Processing batch 2/5 with 3 sections
-2025-05-09 07:52:48,330 - XplainCrypto - writer.check_for_problem_section - INFO - Section 'Market Analysis' is NOT in problem_section_titles: set()
-2025-05-09 07:52:48,330 - XplainCrypto - writer.generate_section_content - INFO - Using standard content generation for section: Market Analysis
-2025-05-09 07:52:48,344 - XplainCrypto - writer.check_for_problem_section - INFO - Section 'Technical Analysis' is NOT in problem_section_titles: set()
-2025-05-09 07:52:48,344 - XplainCrypto - writer.generate_section_content - INFO - Using standard content generation for section: Technical Analysis
-2025-05-09 07:52:48,355 - XplainCrypto - writer.check_for_problem_section - INFO - Section 'Developer Tools and User Experience' is NOT in problem_section_titles: set()
-2025-05-09 07:52:48,355 - XplainCrypto - writer.generate_section_content - INFO - Using standard content generation for section: Developer Tools and User Experience
-2025-05-09 07:52:52,012 - XplainCrypto - writer._generate_section_content - INFO - Generated initial content for Market Analysis: 427 words
-2025-05-09 07:52:52,012 - XplainCrypto - writer._generate_section_content - WARNING - Content for Market Analysis too short (427/600). Retrying with explicit instructions.
-2025-05-09 07:52:52,319 - XplainCrypto - writer._generate_section_content - INFO - Generated initial content for Developer Tools and User Experience: 429 words
-2025-05-09 07:52:52,319 - XplainCrypto - writer.generate_section_content - ERROR - Error generating content for Developer Tools and User Experience: 'CacheManager' object has no attribute 'save_to_cache'
-2025-05-09 07:52:52,319 - XplainCrypto - writer._generate_fallback_content - WARNING - Using basic fallback content for Developer Tools and User Experience
-2025-05-09 07:52:52,745 - XplainCrypto - writer._generate_section_content - INFO - Generated initial content for Technical Analysis: 427 words
-2025-05-09 07:52:52,745 - XplainCrypto - writer._generate_section_content - WARNING - Content for Technical Analysis too short (427/500). Retrying with explicit instructions.
-2025-05-09 07:52:53,219 - XplainCrypto - main.disconnect - INFO - Client disconnected: IznZcMvBgWIKtvG0AAAC
+2025-05-09 09:14:47,145 - XplainCrypto - researcher._invoke_tool_for_endpoint - INFO - fetch_data completed successfully for data://defillama/tvl/ondo
+2025-05-09 09:14:47,206 - XplainCrypto - researcher._invoke_tool_for_endpoint - INFO - Saved fetched data to cache for data://defillama/tvl/{coin} (key: defillama_tvl_executive_summary)
+2025-05-09 09:14:47,206 - XplainCrypto - researcher.execute_workflow - INFO - Processing section: 'Introduction' | Required sources: ['coinmarketcap']
+2025-05-09 09:14:47,206 - XplainCrypto - researcher.execute_workflow - INFO - Section 'Introduction': Running RAG with query: 'ONDO introduction background mission'
+2025-05-09 09:14:47,207 - XplainCrypto - researcher.execute_workflow - INFO - RAG retrieved 1 endpoints for section query: ['data://coinmarketcap/overview/{coin}']
+2025-05-09 09:14:47,207 - XplainCrypto - researcher.execute_workflow - INFO - Endpoint data://coinmarketcap/overview/{coin} already processed. Skipping.
+2025-05-09 09:14:47,207 - XplainCrypto - researcher.execute_workflow - INFO - Processing section: 'Tokenomics and Distribution' | Required sources: ['coinmarketcap', 'tokenomics']
+2025-05-09 09:14:47,207 - XplainCrypto - researcher.execute_workflow - INFO - Section 'Tokenomics and Distribution': Running RAG with query: 'ONDO tokenomics supply distribution utility'
+2025-05-09 09:14:47,209 - XplainCrypto - researcher.execute_workflow - INFO - RAG retrieved 2 endpoints for section query: ['data://coinmarketcap/overview/{coin}', 'data://tokenomics/distribution/{coin}']
+2025-05-09 09:14:47,209 - XplainCrypto - researcher.execute_workflow - INFO - Endpoint data://coinmarketcap/overview/{coin} already processed. Skipping.
+2025-05-09 09:14:47,209 - XplainCrypto - researcher.execute_workflow - INFO - Section 'Tokenomics and Distribution': Invoking tool for endpoint: data://tokenomics/distribution/{coin}
+2025-05-09 09:14:47,209 - XplainCrypto - researcher._invoke_tool_for_endpoint - INFO - Using section-specific cache path with key 'tokenomics_and_distribution': docs/ondo/cache/tokenomics/distribution_tokenomics_and_distribution.json
+2025-05-09 09:14:47,209 - XplainCrypto - researcher._invoke_tool_for_endpoint - INFO - No cache hit for data://tokenomics/distribution/{coin}. Calling fetch_data with Endpoint='data://tokenomics/distribution/ondo', Params={'project_name': 'ONDO'}
+2025-05-09 09:14:47,209 - XplainCrypto - researcher._invoke_tool_for_endpoint - INFO - Setting 15-second timeout for fetch_data call to data://tokenomics/distribution/ondo
+2025-05-09 09:14:48,564 - XplainCrypto - researcher._invoke_tool_for_endpoint - INFO - fetch_data completed successfully for data://tokenomics/distribution/ondo
+2025-05-09 09:14:48,565 - XplainCrypto - researcher._invoke_tool_for_endpoint - INFO - Saved fetched data to cache for data://tokenomics/distribution/{coin} (key: tokenomics_distribution_tokenomics_and_distribution)
+2025-05-09 09:14:48,565 - XplainCrypto - researcher.execute_workflow - INFO - Processing section: 'Market Analysis' | Required sources: ['coinmarketcap', 'defillama']
+2025-05-09 09:14:48,565 - XplainCrypto - researcher.execute_workflow - INFO - Section 'Market Analysis': Running RAG with query: 'ONDO market performance competitors'
+2025-05-09 09:14:48,565 - XplainCrypto - researcher.execute_workflow - INFO - RAG retrieved 2 endpoints for section query: ['data://coinmarketcap/overview/{coin}', 'data://defillama/tvl/{coin}']
+2025-05-09 09:14:48,565 - XplainCrypto - researcher.execute_workflow - INFO - Endpoint data://coinmarketcap/overview/{coin} already processed. Skipping.
+2025-05-09 09:14:48,565 - XplainCrypto - researcher.execute_workflow - INFO - Endpoint data://defillama/tvl/{coin} already processed. Skipping.
+2025-05-09 09:14:48,565 - XplainCrypto - researcher.execute_workflow - INFO - Processing section: 'Technical Analysis' | Required sources: ['coinmarketcap']
+2025-05-09 09:14:48,565 - XplainCrypto - researcher.execute_workflow - INFO - Section 'Technical Analysis': Running RAG with query: 'ONDO technical architecture blockchain'
+2025-05-09 09:14:48,566 - XplainCrypto - researcher.execute_workflow - INFO - RAG retrieved 1 endpoints for section query: ['data://coinmarketcap/overview/{coin}']
+2025-05-09 09:14:48,566 - XplainCrypto - researcher.execute_workflow - INFO - Endpoint data://coinmarketcap/overview/{coin} already processed. Skipping.
+2025-05-09 09:14:48,566 - XplainCrypto - researcher.execute_workflow - INFO - Section 'Developer Tools and User Experience' only requires web_research, which was already processed
+2025-05-09 09:14:48,566 - XplainCrypto - researcher.execute_workflow - INFO - Section 'Security' only requires web_research, which was already processed
+2025-05-09 09:14:48,566 - XplainCrypto - researcher.execute_workflow - INFO - Processing section: 'Liquidity and Adoption Metrics' | Required sources: ['coinmarketcap', 'defillama']
+2025-05-09 09:14:48,566 - XplainCrypto - researcher.execute_workflow - INFO - Section 'Liquidity and Adoption Metrics': Running RAG with query: 'ONDO liquidity adoption metrics'
+2025-05-09 09:14:48,566 - XplainCrypto - researcher.execute_workflow - INFO - RAG retrieved 2 endpoints for section query: ['data://coinmarketcap/overview/{coin}', 'data://defillama/tvl/{coin}']
+2025-05-09 09:14:48,566 - XplainCrypto - researcher.execute_workflow - INFO - Endpoint data://coinmarketcap/overview/{coin} already processed. Skipping.
+2025-05-09 09:14:48,566 - XplainCrypto - researcher.execute_workflow - INFO - Endpoint data://defillama/tvl/{coin} already processed. Skipping.
+2025-05-09 09:14:48,566 - XplainCrypto - researcher.execute_workflow - INFO - Section 'Governance and Community' only requires web_research, which was already processed
+2025-05-09 09:14:48,566 - XplainCrypto - researcher.execute_workflow - INFO - Processing section: 'Ecosystem and Partnerships' | Required sources: ['defillama']
+2025-05-09 09:14:48,566 - XplainCrypto - researcher.execute_workflow - INFO - Section 'Ecosystem and Partnerships': Running RAG with query: 'ONDO ecosystem partnerships integrations'
+2025-05-09 09:14:48,567 - XplainCrypto - researcher.execute_workflow - INFO - RAG retrieved 1 endpoints for section query: ['data://defillama/tvl/{coin}']
+2025-05-09 09:14:48,567 - XplainCrypto - researcher.execute_workflow - INFO - Endpoint data://defillama/tvl/{coin} already processed. Skipping.
+2025-05-09 09:14:48,567 - XplainCrypto - researcher.execute_workflow - INFO - Section 'Risks and Opportunities' only requires web_research, which was already processed
+2025-05-09 09:14:48,567 - XplainCrypto - researcher.execute_workflow - INFO - Section 'Team and Development Activity' only requires web_research, which was already processed
+2025-05-09 09:14:48,567 - XplainCrypto - researcher.execute_workflow - INFO - Section 'Conclusion' only requires web_research, which was already processed
+2025-05-09 09:14:48,567 - XplainCrypto - researcher.execute_workflow - INFO - Consolidating fetched data into state...
+2025-05-09 09:14:48,567 - XplainCrypto - researcher.execute_workflow - INFO - Problem sections reported: 0
+2025-05-09 09:14:48,567 - XplainCrypto - researcher.execute_workflow - INFO - Completed execute_workflow
+2025-05-09 09:14:48,567 - XplainCrypto - researcher.run - INFO - Completed Researcher.run
+2025-05-09 09:14:48,569 - XplainCrypto - workflow_manager.execute_workflow - INFO - Researcher completed
+2025-05-09 09:14:48,569 - XplainCrypto - workflow_manager.execute_workflow - INFO - Running Writer
+2025-05-09 09:14:48,570 - XplainCrypto - writer.writer - INFO - Async writer creating draft for ONDO
+2025-05-09 09:14:48,570 - XplainCrypto - writer.__init__ - INFO - Using Hugging Face API with summarization models
+2025-05-09 09:14:48,570 - XplainCrypto - writer.write_draft - INFO - Writing draft for ONDO
+2025-05-09 09:14:48,570 - XplainCrypto - cache_utils.__init__ - INFO - Cache directory set to: docs/ondo/cache
+2025-05-09 09:14:48,570 - XplainCrypto - cache_manager.load_config - INFO - Loaded cache config: max_size=500MB, max_files_per_project=1000, cleanup_threshold=400MB
+2025-05-09 09:14:48,570 - XplainCrypto - writer.write_draft - INFO - Problem section titles: set()
+2025-05-09 09:14:48,570 - XplainCrypto - writer.write_draft - INFO - Processing 13 sections in 5 batches of 3
+2025-05-09 09:14:48,570 - XplainCrypto - writer.write_draft - INFO - Processing batch 1/5 with 3 sections
+2025-05-09 09:14:48,571 - XplainCrypto - writer.check_for_problem_section - INFO - Section 'Executive Summary' is NOT in problem_section_titles: set()
+2025-05-09 09:14:48,571 - XplainCrypto - writer.generate_section_content - INFO - Using standard content generation for section: Executive Summary
+2025-05-09 09:14:48,593 - XplainCrypto - writer.check_for_problem_section - INFO - Section 'Introduction' is NOT in problem_section_titles: set()
+2025-05-09 09:14:48,593 - XplainCrypto - writer.generate_section_content - INFO - Using standard content generation for section: Introduction
+2025-05-09 09:14:48,605 - XplainCrypto - writer.check_for_problem_section - INFO - Section 'Tokenomics and Distribution' is NOT in problem_section_titles: set()
+2025-05-09 09:14:48,605 - XplainCrypto - writer.generate_section_content - INFO - Using standard content generation for section: Tokenomics and Distribution
+2025-05-09 09:14:51,193 - XplainCrypto - writer._generate_section_content - INFO - Generated initial content for Executive Summary: 254 words
+2025-05-09 09:14:51,193 - XplainCrypto - writer.generate_section_content - ERROR - Error generating content for Executive Summary: 'CacheManager' object has no attribute 'save_to_cache'
+2025-05-09 09:14:51,193 - XplainCrypto - writer._generate_fallback_content - WARNING - Using basic fallback content for Executive Summary
+2025-05-09 09:14:51,385 - XplainCrypto - writer._generate_section_content - INFO - Generated initial content for Introduction: 289 words
+2025-05-09 09:14:51,386 - XplainCrypto - writer.generate_section_content - ERROR - Error generating content for Introduction: 'CacheManager' object has no attribute 'save_to_cache'
+2025-05-09 09:14:51,386 - XplainCrypto - writer._generate_fallback_content - WARNING - Using basic fallback content for Introduction
+2025-05-09 09:14:53,028 - XplainCrypto - writer._generate_section_content - INFO - Generated initial content for Tokenomics and Distribution: 392 words
+2025-05-09 09:14:53,028 - XplainCrypto - writer._generate_section_content - WARNING - Content for Tokenomics and Distribution too short (392/400). Retrying with explicit instructions.
+2025-05-09 09:14:57,369 - XplainCrypto - writer._generate_section_content - INFO - Retry generated content for Tokenomics and Distribution: 389 words
+2025-05-09 09:14:57,369 - XplainCrypto - writer._generate_section_content - WARNING - Retry content still too short (392/400). Using GPT-4.
+2025-05-09 09:15:01,270 - XplainCrypto - main.disconnect - INFO - Client disconnected: jHX0oG-epzxt_z2oAAAC
+2025-05-09 09:17:43,618 - XplainCrypto - logging_config.setup_logging - INFO - Logging initialized: file level=INFO, console level=20
+2025-05-09 09:17:43,620 - XplainCrypto - workflow_manager._load_report_config - INFO - Loaded report configuration with 13 sections
+2025-05-09 09:17:43,620 - XplainCrypto - workflow_manager.__init__ - INFO - ProgressTracker initialized in WorkflowManager
+2025-05-09 09:17:43,620 - XplainCrypto - workflow_manager.__init__ - INFO - ErrorReporter initialized in WorkflowManager
+2025-05-09 09:19:28,007 - XplainCrypto - logging_config.setup_logging - INFO - Logging initialized: file level=INFO, console level=20
+2025-05-09 09:19:28,009 - XplainCrypto - workflow_manager._load_report_config - INFO - Loaded report configuration with 13 sections
+2025-05-09 09:19:28,010 - XplainCrypto - workflow_manager.__init__ - INFO - ProgressTracker initialized in WorkflowManager
+2025-05-09 09:19:28,010 - XplainCrypto - workflow_manager.__init__ - INFO - ErrorReporter initialized in WorkflowManager

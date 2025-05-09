@@ -215,15 +215,15 @@ class VectorStore:
             # Convert to list of floats
             return embedding.tolist()
         except Exception as e:
-            self.logger.error(f"Error generating embedding: {str(e)}", exc_info=True)
+            logger.error(f"Error generating embedding: {str(e)}", exc_info=True)
             return None
             
-    async def search(self, embedding: List[float], top_k: int = 10) -> List[Dict[str, Any]]:
+    async def search(self, query: str, top_k: int = 10) -> List[Dict[str, Any]]:
         """
         Search the vector store for similar vectors.
         
         Args:
-            embedding: The embedding to search for
+            query: The query to search for
             top_k: The number of results to return
             
         Returns:
@@ -231,8 +231,14 @@ class VectorStore:
         """
         try:
             if not self.index:
-                self.logger.error("Vector store index not initialized")
+                logger.error("Vector store index not initialized")
                 return []
+                
+            # Encode the query if it's a string
+            if isinstance(query, str):
+                embedding = await self.embed_text(query)
+            else:
+                embedding = query
                 
             # Query the index
             results = self.index.query(
@@ -252,7 +258,7 @@ class VectorStore:
                 
             return formatted_results
         except Exception as e:
-            self.logger.error(f"Error searching vector store: {str(e)}", exc_info=True)
+            logger.error(f"Error searching vector store: {str(e)}", exc_info=True)
             return []
 
 # Initialize with environment variable

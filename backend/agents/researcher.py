@@ -208,36 +208,47 @@ class Researcher:
             # Track processed endpoints to avoid duplicate API calls
             self.processed_endpoints = set()
             
-            # First, batch process all API calls to minimize redundant requests
+            # First, use RAG-based batch processing for project data
+            # This will get RAG-appropriate data for each section
             await self._batch_process_project_data(report_config, project_name)
             
-            # Store Tavily results from batch processing in state
+            # Store research results from batch processing in state
             if "batch_data" in self.data and "tavily" in self.data["batch_data"]:
-                tavily_batch_results = self.data["batch_data"]["tavily"]
+                section_research_results = self.data["batch_data"]["tavily"]
                 
                 # Store these results in the appropriate state locations
-                for section_key, section_data in tavily_batch_results.items():
+                for section_key, section_data in section_research_results.items():
                     if is_state_dict:
                         if section_key not in state["data"]:
                             state["data"][section_key] = {}
-                        state["data"][section_key]["tavily"] = section_data
+                        if "tavily" not in state["data"][section_key]:
+                            state["data"][section_key]["tavily"] = section_data
                     else:
                         if not hasattr(state.data, section_key):
                             setattr(state.data, section_key, {})
                         section_data_obj = getattr(state.data, section_key)
-                        section_data_obj["tavily"] = section_data
+                        if "tavily" not in section_data_obj:
+                            section_data_obj["tavily"] = section_data
             
-            # Process each section from report_config
+            # Process each section from report_config to get non-research data
+            # Research data was already handled by _batch_process_tavily via _batch_process_project_data
             for section in report_config.get("sections", []):
                 section_title = section.get("title")
                 if not section_title:
                     continue
                     
-                required_sources = section.get("data_sources", [])
-                self.logger.info(f"Processing section: '{section_title}' | Required sources: {required_sources}")
-                
                 # Convert section title to section_key format (lowercase with underscores)
                 section_key = section_title.lower().replace(" ", "_")
+                
+                # Get required data sources, filtering out web_research as it's handled already
+                required_sources = [source for source in section.get("data_sources", [])
+                                    if source != "web_research"]
+                
+                if not required_sources:
+                    self.logger.info(f"Section '{section_title}' only requires web_research, which was already processed")
+                    continue
+                
+                self.logger.info(f"Processing section: '{section_title}' | Required sources: {required_sources}")
                 
                 # Use RAG to select endpoints for this section
                 query_template = section.get("query_template", "{project_name}")
@@ -247,20 +258,19 @@ class Researcher:
                 endpoints_for_section = []
                 try:
                     if self.rag_retriever:
-                        # Pass the required_sources to RAG retriever
+                        # Pass the required_sources to RAG retriever (excluding web_research)
                         endpoints_for_section = await asyncio.wait_for(
                             self.rag_retriever.get_endpoints_for_project(section_query, required_sources=required_sources), 
                             timeout=5.0
                         )
-                        # Filter out HuggingFace endpoints - we'll use them only as fallbacks
+                        # Filter out research endpoints as they've been handled in batch processing
                         endpoints_for_section = [
                             endpoint for endpoint in endpoints_for_section
-                            if "huggingface" not in endpoint
+                            if "research" not in endpoint.lower() and "tavily" not in endpoint.lower()
                         ]
                         self.logger.info(f"RAG retrieved {len(endpoints_for_section)} endpoints for section query: {endpoints_for_section}")
                     else:
-                        self.logger.warning("RAG retriever not available, using fallback endpoints")
-                        # Use tool calls directly instead of hardcoded endpoints
+                        self.logger.warning("RAG retriever not available, skipping additional endpoint retrieval")
                         endpoints_for_section = []
                 except Exception as e:
                     self.logger.error(f"Error in RAG retrieval for section '{section_title}': {str(e)}")
@@ -276,7 +286,7 @@ class Researcher:
                     try:
                         # Invoke the tool for this endpoint
                         self.logger.info(f"Section '{section_title}': Invoking tool for endpoint: {endpoint}")
-                        result = await self._invoke_tool_for_endpoint(endpoint, project_name)
+                        result = await self._invoke_tool_for_endpoint(endpoint, project_name, query=section_query, cache_key=section_title)
                         
                         # Mark as processed to avoid duplicate calls
                         self.processed_endpoints.add(endpoint)
@@ -309,7 +319,7 @@ class Researcher:
                             state.problem_sections.append(section_title)
             
             # Consolidate all fetched data into state
-            self.logger.info("Consolidating fetched data into state... (Refinement likely needed)")
+            self.logger.info("Consolidating fetched data into state...")
             
             # Process each key in self.data
             for key, value in self.data.items():
@@ -346,7 +356,7 @@ class Researcher:
                 state.errors.append(str(e))
             return state
 
-    async def _invoke_tool_for_endpoint(self, endpoint_pattern: str, project_name: str, query: Optional[str] = None) -> Dict[str, Any]:
+    async def _invoke_tool_for_endpoint(self, endpoint_pattern: str, project_name: str, query: Optional[str] = None, cache_key: Optional[str] = None) -> Dict[str, Any]:
         """Formats endpoint pattern INCLUDING identifiers in the path and calls fetch_data."""
         logger.info(f"Invoking tool for endpoint pattern: '{endpoint_pattern}' for project '{project_name}' with query '{query}'")
         
@@ -425,12 +435,21 @@ class Researcher:
             cache_mgr = CacheManager(project_name=project_name)
             
             # Use standardized cache path generation
-            cache_path = cache_mgr.get_cache_path(source, tool_name_for_cache, query_param_for_cache)
-            self.logger.info(f"Using standardized cache path: {cache_path}")
-            
-            cached_data = cache_mgr.load(source, tool_name_for_cache, query_param_for_cache)
+            # If a specific cache_key is provided, use it instead of derived query_param_for_cache
+            if cache_key:
+                # For section-specific caching (e.g., format section name for cache file)
+                # Convert any spaces in section names to underscores for cache path
+                formatted_cache_key = cache_key.lower().replace(' ', '_')
+                cache_path = cache_mgr.get_cache_path(source, tool_name_for_cache, formatted_cache_key)
+                self.logger.info(f"Using section-specific cache path with key '{formatted_cache_key}': {cache_path}")
+                cached_data = cache_mgr.load(source, tool_name_for_cache, formatted_cache_key)
+            else:
+                cache_path = cache_mgr.get_cache_path(source, tool_name_for_cache, query_param_for_cache)
+                self.logger.info(f"Using standardized cache path: {cache_path}")
+                cached_data = cache_mgr.load(source, tool_name_for_cache, query_param_for_cache)
+                
             if cached_data:
-                self.logger.info(f"Using cached data for {endpoint_pattern} (key: {source}_{tool_name_for_cache}_{query_param_for_cache})")
+                self.logger.info(f"Using cached data for {endpoint_pattern} (key: {source}_{tool_name_for_cache}_{cache_key or query_param_for_cache})")
                 if isinstance(cached_data, dict):
                      cached_data.setdefault("source", source)
                      return cached_data
@@ -461,8 +480,13 @@ class Researcher:
 
             # Save the processed result to cache
             if "error" not in processed_result: # Only cache successful results
-                 cache_mgr.save(processed_result, source, tool_name_for_cache, query_param_for_cache)
-                 self.logger.info(f"Saved fetched data to cache for {endpoint_pattern} (key: {source}_{tool_name_for_cache}_{query_param_for_cache})")
+                if cache_key:
+                    formatted_cache_key = cache_key.lower().replace(' ', '_')
+                    cache_mgr.save(processed_result, source, tool_name_for_cache, formatted_cache_key)
+                    self.logger.info(f"Saved fetched data to cache for {endpoint_pattern} (key: {source}_{tool_name_for_cache}_{formatted_cache_key})")
+                else:
+                    cache_mgr.save(processed_result, source, tool_name_for_cache, query_param_for_cache)
+                    self.logger.info(f"Saved fetched data to cache for {endpoint_pattern} (key: {source}_{tool_name_for_cache}_{query_param_for_cache})")
             else:
                  self.logger.warning(f"Result for {endpoint_pattern} contained an error, not caching. Error: {processed_result.get('error')}")
             
@@ -699,7 +723,7 @@ class Researcher:
 
     async def _batch_process_project_data(self, report_config: Dict, project_name: str) -> None:
         """
-        Batch process all API calls for a project for all supported data sources.
+        Batch process all API calls for a project using RAG for source selection.
         
         Args:
             report_config: Report configuration containing required data sources
@@ -713,81 +737,60 @@ class Researcher:
         if "batch_data" not in self.data:
             self.data["batch_data"] = {}
             
-        # Determine which data sources should be fetched based on report_config
-        required_sources = {
-            "coinmarketcap": False,
-            "coingecko": False, 
-            "defillama": False,
-            "tokenomics": False,
-            "tavily": True, # Always include Tavily
-        }
+        # Collect all unique required sources from report_config
+        all_required_sources = set()
         
-        # Extract required sources from report_config
-        for section in report_config.get("sections", []):
-            for source in section.get("data_sources", []):
-                source_key = source.lower()
-                if source_key in required_sources:
-                    required_sources[source_key] = True
-                elif source_key == "web_research":
-                    required_sources["tavily"] = True
-                    
-        # Also check visualization types for required sources
-        for viz_type, viz_config in report_config.get("visualization_types", {}).items():
-            source = viz_config.get("data_source", "").lower()
-            if source in required_sources:
-                required_sources[source] = True
+        # Organize sections by required data sources
+        sections_by_source = {}
+        
+        # Extract sections and their required sources from report_config
+        if "sections" in report_config:
+            for section in report_config.get("sections", []):
+                section_title = section.get("title")
+                if not section_title:
+                    continue
                 
-            # Check specific fields to fetch
-            field = viz_config.get("data_field", "")
-            if source == "coinmarketcap" and field:
-                if "batch_fields" not in self.data:
-                    self.data["batch_fields"] = {}
-                if "coinmarketcap" not in self.data["batch_fields"]:
-                    self.data["batch_fields"]["coinmarketcap"] = []
-                self.data["batch_fields"]["coinmarketcap"].append(field)
+                # Format section name consistently
+                section_key = section_title.lower().replace(" ", "_")
                 
-            elif source == "defillama" and field:
-                if "batch_fields" not in self.data:
-                    self.data["batch_fields"] = {}
-                if "defillama" not in self.data["batch_fields"]:
-                    self.data["batch_fields"]["defillama"] = []
-                self.data["batch_fields"]["defillama"].append(field)
+                # Get data sources for this section
+                sources = section.get("data_sources", [])
+                if not sources:
+                    continue
                 
-            elif source == "tokenomics" and field:
-                if "batch_fields" not in self.data:
-                    self.data["batch_fields"] = {}
-                if "tokenomics" not in self.data["batch_fields"]:
-                    self.data["batch_fields"]["tokenomics"] = []
-                self.data["batch_fields"]["tokenomics"].append(field)
+                # Add sources to all_required_sources
+                all_required_sources.update(sources)
                 
-        # Log which sources will be fetched
-        for source, included in required_sources.items():
-            if included:
-                fields = self.data.get("batch_fields", {}).get(source, ["*"])
-                self.logger.info(f"Batch processing will fetch from {source}: {fields}")
-                
-        # Prepare tasks to run in parallel
-        tasks = []
+                # Organize sections by source
+                for source in sources:
+                    if source not in sections_by_source:
+                        sections_by_source[source] = []
+                    sections_by_source[source].append(section_key)
         
-        # CoinGecko batch processing
-        if required_sources["coingecko"]:
-            tasks.append(self._batch_process_coingecko(project_name))
+        # Log the required sources
+        self.logger.info(f"Found {len(all_required_sources)} unique required sources: {all_required_sources}")
         
-        # CoinMarketCap batch processing
-        if required_sources["coinmarketcap"]:
-            tasks.append(self._batch_process_coinmarketcap(project_name))
+        # Always include a "web_research" task for documentation
+        if "web_research" in all_required_sources:
+            tasks = [self._batch_process_tavily(project_name, report_config)]
+            self.logger.info(f"Including research processing for web_research")
+        else:
+            tasks = []
         
-        # DeFiLlama batch processing
-        if required_sources["defillama"]:
-            tasks.append(self._batch_process_defillama(project_name))
-        
-        # Tokenomics batch processing
-        if required_sources["tokenomics"]:
-            tasks.append(self._batch_process_tokenomics(project_name))
-        
-        # Tavily batch processing - ALWAYS include this
-        # Important: Pass the report_config to ensure section-specific processing
-        tasks.append(self._batch_process_tavily(project_name, report_config))
+        # Add required non-web_research data sources to processing tasks
+        for source in all_required_sources:
+            if source != "web_research":
+                self.logger.info(f"Processing source {source} for project {project_name}")
+                if source == "coingecko":
+                    tasks.append(self._batch_process_coingecko(project_name))
+                elif source == "coinmarketcap":
+                    tasks.append(self._batch_process_coinmarketcap(project_name))
+                elif source == "defillama":
+                    tasks.append(self._batch_process_defillama(project_name))
+                elif source == "tokenomics":
+                    tasks.append(self._batch_process_tokenomics(project_name))
+                else:
+                    self.logger.warning(f"No specific handler for source {source}, will rely on RAG")
         
         # Execute all batch processing tasks in parallel
         if tasks:
@@ -925,24 +928,30 @@ class Researcher:
             return {"error": str(e)}
 
     async def _batch_process_tavily(self, project_name: str, report_config: Dict = None) -> Dict[str, Any]:
-        """Batch process all Tavily API calls for a project.
-        This creates a separate cache file for each section, enabling section-specific research.
+        """Use RAG to process research needs for each section rather than direct Tavily calls.
         
         Args:
             project_name: Name of the project to research
             report_config: Optional report configuration with sections
             
         Returns:
-            Dict containing Tavily search results organized by section
+            Dict containing research results organized by section
         """
-        self.logger.info(f"Batch processing Tavily data for {project_name}")
+        self.logger.info(f"Processing research needs for {project_name} using RAG")
         
         try:
-            # Initialize batch_data if it doesn't exist
+            # Initialize results structure if it doesn't exist
             if not hasattr(self, 'data'):
                 self.data = {}
             if "batch_data" not in self.data:
                 self.data["batch_data"] = {}
+            if "tavily" not in self.data["batch_data"]:
+                self.data["batch_data"]["tavily"] = {}
+            
+            # Skip if RAG retriever is not available
+            if not self.rag_retriever:
+                self.logger.warning("RAG retriever not available for research processing")
+                return self.data["batch_data"]["tavily"]
             
             # Define section-specific queries based on report_config
             # Standard required sections as fallback
@@ -958,18 +967,22 @@ class Researcher:
             
             # Extract sections from report_config if available
             config_sections = []
+            section_data_sources = {}
             if report_config and isinstance(report_config, dict) and "sections" in report_config:
                 for section in report_config["sections"]:
                     if "title" in section:
                         # Convert section titles to snake_case for consistency
                         section_key = section["title"].lower().replace(' ', '_')
                         config_sections.append(section_key)
+                        # Track required sources for this section
+                        section_data_sources[section_key] = section.get("data_sources", [])
                 self.logger.info(f"Extracted {len(config_sections)} sections from report_config")
             
             # Use sections from report_config if available, otherwise use standard sections
             sections = config_sections if config_sections else standard_sections
             self.logger.info(f"Processing {len(sections)} sections: {sections}")
             
+            # Prepare section queries
             section_queries = {}
             for section in sections:
                 # Create section-specific query using section name
@@ -977,13 +990,9 @@ class Researcher:
                 formatted_section = section.replace('_', ' ')
                 section_queries[section] = f"{project_name} cryptocurrency {formatted_section}"
             
-            # Run section-specific searches
-            self.logger.info(f"Processing {len(section_queries)} sections with Tavily")
-            
-            # Maintain results for all sections
+            # Process each section with RAG-based retrieval
             all_section_results = {}
             
-            # Process each section with a specific cache key
             for section, query in section_queries.items():
                 try:
                     self.logger.info(f"Processing section '{section}' with query: '{query}'")
@@ -993,7 +1002,7 @@ class Researcher:
                     cached_data = cache_manager.load("tavily", "research", section)
                     
                     if cached_data:
-                        self.logger.info(f"Using cached Tavily data for section '{section}'")
+                        self.logger.info(f"Using cached research data for section '{section}'")
                         # Ensure cached_data is a dictionary
                         if not isinstance(cached_data, dict):
                             self.logger.warning(f"Cached data for section '{section}' is not a dictionary. Converting.")
@@ -1001,28 +1010,48 @@ class Researcher:
                         else:
                             all_section_results[section] = cached_data
                     else:
-                        self.logger.info(f"Fetching fresh Tavily data for section '{section}'")
-                        # Use section as the cache key to create section-specific cache files
-                        result = await self.mcp_client.call_tool("tavily", "research", query=query, project_name=project_name, cache_key=section)
+                        # Get required data sources for this section
+                        required_sources = section_data_sources.get(section, ["web_research"])
+                        self.logger.info(f"Section '{section}' requires sources: {required_sources}")
                         
-                        if result:
-                            # Ensure result is a dictionary
-                            if not isinstance(result, dict):
-                                self.logger.warning(f"Tavily result for section '{section}' is not a dictionary. Converting.")
-                                all_section_results[section] = {"results": [{"content": str(result)}]}
-                            else:
-                                all_section_results[section] = result
+                        # Use RAG to get the appropriate endpoints - including web_research mapping
+                        endpoints = await self.rag_retriever.get_endpoints_for_project(query, required_sources=required_sources)
+                        
+                        # Look for research endpoints (tavily or similar)
+                        research_results = None
+                        for endpoint in endpoints:
+                            if "research" in endpoint.lower() or "tavily" in endpoint.lower():
+                                self.logger.info(f"Using RAG-selected endpoint for research: {endpoint}")
                                 
-                            self.logger.info(f"Successfully retrieved and cached Tavily data for section '{section}'")
+                                # Use the _invoke_tool_for_endpoint method with section as cache_key
+                                result = await self._invoke_tool_for_endpoint(
+                                    endpoint, 
+                                    project_name, 
+                                    query=query, 
+                                    cache_key=section
+                                )
+                                
+                                if result:
+                                    # Ensure we have a valid dictionary
+                                    if not isinstance(result, dict):
+                                        self.logger.warning(f"Research result for section '{section}' is not a dictionary. Converting.")
+                                        result = {"results": [{"content": str(result)}]}
+                                    research_results = result
+                                    break
+                        
+                        # If we got results, store them
+                        if research_results:
+                            all_section_results[section] = research_results
+                            self.logger.info(f"Successfully retrieved research data for section '{section}'")
                         else:
-                            error_msg = "Failed to retrieve Tavily data"
+                            error_msg = "No valid research endpoints found by RAG"
                             self.logger.warning(f"Error in section '{section}': {error_msg}")
                             all_section_results[section] = {"error": error_msg, "results": []}
                 except Exception as e:
                     self.logger.error(f"Error processing section '{section}': {str(e)}")
                     all_section_results[section] = {"error": str(e), "results": []}
             
-            # Store the section results in the batch data
+            # Store the section results
             self.data["batch_data"]["tavily"] = all_section_results
             
             # Check if cache files were created properly
@@ -1036,7 +1065,7 @@ class Researcher:
             return all_section_results
                 
         except Exception as e:
-            self.logger.error(f"Error in batch processing Tavily data for {project_name}: {str(e)}", exc_info=True)
+            self.logger.error(f"Error in batch processing research data for {project_name}: {str(e)}", exc_info=True)
             return {"error": str(e)}
 
 async def researcher(state, llm=None, logger=None, config=None):

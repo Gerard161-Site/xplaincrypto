@@ -170,7 +170,7 @@ class WriterAgent:
                     )
                     
                 # Cache successful generation
-                cache_mgr.save_to_cache(
+                cache_mgr.save(
                     {"content": content, "section_title": section_title},
                     "writer", 
                     "section",
@@ -343,7 +343,7 @@ class WriterAgent:
         
         # Cache successful inference
         if content and content != f"Data unavailable for {section_title}.":
-            cache_mgr.save_to_cache(
+            cache_mgr.save(
                 {"content": content, "section_title": section_title},
                 "writer_infer",
                 "section",
@@ -1094,7 +1094,7 @@ class WriterAgent:
                 self.logger.error(f"Error expanding problem section: {str(e)}")
         
         # Cache the final content
-        cache_mgr.save_to_cache(
+        cache_mgr.save(
             {"content": content, "section_title": section_title, "word_count": word_count},
             "writer_hf",
             "section",

@@ -45,6 +45,31 @@ class RAGRetriever:
             # Set to None to allow fallback behavior
             self.llm = None
 
+    async def initialize(self) -> None:
+        """
+        Initialize the RAGRetriever fully, ensuring vector store and other components are ready.
+        """
+        self.logger.info("Initializing RAGRetriever...")
+        try:
+            # Initialize vector store if needed
+            if self.vector_store and hasattr(self.vector_store, 'initialize'):
+                await self.vector_store.initialize()
+                self.logger.info("Vector store initialized successfully")
+                
+            # Initialize cache manager
+            if not self.cache_manager:
+                try:
+                    self.cache_manager = CacheManager(project_name="system")
+                    self.logger.info("Initialized cache manager for RAG results")
+                except Exception as e:
+                    self.logger.error(f"Error initializing cache manager: {str(e)}")
+                
+            self.logger.info("RAGRetriever initialization complete")
+            return True
+        except Exception as e:
+            self.logger.error(f"Error initializing RAGRetriever: {str(e)}", exc_info=True)
+            return False
+
     def _generate_cache_key(self, query: str) -> str:
         """Generate a deterministic cache key from a query string."""
         # Normalize the query by lowercasing and removing extra whitespace
@@ -245,140 +270,104 @@ class RAGRetriever:
         if required_sources:
             cache_key += f"_{'_'.join(sorted(required_sources))}"
         
-        cached_results = self.cache_manager.load("system", "rag", cache_key)
-        if cached_results:
-            self.logger.info(f"Using cached RAG results for: {query}")
-            return cached_results
+        if self.cache_manager:
+            cached_results = self.cache_manager.load("rag", "search", cache_key)
+            if cached_results and isinstance(cached_results, list):
+                self.logger.info(f"Using cached endpoints for query: {query}")
+                return cached_results
         
         try:
-            # Get semantic search results from vector store
-            search_results = await self.vector_store.search(query, top_k=10)
+            # Map source names to endpoint patterns for certain required sources
+            source_to_endpoint_mapping = {
+                "web_research": ["research://tavily/{query}"],
+                "coinmarketcap": ["data://coinmarketcap/overview/{coin}"],
+                "coingecko": ["data://coingecko/price/{coin}", "data://coingecko/market_data/{coin}"],
+                "defillama": ["data://defillama/tvl/{coin}"],
+                "tokenomics": ["data://tokenomics/distribution/{coin}"]
+            }
             
-            if not search_results:
-                self.logger.warning("No search results found in vector store, using fallback endpoints")
-                # Always include some basic fallbacks
-                fallback_endpoints = [
-                    "data://coingecko/price/{coin}",
-                    "data://coingecko/market/{coin}",
-                    "data://coinmarketcap/price/{coin}",
-                    "data://defillama/tvl/{protocol}"
-                ]
+            # Special case handling for required sources
+            if required_sources:
+                specific_endpoints = []
                 
-                # If web_research is required, add Tavily endpoints
-                if required_sources and "web_research" in required_sources:
-                    self.logger.info("Adding Tavily endpoints for web_research")
-                    fallback_endpoints.extend([
-                        "research://tavily/{query}",
-                        "data://tavily/research/{query}"
-                    ])
+                for source in required_sources:
+                    source_lower = source.lower()
+                    if source_lower in source_to_endpoint_mapping:
+                        specific_endpoints.extend(source_to_endpoint_mapping[source_lower])
                 
-                self.cache_manager.save(fallback_endpoints, "system", "rag", cache_key)
-                return fallback_endpoints
-            
-            # Filter and select endpoints based on required sources
-            top_endpoints = []
-            
-            # Check if we need to do LLM filtering
-            if self.llm:
-                # Build a prompt for the LLM to select endpoints
-                prompt = self._build_selection_prompt(query, search_results, required_sources)
-                try:
-                    # Get endpoint selections from LLM
-                    self.logger.info(f"Using {self.llm_model} to select endpoints")
-                    llm_selections = await self._get_llm_endpoint_selections(prompt)
+                # If we have specific source matches, use them
+                if specific_endpoints:
+                    self.logger.info(f"Using mapped endpoints for required sources {required_sources}: {specific_endpoints}")
                     
-                    if llm_selections:
-                        top_endpoints = llm_selections
-                        self.logger.info(f"LLM selected {len(top_endpoints)} endpoints: {top_endpoints}")
-                    else:
-                        self.logger.warning("LLM returned no endpoints, using vector search results directly")
-                        # Get the top results from vector search
-                        top_endpoints = [result["id"] for result in search_results]
-                except Exception as e:
-                    self.logger.error(f"Error in LLM endpoint selection: {str(e)}")
-                    # Fallback to using vector search results directly
-                    top_endpoints = [result["id"] for result in search_results]
-            else:
-                # Without LLM, just use vector search results directly
-                top_endpoints = [result["id"] for result in search_results]
+                    # Cache the results if cache manager is available
+                    if self.cache_manager:
+                        self.cache_manager.save(specific_endpoints, "rag", "search", cache_key)
+                    
+                    return specific_endpoints
             
-            # If no valid endpoints were found or if particular sources are required,
-            # add source-specific fallbacks
-            if not top_endpoints or (required_sources and not self._has_required_sources(top_endpoints, required_sources)):
-                self.logger.warning("No valid endpoints found in search results, using fallback endpoints")
+            # For more complex queries or when specific mapping doesn't exist,
+            # use semantic search with Pinecone
+            if self.vector_store:
+                # Run semantic search against our endpoint descriptions
+                top_k = int(os.getenv("RAG_TOP_K", "10"))
+                results = await self.vector_store.search(query, top_k=top_k)
                 
-                # Check if we have special required sources that need specific endpoints
+                # Extract endpoint patterns from results
+                endpoint_patterns = [result["metadata"]["pattern"] for result in results 
+                                     if "metadata" in result and "pattern" in result["metadata"]]
+                
+                # Filter to required sources if specified
                 if required_sources:
-                    fallback_endpoints = []
+                    self.logger.info(f"Filtering endpoints to match required sources: {required_sources}")
+                    filtered_endpoints = []
                     
-                    # Add source-specific endpoints based on required_sources
-                    if "coinmarketcap" in required_sources:
-                        fallback_endpoints.extend([
-                            "data://coinmarketcap/price/{coin}",
-                            "data://coinmarketcap/market_data/{coin}"
-                        ])
-                        
-                    if "coingecko" in required_sources:
-                        fallback_endpoints.extend([
-                            "data://coingecko/price/{coin}",
-                            "data://coingecko/market/{coin}"
-                        ])
-                        
-                    if "defillama" in required_sources:
-                        fallback_endpoints.append("data://defillama/tvl/{protocol}")
-                        
-                    if "tokenomics" in required_sources:
-                        fallback_endpoints.append("data://tokenomics/distribution/{project}")
+                    # Handle web_research special case
+                    web_research_required = "web_research" in required_sources
+                    if web_research_required:
+                        # Add Tavily research endpoint
+                        filtered_endpoints.append("research://tavily/{query}")
+                        # Remove web_research as we've handled it
+                        required_sources = [s for s in required_sources if s != "web_research"]
                     
-                    # Special handling for web_research - always map to Tavily endpoints
-                    if "web_research" in required_sources:
-                        self.logger.info("Adding Tavily endpoints for web_research requirement")
-                        fallback_endpoints.extend([
-                            "research://tavily/{query}",
-                            "data://tavily/research/{query}"
-                        ])
+                    # Filter other endpoints based on required sources
+                    for endpoint in endpoint_patterns:
+                        endpoint_parts = endpoint.split("://")
+                        if len(endpoint_parts) > 1:
+                            source_name = endpoint_parts[1].split("/")[0]
+                            
+                            # Match source names to required sources
+                            for required in required_sources:
+                                if required.lower() in source_name.lower():
+                                    filtered_endpoints.append(endpoint)
+                                    break
                     
-                    # If we found source-specific endpoints, use those
-                    if fallback_endpoints:
-                        top_endpoints = fallback_endpoints
-                    else:
-                        # Otherwise use generic fallbacks
-                        top_endpoints = [
-                            "data://coingecko/price/{coin}",
-                            "data://coinmarketcap/price/{coin}",
-                            "data://defillama/tvl/{protocol}"
-                        ]
-                        
-                        # Add Tavily for web_research if needed
-                        if required_sources and "web_research" in required_sources:
-                            top_endpoints.append("research://tavily/{query}")
-                else:
-                    # Default fallbacks if no required_sources specified
-                    top_endpoints = [
-                        "data://coingecko/price/{coin}",
-                        "data://coinmarketcap/price/{coin}",
-                        "data://defillama/tvl/{protocol}"
-                    ]
-            
-            # Cache the results for future use
-            self.cache_manager.save(top_endpoints, "system", "rag", cache_key)
-            
-            return top_endpoints
-            
-        except Exception as e:
-            self.logger.error(f"Error in endpoint selection: {str(e)}", exc_info=True)
-            # Return basic fallbacks on error
-            fallback_endpoints = [
-                "data://coingecko/price/{coin}",
-                "data://coinmarketcap/price/{coin}",
-                "data://defillama/tvl/{protocol}"
-            ]
-            
-            # Add Tavily for web_research if needed
-            if required_sources and "web_research" in required_sources:
-                fallback_endpoints.append("research://tavily/{query}")
+                    endpoint_patterns = filtered_endpoints
                 
-            return fallback_endpoints
+                self.logger.info(f"Retrieved {len(endpoint_patterns)} RAG endpoints for query: {endpoint_patterns}")
+                
+                # Cache the results if cache manager is available
+                if self.cache_manager:
+                    self.cache_manager.save(endpoint_patterns, "rag", "search", cache_key)
+                
+                return endpoint_patterns
+            else:
+                self.logger.warning("Vector store not initialized. Using fallback endpoints.")
+                # Include tavily endpoint if web_research is required
+                if required_sources and "web_research" in required_sources:
+                    return ["research://tavily/{query}"]
+                return []
+        
+        except Exception as e:
+            self.logger.error(f"Error in RAG retrieval: {str(e)}", exc_info=True)
+            
+            # Default fallback endpoints
+            default_endpoints = []
+            
+            # Include tavily endpoint if web_research is required
+            if required_sources and "web_research" in required_sources:
+                default_endpoints.append("research://tavily/{query}")
+            
+            return default_endpoints
 
     def _has_required_sources(self, endpoints: List[str], required_sources: List[str]) -> bool:
         """
