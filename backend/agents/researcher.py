@@ -893,10 +893,9 @@ class Researcher:
         Returns:
             Dict containing research results organized by section
         """
-        self.logger.info(f"Processing research needs for {project_name} using RAG")
+        self.logger.info(f"Processing Tavily research for {project_name} using section query_templates")
         
         try:
-            # Initialize results structure if it doesn't exist
             if not hasattr(self, 'data'):
                 self.data = {}
             if "batch_data" not in self.data:
@@ -904,125 +903,177 @@ class Researcher:
             if "tavily" not in self.data["batch_data"]:
                 self.data["batch_data"]["tavily"] = {}
             
-            # Skip if RAG retriever is not available
             if not self.rag_retriever:
-                self.logger.warning("RAG retriever not available for research processing")
+                self.logger.warning("RAG retriever not available for Tavily research processing")
                 return self.data["batch_data"]["tavily"]
             
-            # Define section-specific queries based on report_config
-            # Standard required sections as fallback
-            standard_sections = [
-                "market_analysis", 
-                "tokenomics", 
-                "team_overview",
-                "technology",
-                "competition",
-                "risks",
-                "future_developments"
+            standard_sections_fallback = [
+                "market_analysis", "tokenomics", "team_overview",
+                "technology", "competition", "risks", "future_developments"
             ]
             
-            # Extract sections from report_config if available
-            config_sections = []
-            section_data_sources = {}
+            config_section_keys = []
+            section_details_map = {} 
+            section_data_sources_map = {}
+
             if report_config and isinstance(report_config, dict) and "sections" in report_config:
-                for section in report_config["sections"]:
-                    if "title" in section:
-                        # Convert section titles to snake_case for consistency
-                        section_key = section["title"].lower().replace(' ', '_')
-                        config_sections.append(section_key)
-                        # Track required sources for this section
-                        section_data_sources[section_key] = section.get("data_sources", [])
-                self.logger.info(f"Extracted {len(config_sections)} sections from report_config")
+                for section_config_item in report_config["sections"]:
+                    if "title" in section_config_item:
+                        section_title = section_config_item["title"]
+                        section_key = section_title.lower().replace(' ', '_')
+                        config_section_keys.append(section_key)
+                        
+                        default_query_template = f"{{project_name}} cryptocurrency {section_title}"
+                        query_template_to_use = section_config_item.get("query_template", default_query_template)
+                        
+                        section_details_map[section_key] = {
+                            "title": section_title,
+                            "query_template": query_template_to_use
+                        }
+                        section_data_sources_map[section_key] = section_config_item.get("data_sources", [])
+                self.logger.info(f"Extracted {len(config_section_keys)} sections from report_config for Tavily: {list(section_details_map.keys())}")
             
-            # Use sections from report_config if available, otherwise use standard sections
-            sections = config_sections if config_sections else standard_sections
-            self.logger.info(f"Processing {len(sections)} sections: {sections}")
+            sections_to_process = config_section_keys if config_section_keys else standard_sections_fallback
+            self.logger.info(f"Tavily will process {len(sections_to_process)} sections: {sections_to_process}")
             
-            # Prepare section queries
-            section_queries = {}
-            for section in sections:
-                # Create section-specific query using section name
-                # Convert snake_case to readable format for the query
-                formatted_section = section.replace('_', ' ')
-                section_queries[section] = f"{project_name} cryptocurrency {formatted_section}"
+            section_tavily_queries = {}
+            for s_key in sections_to_process:
+                if s_key in section_details_map:
+                    details = section_details_map[s_key]
+                    template = details["query_template"]
+                    try:
+                        # Format the query_template, primarily expecting {project_name}
+                        # Other placeholders could be added to .format() if templates use them
+                        query_for_tavily = template.format(project_name=project_name)
+                    except KeyError as e:
+                        self.logger.warning(f"Query template for section '{details['title']}' (key: {s_key}) has a missing key: {e}. Using default query format.")
+                        query_for_tavily = f"{project_name} cryptocurrency {details['title']}"
+                    section_tavily_queries[s_key] = query_for_tavily
+                else:
+                    # Fallback for standard_sections_fallback or if details somehow missing
+                    formatted_name = s_key.replace('_', ' ')
+                    section_tavily_queries[s_key] = f"{project_name} cryptocurrency {formatted_name}"
             
-            # Process each section with RAG-based retrieval
             all_section_results = {}
             
-            for section, query in section_queries.items():
+            for current_section_key, tavily_search_query_content in section_tavily_queries.items():
                 try:
-                    self.logger.info(f"Processing section '{section}' with query: '{query}'")
+                    self.logger.info(f"Tavily processing section_key '{current_section_key}' with search query: '{tavily_search_query_content}'")
                     
-                    # First check if we have cached data for this section
-                    cache_manager = CacheManager(project_name=project_name)
-                    cached_data = cache_manager.load("tavily", "research", section)
+                    cache_manager = CacheManager(project_name=project_name, logger=self.logger) # Ensure logger is passed
+                    cached_data = cache_manager.load("tavily", "research", current_section_key) 
                     
                     if cached_data:
-                        self.logger.info(f"Using cached research data for section '{section}'")
-                        # Ensure cached_data is a dictionary
+                        self.logger.info(f"Using cached Tavily data for section_key '{current_section_key}' (file: research_{current_section_key}.json)")
                         if not isinstance(cached_data, dict):
-                            self.logger.warning(f"Cached data for section '{section}' is not a dictionary. Converting.")
-                            all_section_results[section] = {"results": [{"content": str(cached_data)}]}
+                            self.logger.warning(f"Cached data for section_key '{current_section_key}' not a dict. Wrapping.")
+                            all_section_results[current_section_key] = {"results": [{"content": str(cached_data)}]}
                         else:
-                            all_section_results[section] = cached_data
+                            all_section_results[current_section_key] = cached_data
                     else:
-                        # Get required data sources for this section
-                        required_sources = section_data_sources.get(section, ["web_research"])
-                        self.logger.info(f"Section '{section}' requires sources: {required_sources}")
+                        self.logger.info(f"No Tavily cache for section_key '{current_section_key}'. Fetching. Target server cache key: {current_section_key}")
                         
-                        # Use RAG to get the appropriate endpoints - including web_research mapping
-                        endpoints = await self.rag_retriever.get_endpoints_for_project(query, required_sources=required_sources)
+                        # We've determined this is for Tavily research.
+                        # Instead of _invoke_tool_for_endpoint, directly call the MCP tool on the Tavily server.
+                        # This ensures the cache_key is correctly passed and used by the server.
                         
-                        # Look for research endpoints (tavily or similar)
-                        research_results = None
-                        for endpoint in endpoints:
-                            if "research" in endpoint.lower() or "tavily" in endpoint.lower():
-                                self.logger.info(f"Using RAG-selected endpoint for research: {endpoint}")
-                                
-                                # Use the _invoke_tool_for_endpoint method with section as cache_key
-                                result = await self._invoke_tool_for_endpoint(
-                                    endpoint, 
-                                    project_name, 
-                                    query=query, 
-                                    cache_key=section
-                                )
-                                
-                                if result:
-                                    # Ensure we have a valid dictionary
-                                    if not isinstance(result, dict):
-                                        self.logger.warning(f"Research result for section '{section}' is not a dictionary. Converting.")
-                                        result = {"results": [{"content": str(result)}]}
-                                    research_results = result
-                                    break
-                        
-                        # If we got results, store them
-                        if research_results:
-                            all_section_results[section] = research_results
-                            self.logger.info(f"Successfully retrieved research data for section '{section}'")
+                        research_data_found = None
+                        try:
+                            self.logger.info(f"Calling MCP client.call_tool for tavily.research: query='{tavily_search_query_content}', cache_key='{current_section_key}'")
+                            fetched_result = await self.mcp_client.call_tool(
+                                server_name="tavily",
+                                tool_name="research",
+                                query=tavily_search_query_content, 
+                                project_name=project_name,
+                                cache_key=current_section_key 
+                            )
+
+                            # Enhanced Debugging and Type Handling for fetched_result
+                            self.logger.info(f"MCP call_tool raw fetched_result for section '{current_section_key}': TYPE={type(fetched_result)}, CONTENT='{str(fetched_result)[:500]}...")
+
+                            if isinstance(fetched_result, str):
+                                self.logger.warning(f"MCP call_tool returned a STRING for section '{current_section_key}'. Attempting to parse as JSON.")
+                                try:
+                                    parsed_json = json.loads(fetched_result)
+                                    if isinstance(parsed_json, dict):
+                                        fetched_result = parsed_json
+                                        self.logger.info(f"Successfully parsed string response into dict for section '{current_section_key}'.")
+                                    else:
+                                        error_detail = f"Parsed JSON for '{current_section_key}' is not a dict, type: {type(parsed_json)}. Original: '{fetched_result[:200]}...'"
+                                        self.logger.error(error_detail)
+                                        fetched_result = {"error": error_detail, "data_unavailable": True, "original_response_type": str(type(parsed_json))}
+                                except json.JSONDecodeError as jde:
+                                    error_detail = f"JSONDecodeError for '{current_section_key}': {str(jde)}. Original: '{fetched_result[:200]}...'"
+                                    self.logger.error(error_detail)
+                                    fetched_result = {"error": error_detail, "data_unavailable": True, "original_response_snippet": fetched_result[:200]}
+                                except Exception as e_parse:
+                                    error_detail = f"Unexpected error parsing str response for '{current_section_key}': {str(e_parse)}. Original: '{fetched_result[:200]}...'"
+                                    self.logger.error(error_detail)
+                                    fetched_result = {"error": error_detail, "data_unavailable": True, "original_response_snippet": fetched_result[:200]}
+                            
+                            # Check if fetched_result is now a dict and proceed
+                            if fetched_result and isinstance(fetched_result, dict) and not fetched_result.get("error") and (fetched_result.get("results") or fetched_result.get("data")):
+                                # Ensure 'results' key exists if 'data' key is primary and vice-versa, or just ensure one is present
+                                if "data" in fetched_result and "results" not in fetched_result:
+                                     # If 'data' exists and might contain the list of results, or is the result itself
+                                     if isinstance(fetched_result["data"], list):
+                                         fetched_result["results"] = fetched_result["data"]
+                                     elif fetched_result["data"] is not None: # If data is a single item, wrap it
+                                         fetched_result["results"] = [fetched_result["data"]]
+                                     else:
+                                         fetched_result["results"] = [] # Ensure results key exists
+                                elif "results" in fetched_result and "data" not in fetched_result and fetched_result["results"] is not None:
+                                    pass # results key is fine
+                                elif "results" not in fetched_result and "data" not in fetched_result:
+                                    self.logger.warning(f"Fetched result for '{current_section_key}' has neither 'data' nor 'results' key. Setting empty results.")
+                                    fetched_result["results"] = []
+
+                                research_data_found = fetched_result
+                                self.logger.info(f"Successfully processed data via mcp.call_tool for Tavily section_key '{current_section_key}'. Server should have cached with key '{current_section_key}'.")
+                            else:
+                                # This block will now catch cases where fetched_result is not a dict, or is a dict with an error, 
+                                # or a dict without 'results'/'data'
+                                if isinstance(fetched_result, dict):
+                                    err_msg = fetched_result.get('error', 'No usable data fields (results/data) in dict')
+                                else: # Should not happen if string parsing creates a dict error
+                                    err_msg = f'Non-dict result of type {type(fetched_result)} after processing'
+                                self.logger.warning(f"mcp.call_tool for tavily.research on section '{current_section_key}' yielded no usable data or an error: {err_msg}")
+                                if not (isinstance(fetched_result, dict) and fetched_result.get("error")):
+                                    # If not already an error dict, make it one.
+                                    fetched_result = {"error": err_msg, "data_unavailable": True, "original_result": str(fetched_result)[:200]}
+
+                        except Exception as e_call_tool:
+                            self.logger.error(f"Exception during mcp_client.call_tool for tavily.research on section '{current_section_key}': {str(e_call_tool)}", exc_info=True)
+                            research_data_found = None # Ensure it's None on exception
+
+                        if research_data_found:
+                            all_section_results[current_section_key] = research_data_found
                         else:
-                            error_msg = "No valid research endpoints found by RAG"
-                            self.logger.warning(f"Error in section '{section}': {error_msg}")
-                            all_section_results[section] = {"error": error_msg, "results": []}
+                            msg = f"No valid Tavily data obtained for section_key '{current_section_key}' via mcp.call_tool."
+                            self.logger.warning(msg)
+                            all_section_results[current_section_key] = {"error": msg, "results": [], "data_unavailable": True}
                 except Exception as e:
-                    self.logger.error(f"Error processing section '{section}': {str(e)}")
-                    all_section_results[section] = {"error": str(e), "results": []}
+                    self.logger.error(f"Error processing Tavily for section_key '{current_section_key}': {str(e)}", exc_info=True)
+                    all_section_results[current_section_key] = {"error": str(e), "results": [], "data_unavailable": True}
             
-            # Store the section results
             self.data["batch_data"]["tavily"] = all_section_results
             
-            # Check if cache files were created properly
-            for section in sections:
-                cache_path = os.path.join("docs", project_name.lower(), "cache", "tavily", f"research_{section}.json")
-                if os.path.exists(cache_path):
-                    self.logger.info(f"✅ Verified cache for '{section}' exists at: {cache_path}")
+            for key_check in sections_to_process:
+                cache_file_path = os.path.join("docs", project_name.lower(), "cache", "tavily", f"research_{key_check}.json")
+                if os.path.exists(cache_file_path):
+                    self.logger.info(f"✅ Verified Tavily cache for '{key_check}' exists: {cache_file_path}")
                 else:
-                    self.logger.warning(f"❌ Cache file missing for '{section}': {cache_path}")
+                    self.logger.warning(f"❌ Tavily cache file missing for '{key_check}': {cache_file_path}. (May be ok if data was unavailable/error).")
             
             return all_section_results
                 
         except Exception as e:
-            self.logger.error(f"Error in batch processing research data for {project_name}: {str(e)}", exc_info=True)
-            return {"error": str(e)}
+            self.logger.error(f"General error in _batch_process_tavily for {project_name}: {str(e)}", exc_info=True)
+            error_payload = {"error": str(e), "data_unavailable": True}
+            # Attempt to store a summary error if possible
+            if hasattr(self, 'data') and "batch_data" in self.data and "tavily" in self.data["batch_data"]:
+                 self.data["batch_data"]["tavily"]["_overall_error"] = error_payload 
+            return error_payload
 
 async def researcher(state, llm=None, logger=None, config=None):
     """Async function interface for researcher."""

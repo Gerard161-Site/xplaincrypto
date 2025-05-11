@@ -1,1 +1,0 @@
-{"data": "rag", "metadata": {"source": "search", "endpoint": "rag_search_ondo cryptocurrency market analysis_coinmarketcap", "query": ["data://coinmarketcap/overview/{coin}"], "cached_at": "2025-05-09T08:10:30.260044", "expires_at": "2025-05-10T08:10:30.260044", "last_accessed": "2025-05-09T08:10:30.260044", "ttl_hours": 24}}

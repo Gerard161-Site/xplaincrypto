@@ -1,1 +1,0 @@
-{"data": ["research://tavily/{query}", "data://coinmarketcap/overview/{coin}"], "metadata": {"source": "rag", "endpoint": "search", "query": "rag_search_bitcoin_price cryptocurrency introduction_coinmarketcap_web_research", "cached_at": "2025-05-09T11:50:11.192120", "expires_at": "2025-05-10T11:50:11.192120", "last_accessed": "2025-05-09T13:05:22.253267", "ttl_hours": 24}}

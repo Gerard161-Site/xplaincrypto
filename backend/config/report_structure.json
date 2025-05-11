@@ -1,0 +1,164 @@
+{
+    "report_name": "Cryptocurrency Research Report",
+    "prompt": "A comprehensive analysis of cryptocurrency projects for investment decision-making",
+    "version": "1.2",
+    "fallback_template": "Data unavailable for {project_name} report.",
+    "sections": [
+        {
+            "title": "Executive Summary",
+            "required": true,
+            "min_words": 200,
+            "max_words": 300,
+            "query_template": "{project_name} executive summary overview",
+            "prompt": "Provide a concise overview of the project's strategic positioning and investment potential. Highlight key differentiators, market position, and forward-looking implications for investors, focusing on high-level insights without repeating detailed metrics covered in other sections.",
+            "fallback_template": "Data unavailable for {section_title}.",
+            "fallback_fields": ["market_cap", "current_price", "tvl"],
+            "data_sources": ["coinmarketcap", "defillama"],
+            "visualizations": ["key_metrics_table"]
+        },
+        {
+            "title": "Introduction",
+            "required": true,
+            "min_words": 250,
+            "max_words": 350,
+            
+            "prompt": "Introduce the project's core value proposition, background, and strategic goals. Provide context on its founding, mission, and role in the cryptocurrency market, without delving into detailed metrics or analysis covered in later sections.",
+            "fallback_template": "Data unavailable for {section_title}.",
+            "fallback_fields": ["current_price", "market_cap"],
+            "data_sources": ["web_research", "coinmarketcap"],
+            "visualizations": ["key_metrics_table", "whitepaper_link"]
+        },
+        {
+            "title": "Tokenomics and Distribution",
+            "required": true,
+            "min_words": 400,
+            "max_words": 600,
+            "query_template": "{project_name} tokenomics supply distribution utility",
+            "prompt": "Analyze the token's economic model, supply metrics, and distribution strategy...",
+            "fallback_template": "Data unavailable for {section_title}.",
+            "fallback_fields": ["total_supply", "circulating_supply", "token_allocation"],
+            "data_sources": ["web_research","coinmarketcap", "tokenomics"],
+            "visualizations": ["tokenomics_pie_chart", "chain_distribution_chart"]
+        },
+        {
+            "title": "Market Analysis",
+            "required": true,
+            "min_words": 600,
+            "max_words": 1000,
+            "query_template": "{project_name} market performance competitors",
+            "prompt": "Conduct a detailed analysis of the project's market performance and competitive positioning. Focus on trading patterns, liquidity trends, market cap growth, and comparisons with competitors, without repeating basic metrics like price or supply covered in earlier sections.",
+            "fallback_template": "Data unavailable for {section_title}.",
+            "fallback_fields": ["market_cap", "price_change_percentage_24h", "competitors"],
+            "data_sources": ["web_research", "coinmarketcap", "defillama"],
+            "visualizations": ["price_chart", "volume_chart", "competitor_comparison_chart"]
+        },
+        {
+            "title": "Technical Analysis",
+            "required": true,
+            "min_words": 500,
+            "max_words": 700,
+            "query_template": "{project_name} technical architecture blockchain",
+            "prompt": "Evaluate the project's technical architecture and innovations. Focus on blockchain technology, consensus mechanism, scalability solutions, and unique features, without overlapping with governance, security, or market analysis covered in other sections.",
+            "fallback_template": "Data unavailable for {section_title}.",
+            "fallback_fields": ["price_history", "volume_history", "tvl_history", "market_cap", "price_change_percentage_24h"],
+            "data_sources": ["web_research", "coinmarketcap"],
+            "visualizations": []
+        },
+        {
+            "title": "Developer Tools and User Experience",
+            "required": true,
+            "min_words": 400,
+            "max_words": 700,
+            "query_template": "{project_name} developer tools user experience",
+            "prompt": "Assess the project's developer ecosystem and user experience. Highlight available tools (e.g., APIs, SDKs), documentation quality, user engagement metrics, and accessibility features, without repeating technical details covered in the Technical Analysis section.",
+            "fallback_template": "Data unavailable for {section_title}.",
+            "fallback_fields": ["tool_name", "metric"],
+            "data_sources": ["web_research"],
+            "visualizations": []
+        },
+        {
+            "title": "Security",
+            "required": true,
+            "min_words": 400,
+            "max_words": 700,
+            "query_template": "{project_name} security audits vulnerabilities",
+            "prompt": "Provide a comprehensive security assessment of the project. Focus on audit history, identified vulnerabilities, risk management practices, and security features, without repeating technical architecture details covered in the Technical Analysis section.",
+            "fallback_template": "Data unavailable for {section_title}.",
+            "fallback_fields": ["audit_date", "findings"],
+            "data_sources": ["web_research"],
+            "visualizations": []
+        },
+        {
+            "title": "Liquidity and Adoption Metrics",
+            "required": true,
+            "min_words": 500,
+            "max_words": 700,
+            "query_template": "{project_name} liquidity adoption metrics",
+            "prompt": "Analyze the project's liquidity and adoption metrics. Focus on user growth, market integration, DeFi engagement (e.g., TVL trends), and exchange listings, without repeating basic market metrics like trading volume covered in the Market Analysis section.",
+            "fallback_template": "Data unavailable for {section_title}.",
+            "fallback_fields": ["tvl", "active_addresses", "exchange_count"],
+            "data_sources": ["web_research", "coinmarketcap", "defillama"],
+            "visualizations": ["tvl_chart", "adoption_metrics_table", "tvl_milestone_chart"]
+        },
+        {
+            "title": "Governance and Community",
+            "required": true,
+            "min_words": 400,
+            "max_words": 700,
+            "query_template": "{project_name} governance voting community",
+            "prompt": "Evaluate the project's governance structure and community engagement. Focus on decision-making processes, voting mechanisms, proposal activity, and community growth, without overlapping with tokenomics or technical analysis covered in other sections.",
+            "fallback_template": "Data unavailable for {section_title}.",
+            "fallback_fields": ["governance_model", "proposal_count"],
+            "data_sources": ["web_research"],
+            "visualizations": []
+        },
+        {
+            "title": "Ecosystem and Partnerships",
+            "required": true,
+            "min_words": 400,
+            "max_words": 700,
+            "query_template": "{project_name} ecosystem partnerships integrations",
+            "prompt": "Analyze the project's strategic partnerships and ecosystem development. Focus on key integrations, collaboration impact, and ecosystem growth, without repeating adoption metrics covered in the Liquidity and Adoption Metrics section.",
+            "fallback_template": "Data unavailable for {section_title}.",
+            "fallback_fields": ["partner_name", "partnership_type"],
+            "data_sources": ["web_research", "defillama"],
+            "visualizations": []
+        },
+        {
+            "title": "Risks and Opportunities",
+            "required": true,
+            "min_words": 450,
+            "max_words": 700,
+            "query_template": "{project_name} risks opportunities analysis",
+            "prompt": "Provide a balanced analysis of the project's risks and opportunities. Focus on regulatory challenges, market risks, technical vulnerabilities, and growth catalysts, without repeating risks or opportunities mentioned in previous sections.",
+            "fallback_template": "Data unavailable for {section_title}.",
+            "fallback_fields": ["risk_type", "opportunity_type"],
+            "data_sources": ["web_research"],
+            "visualizations": []
+        },
+        {
+            "title": "Team and Development Activity",
+            "required": true,
+            "min_words": 400,
+            "max_words": 700,
+            "query_template": "{project_name} team development activity",
+            "prompt": "Evaluate the project's team capabilities and development momentum. Focus on team experience, notable members, development activity (e.g., GitHub commits), and roadmap execution, without overlapping with technical analysis covered in other sections.",
+            "fallback_template": "Data unavailable for {section_title}.",
+            "fallback_fields": ["team_size", "development_activity"],
+            "data_sources": ["web_research"],
+            "visualizations": []
+        },
+        {
+            "title": "Conclusion",
+            "required": true,
+            "min_words": 300,
+            "max_words": 500,
+            "query_template": "{project_name} conclusion investment insights",
+            "prompt": "Synthesize key investment considerations and provide actionable insights for the project. Focus on the primary investment thesis, growth opportunities, and strategic recommendations, without introducing new data or repeating detailed analysis from previous sections.",
+            "fallback_template": "Data unavailable for {section_title}.",
+            "fallback_fields": [],
+            "data_sources": [],
+            "visualizations": []
+        }
+    ]
+} 

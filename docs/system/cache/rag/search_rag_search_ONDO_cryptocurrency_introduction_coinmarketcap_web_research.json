@@ -1,1 +1,0 @@
-{"data": ["research://tavily/{query}", "data://coinmarketcap/overview/{coin}"], "metadata": {"source": "rag", "endpoint": "search", "query": "rag_search_ONDO cryptocurrency introduction_coinmarketcap_web_research", "cached_at": "2025-05-09T09:13:41.412778", "expires_at": "2025-05-10T09:13:41.412778", "last_accessed": "2025-05-09T19:50:47.088603", "ttl_hours": 24}}

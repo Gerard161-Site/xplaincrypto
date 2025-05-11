@@ -1,0 +1,227 @@
+{
+  "visualization_types": {
+    "price_trend_chart": {
+      "type": "line_chart",
+      "title": "Price Trend",
+      "description": "Historical price trend of the token",
+      "data_source": "coingecko",
+      "data_field": "price_history",
+      "output_filename": "price_trend_chart",
+      "x_field": "date",
+      "y_field": "price",
+      "line_name": "Price",
+      "x_axis_title": "Date",
+      "y_axis_title": "Price (USD)",
+      "source": "CoinGecko"
+    },
+    "volume_chart": {
+      "type": "line_chart",
+      "title": "Trading Volume",
+      "description": "Historical trading volume of the token",
+      "data_source": "coinmarketcap",
+      "data_field": "volume_history",
+      "output_filename": "volume_chart",
+      "x_field": "date",
+      "y_field": "volume",
+      "line_name": "Volume",
+      "x_axis_title": "Date",
+      "y_axis_title": "Volume (USD)",
+      "source": "CoinMarketCap"
+    },
+    "tvl_chart": {
+      "type": "line_chart",
+      "title": "Total Value Locked",
+      "description": "Historical TVL (Total Value Locked) for the protocol",
+      "data_source": "defillama",
+      "data_field": "tvl_history",
+      "output_filename": "tvl_chart",
+      "x_field": "date",
+      "y_field": "tvl",
+      "line_name": "TVL",
+      "x_axis_title": "Date",
+      "y_axis_title": "TVL (USD)",
+      "source": "DeFiLlama"
+    },
+    "tvl_phases_chart": {
+      "type": "line_chart",
+      "title": "TVL Growth Phases",
+      "description": "TVL growth with key market phases highlighted",
+      "data_source": "defillama",
+      "data_field": "tvl_history",
+      "output_filename": "tvl_phases_chart",
+      "x_field": "date",
+      "y_field": "tvl",
+      "line_name": "TVL",
+      "x_axis_title": "Date",
+      "y_axis_title": "TVL (USD)",
+      "source": "DeFiLlama"
+    },
+    "tvl_milestone_chart": {
+      "type": "line_chart",
+      "title": "TVL Milestones",
+      "description": "TVL growth with key protocol milestones",
+      "data_source": "defillama",
+      "data_field": "tvl_history",
+      "output_filename": "tvl_milestone_chart",
+      "x_field": "date",
+      "y_field": "tvl",
+      "line_name": "TVL",
+      "x_axis_title": "Date",
+      "y_axis_title": "TVL (USD)",
+      "source": "DeFiLlama"
+    },
+    "market_cap_chart": {
+      "type": "line_chart",
+      "title": "Market Capitalization",
+      "description": "Historical market capitalization of the token",
+      "data_source": "coinmarketcap",
+      "data_field": "market_cap_history",
+      "output_filename": "market_cap_chart",
+      "x_field": "date",
+      "y_field": "market_cap",
+      "line_name": "Market Cap",
+      "x_axis_title": "Date",
+      "y_axis_title": "Market Cap (USD)",
+      "source": "CoinMarketCap"
+    },
+    "token_distribution_chart": {
+      "type": "pie_chart",
+      "title": "Token Distribution",
+      "description": "Token allocation across different stakeholders",
+      "data_source": "tokenomics",
+      "data_field": "token_distribution",
+      "output_filename": "token_distribution_chart",
+      "source": "Project Documentation"
+    },
+    "chain_distribution_chart": {
+      "type": "pie_chart",
+      "title": "Chain Distribution",
+      "description": "TVL distribution across different chains",
+      "data_source": "defillama",
+      "data_field": "chains",
+      "output_filename": "chain_distribution_chart",
+      "source": "DeFiLlama"
+    },
+    "supply_schedule_chart": {
+      "type": "line_chart",
+      "title": "Token Supply Schedule",
+      "description": "Projected token supply schedule over time",
+      "data_source": "tokenomics",
+      "data_field": "supply_schedule",
+      "output_filename": "supply_schedule_chart",
+      "x_field": "date",
+      "y_field": "supply",
+      "line_name": "Circulating Supply",
+      "x_axis_title": "Date",
+      "y_axis_title": "Token Supply",
+      "source": "Project Documentation"
+    },
+    "key_metrics_table": {
+      "type": "table",
+      "title": "Key Metrics",
+      "description": "Important metrics for the project",
+      "data_source": "coinmarketcap",
+      "data_field": "metrics",
+      "output_filename": "key_metrics_table",
+      "source": "CoinMarketCap"
+    },
+    "revenue_chart": {
+      "type": "line_chart",
+      "title": "Protocol Revenue",
+      "description": "Historical revenue of the protocol",
+      "data_source": "defillama",
+      "data_field": "revenue_history",
+      "output_filename": "revenue_chart",
+      "x_field": "date",
+      "y_field": "revenue",
+      "line_name": "Revenue",
+      "x_axis_title": "Date",
+      "y_axis_title": "Revenue (USD)",
+      "source": "DeFiLlama"
+    },
+    "fee_comparison_chart": {
+      "type": "bar_chart",
+      "title": "Fee Comparison",
+      "description": "Comparison of fees across different protocols",
+      "data_source": "research",
+      "data_field": "fee_comparison",
+      "output_filename": "fee_comparison_chart",
+      "x_field": "protocol",
+      "y_field": "fee",
+      "x_axis_title": "Protocol",
+      "y_axis_title": "Fee (%)",
+      "source": "Various Sources"
+    },
+    "protocol_timeline": {
+      "type": "table",
+      "title": "Protocol Timeline",
+      "description": "Key events and milestones in the protocol's history",
+      "data_source": "research",
+      "data_field": "timeline",
+      "output_filename": "protocol_timeline",
+      "source": "Various Sources"
+    },
+    "competitors_table": {
+      "type": "table",
+      "title": "Competitor Analysis",
+      "description": "Comparison with competing protocols",
+      "data_source": "research",
+      "data_field": "competitors",
+      "output_filename": "competitors_table",
+      "source": "Various Sources"
+    }
+  },
+  "fallback_options": {
+    "token_distribution_chart": {
+      "sample_data": {
+        "Team": 20,
+        "Foundation": 15,
+        "Community": 25,
+        "Investors": 20,
+        "Ecosystem": 20
+      }
+    },
+    "tvl_chart": {
+      "sample_data": {
+        "timestamps": ["2022-01", "2022-02", "2022-03", "2022-04", "2022-05", "2022-06"],
+        "values": [100000, 250000, 400000, 350000, 500000, 750000],
+        "label": "TVL"
+      }
+    },
+    "price_trend_chart": {
+      "sample_data": {
+        "timestamps": ["2022-01", "2022-02", "2022-03", "2022-04", "2022-05", "2022-06"],
+        "values": [1.2, 1.5, 2.1, 1.8, 2.3, 2.7],
+        "label": "Price"
+      }
+    }
+  },
+  "style_defaults": {
+    "colors": {
+      "primary": "#3366cc",
+      "secondary": "#dc3912",
+      "accent": "#ff9900",
+      "accent_secondary": "#109618",
+      "accent_tertiary": "#990099",
+      "background": "#ffffff",
+      "text": "#333333",
+      "grid": "#e6e6e6",
+      "pie_chart": ["#3366cc", "#dc3912", "#ff9900", "#109618", "#990099", "#0099c6", "#dd4477", "#66aa00"]
+    },
+    "fonts": {
+      "title": "Arial, sans-serif",
+      "label": "Arial, sans-serif",
+      "base": "Arial, sans-serif"
+    },
+    "dimensions": {
+      "width": 1000,
+      "height": 600
+    },
+    "margins": {
+      "top": 80,
+      "right": 50,
+      "bottom": 50,
+      "left": 50
+    }
+  }
+} 
