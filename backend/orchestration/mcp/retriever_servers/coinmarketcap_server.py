@@ -465,6 +465,65 @@ async def get_coin_ohlcv_data(coin: str, days: int = 30, project_name: str = "")
     logger.info(f"Tool called: get_coin_ohlcv_data for {coin}, days={days}, project_name={project_name}")
     return await _fetch_ohlcv_impl(coin, days, project_name)
 
+@mcp.tool()
+async def get_volume_history(coin: str, days: int = 30, project_name: str = "") -> dict:
+    """Get historical volume data for a coin from CoinMarketCap."""
+    logger.info(f"Tool called: get_volume_history for {coin}, days={days}, project_name={project_name}")
+    
+    # Ensure we have a valid project name
+    project_to_use = project_name or coin
+    if not project_to_use or project_to_use == "default":
+        project_to_use = coin  # Fallback to using coin as project name
+    
+    if project_name:
+        init_with_project(project_name)
+    else:
+        init_with_project(project_to_use)
+    
+    # Check cache first
+    cache_key = f"{coin.lower()}_volume_days_{days}"
+    cached_data = cache_manager.load("coinmarketcap", "volume_history", cache_key)
+    if cached_data:
+        logger.info(f"Using cached volume history for {coin}, days={days}")
+        return cached_data
+    
+    # Initialize API with proper project name
+    api = CoinMarketCapAPI(project_name=project_to_use)
+    
+    try:
+        # Get historical data which includes volume
+        historical_data = await api.fetch_historical_data(coin, days)
+        
+        if "volumes" in historical_data and historical_data["volumes"] and "timestamps" in historical_data:
+            # Create a formatted volume history
+            volume_history = []
+            for i in range(len(historical_data["timestamps"])):
+                if i < len(historical_data["volumes"]):
+                    volume_history.append([
+                        historical_data["timestamps"][i],  # timestamp
+                        historical_data["volumes"][i]      # volume
+                    ])
+            
+            result = {
+                "symbol": coin.upper(),
+                "name": coin,
+                "days": days,
+                "currency": "USD",
+                "volume_history": volume_history
+            }
+            
+            # Cache the result
+            cache_manager.save(result, "coinmarketcap", "volume_history", cache_key)
+            logger.info(f"Cached volume history for {coin}")
+            
+            return result
+        else:
+            logger.warning(f"No volume history found in historical data for {coin}")
+            return {"error": "No volume history available", "volume_history": []}
+    except Exception as e:
+        logger.error(f"Error fetching volume history: {str(e)}")
+        return {"error": f"Failed to fetch volume history: {str(e)}", "volume_history": []}
+
 # Don't try to access tools here since it's a coroutine
 logger.info("CoinMarketCap MCP server initialized with tools")
 

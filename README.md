@@ -9,7 +9,7 @@ XplainCrypto is a powerful platform that produces comprehensive, factual, and re
 - **Real-Time Data Integration** - Up-to-date market data from CoinGecko, CoinMarketCap, and DeFiLlama
 - **LangGraph Workflow** - Advanced state management and orchestration of the research process
 - **Comprehensive Reports** - Detailed analysis with specific facts, figures, and technical details
-- **Customizable Reports** - Configurable report structure and content via report_config.json
+- **Customizable Reports** - Configurable report structure and content via report_structure.json
 - **Dynamic Visualizations** - Automated generation of charts and tables based on research data
 
 ## 🏗️ Architecture
@@ -55,7 +55,7 @@ The system automatically selects the appropriate visualizer based on the chart t
 
 ## 🛠️ Customization
 
-Reports can be customized through the report_config.json file:
+Reports can be customized through the report_structure.json file:
 
 - Define report sections and their order
 - Specify which visualizations appear in each section
@@ -71,7 +71,7 @@ Reports can be customized through the report_config.json file:
    - `OPENAI_API_KEY` - Required for LLM operations
    - `TAVILY_API_KEY` - Required for web search
    - `COINMARKETCAP_API_KEY` - Optional for additional market data
-4. Customize report_config.json (optional)
+4. Customize report_structure.json (optional)
 5. Run the server: `python -m uvicorn main:app --reload`
 
 ## 📊 Using the System
@@ -114,7 +114,7 @@ xplaincrypto/
 │   │   └── publisher.py  # Report publishing agent
 │   ├── config/           # Configuration files
 │   │   ├── app_config.json # Main application configuration
-│   │   ├── report_config.json # Report customization settings
+│   │   ├── report_structure.json # Report customization settings
 │   │   ├── style_config.json # Visual styling configuration
 │   │   └── error_categories.json # Error handling configuration
 │   ├── core/             # Core application components

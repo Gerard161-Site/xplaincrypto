@@ -1,3 +1,4 @@
+# backend/data_standardizer.py
 import logging
 import json
 import os
@@ -19,6 +20,86 @@ class DataStandardizer:
     def __init__(self, logger: Optional[logging.Logger] = None):
         """Initialize the DataStandardizer with optional logger."""
         self.logger = logger or logging.getLogger(__name__)
+        
+        # Default visualization mappings in case visualization_mapping.json is missing
+        self.default_viz_mapping = {
+            "key_metrics_table": {
+                "type": "table",
+                "data_source": "coinmarketcap",
+                "data_field": ""
+            },
+            "price_trend_chart": {
+                "type": "line_chart",
+                "data_source": "coinmarketcap",
+                "data_field": "price_history",
+                "x_field": "date",
+                "y_field": "price",
+                "line_name": "Price"
+            },
+            "whitepaper_link": {
+                "type": "table",
+                "data_source": "tokenomics",
+                "data_field": "documentation_url"
+            },
+            "tokenomics_pie_chart": {
+                "type": "pie_chart",
+                "data_source": "tokenomics",
+                "data_field": "data"
+            },
+            "chain_distribution_chart": {
+                "type": "pie_chart",
+                "data_source": "defillama",
+                "data_field": "currentChainTvls"
+            },
+            "candlestick_chart": {
+                "type": "candlestick_chart",
+                "data_source": "coinmarketcap",
+                "data_field": "ohlcv"
+            },
+            "volume_chart": {
+                "type": "line_chart",
+                "data_source": "coinmarketcap",
+                "data_field": "volume_history",
+                "x_field": "date",
+                "y_field": "volume",
+                "line_name": "Volume"
+            },
+            "competitor_comparison_chart": {
+                "type": "comparison_chart",
+                "data_source": "multi",
+                "data_field": "competitors"
+            },
+            "liquidity_trends_chart": {
+                "type": "line_chart",
+                "data_source": "coinmarketcap",
+                "data_field": "volume_history"
+            },
+            "adoption_metrics_table": {
+                "type": "table",
+                "data_source": "multi",
+                "data_field": ""
+            },
+            "tvl_chart": {
+                "type": "line_chart",
+                "data_source": "defillama",
+                "data_field": "tvl_history"
+            },
+            "tvl_milestone_chart": {
+                "type": "line_chart",
+                "data_source": "defillama",
+                "data_field": "tvl_history"
+            },
+            "tvl_phases_chart": {
+                "type": "line_chart",
+                "data_source": "defillama",
+                "data_field": "tvl_history"
+            },
+            "monthly_growth_chart": {
+                "type": "line_chart",
+                "data_source": "defillama",
+                "data_field": "tvl_history"
+            }
+        }
     
     def standardize_state_data(self, state: Union[ResearchState, Dict], report_config: Dict) -> Union[ResearchState, Dict]:
         """
@@ -47,6 +128,32 @@ class DataStandardizer:
             self.logger.warning("CacheManager not available, skipping cache writing")
             cache_mgr = None
         
+        # Load visualization mapping
+        viz_mapping = self.default_viz_mapping.copy() # Start with defaults, use .copy() to avoid modifying class default
+        try:
+            # Construct path to visualization_mapping.json
+            # Assuming data_standardizer.py is in backend/utils/
+            # and visualization_mapping.json is in config/ at the project root
+            current_file_path = os.path.abspath(__file__)
+            utils_dir = os.path.dirname(current_file_path)
+            backend_dir = os.path.dirname(utils_dir)
+            project_root = os.path.dirname(backend_dir)
+            
+            mapping_file_name = "visualization_mapping.json"
+            mapping_file_path = os.path.join(backend_dir, "config", mapping_file_name)
+            
+            self.logger.info(f"Attempting to load visualization mapping from: {mapping_file_path}")
+            with open(mapping_file_path, "r") as f:
+                external_mapping = json.load(f).get("visualization_types", {})
+                viz_mapping.update(external_mapping) # Update with loaded ones
+                self.logger.info(f"Successfully loaded and merged {mapping_file_name} from {mapping_file_path}")
+        except FileNotFoundError:
+            self.logger.warning(f"{mapping_file_name} not found at {mapping_file_path}. Using default mappings.")
+        except json.JSONDecodeError as e:
+            self.logger.error(f"Error decoding {mapping_file_name} from {mapping_file_path}: {str(e)}. Using default mappings.")
+        except Exception as e:
+            self.logger.error(f"Unexpected error loading {mapping_file_name} from {mapping_file_path}: {str(e)}. Using default mappings.")
+        
         # Ensure visualization_data exists
         if is_state_dict:
             if "visualization_data" not in state:
@@ -73,24 +180,38 @@ class DataStandardizer:
             
             # Standardize data for each visualization
             for viz in visualizations:
-                # Check if viz is a dictionary before trying to access it
-                if not isinstance(viz, dict):
-                    self.logger.warning(f"Visualization in section '{section_title}' is not a dictionary: {viz}")
+                # Handle both dictionary and string visualizations
+                if isinstance(viz, dict):
+                    viz_config = viz
+                    viz_id = viz_config.get("id", "")
+                    viz_type = viz_config.get("type", "")
+                    data_source = viz_config.get("data_source", "")
+                    data_field = viz_config.get("data_field", "")
+                elif isinstance(viz, str):
+                    self.logger.info(f"Processing string visualization: {viz}")
+                    viz_id = viz
+                    viz_config = viz_mapping.get(viz_id, {})
+                    if not viz_config:
+                        self.logger.warning(f"No mapping found for visualization: {viz_id}")
+                        continue
+                    viz_type = viz_config.get("type", "")
+                    data_source = viz_config.get("data_source", "")
+                    data_field = viz_config.get("data_field", "")
+                else:
+                    self.logger.warning(f"Invalid visualization format in section '{section_title}': {viz}")
                     continue
-                    
-                viz_type = viz.get("type", "")
-                viz_id = viz.get("id", "")
-                data_source = viz.get("data_source", "")
-                data_field = viz.get("data_field", "")
                 
                 if not viz_type or not viz_id:
+                    self.logger.warning(f"Skipping visualization with missing type or id: {viz_id}")
                     continue
                     
                 # Prepare visualization data
-                viz_data = self._prepare_visualization_data(state, viz, section_title, data_sources)
+                self.logger.debug(f"Preparing data for viz_id: {viz_id}, type: {viz_type}, source: {data_source}, field: {data_field}")
+                viz_data = self._prepare_visualization_data(state, viz_config, section_title, data_sources)
                 
                 # Store standardized data in state.visualization_data
                 if viz_data:
+                    self.logger.debug(f"Storing viz_data for {viz_id}: {viz_data}")
                     if is_state_dict:
                         if normalized_section not in state["visualization_data"]:
                             state["visualization_data"][normalized_section] = {}
@@ -104,12 +225,15 @@ class DataStandardizer:
                     # Write to cache if cache manager is available
                     if cache_mgr and data_source and data_field:
                         try:
-                            # Save standardized data to cache
-                            cache_key = f"{data_source}/{data_field}"
-                            self.logger.info(f"Writing standardized data to cache: {cache_key}")
-                            cache_mgr.save(viz_data, data_source, data_field, "")
+                            cache_key_display = f"{data_source}/{data_field}" # For logging
+                            self.logger.info(f"Writing standardized data to cache: {cache_key_display}")
+                            # Use viz_id as query parameter to make cache key more specific for standardized viz data
+                            query_for_cache = viz_id if viz_id else "general"
+                            cache_mgr.save(viz_data, data_source, data_field, query_for_cache)
                         except Exception as e:
                             self.logger.error(f"Error writing to cache: {str(e)}")
+                else:
+                    self.logger.warning(f"No viz_data prepared for {viz_id}")
         
         self.logger.info("State data standardization complete")
         return state
@@ -129,7 +253,7 @@ class DataStandardizer:
     def _prepare_visualization_data(self, state: Union[ResearchState, Dict], 
                                    viz_config: Dict, 
                                    section_title: str,
-                                   data_sources: List[str]) -> Dict:
+                                   section_data_sources: List[str]) -> Dict:
         """
         Prepare standardized data for a specific visualization.
         
@@ -137,19 +261,42 @@ class DataStandardizer:
             state: Research state
             viz_config: Visualization configuration
             section_title: Section title
-            data_sources: List of data sources for this section
+            section_data_sources: List of data sources available for this section (from report_config)
             
         Returns:
             Standardized data for the visualization
         """
         viz_type = viz_config.get("type", "")
         viz_id = viz_config.get("id", "")
+        if not viz_id and "title" in viz_config:
+            viz_id = viz_config.get("title", "unknown_viz").lower().replace(" ", "_")
+
         data_field = viz_config.get("data_field", "")
+        specific_source_for_viz = viz_config.get("data_source")
+        normalized_section = self._normalize_section_name(section_title)
+
+        self.logger.info(f"Preparing data for visualization: {viz_id} (type: {viz_type}, field: '{data_field}', specific_source_config: {specific_source_for_viz}) in section '{section_title}' (normalized: {normalized_section})")
+
+        effective_data_sources_to_check = []
+        if specific_source_for_viz and specific_source_for_viz != "multi":
+            if specific_source_for_viz in section_data_sources:
+                effective_data_sources_to_check = [specific_source_for_viz]
+                self.logger.info(f"Viz '{viz_id}' uses specific source '{specific_source_for_viz}', which is available in section.")
+            else:
+                self.logger.warning(f"Visualization '{viz_id}' requests specific source '{specific_source_for_viz}', but it's NOT listed in section's available sources: {section_data_sources}. Data extraction for this field from this source will likely fail or be skipped.")
+                effective_data_sources_to_check = [specific_source_for_viz]
+
+        elif specific_source_for_viz == "multi":
+            effective_data_sources_to_check = section_data_sources
+            self.logger.info(f"Viz '{viz_id}' uses 'multi' source, checking all section sources: {section_data_sources}")
+        else:
+            effective_data_sources_to_check = section_data_sources
+            self.logger.info(f"Viz '{viz_id}' has no specific_source or it's empty, defaulting to all section sources: {section_data_sources}")
         
-        self.logger.info(f"Preparing data for visualization: {viz_id} ({viz_type})")
+        self.logger.debug(f"Effective sources to check for viz '{viz_id}': {effective_data_sources_to_check} for data_field '{data_field}'")
         
         # Get data from state based on data sources
-        raw_data = self._extract_data_from_state(state, data_sources, data_field)
+        raw_data = self._extract_data_from_state(state, normalized_section, effective_data_sources_to_check, data_field)
         
         # If no data found, return empty dict
         if not raw_data:
@@ -172,85 +319,91 @@ class DataStandardizer:
             return self._standardize_generic_data(raw_data, viz_config)
     
     def _extract_data_from_state(self, state: Union[ResearchState, Dict], 
-                               data_sources: List[str],
+                               normalized_section_name: str,
+                               sources_to_check: List[str],
                                data_field: str) -> Dict:
         """
-        Extract relevant data from state based on data sources.
+        Extract specific data field from multiple sources within the state,
+        considering the specific section.
+        If data_field is empty, it extracts all data for the specified sources within that section.
         
         Args:
-            state: Research state
-            data_sources: List of data sources to check
-            data_field: Specific data field to extract
+            state: Research state object or dictionary
+            normalized_section_name: The normalized name of the current section being processed.
+            sources_to_check: List of data source names (e.g., ["coinmarketcap", "defillama"])
+                              These are the sources that _should_ be checked for this viz.
+            data_field: Specific data field to extract (e.g., "price_history", "tvl")
+                        If empty, all data from the source is taken.
             
         Returns:
-            Dictionary of extracted data
+            Dictionary with extracted data, keyed by source name.
         """
         result = {}
-        is_state_dict = isinstance(state, dict)
         
-        # First try to get data from state.data
-        if is_state_dict:
-            state_data = state.get("data", {})
-            
-            # Check each data source
-            for source in data_sources:
-                if source in state_data:
-                    source_data = state_data[source]
-                    
-                    # If data_field specified, look for it
-                    if data_field and isinstance(source_data, dict):
-                        found = False
-                        # First look for exact match
-                        if data_field in source_data:
-                            result[source] = {data_field: source_data[data_field]}
-                            found = True
-                        else:
-                            # Then look for field names containing the data_field
-                            for field, field_data in source_data.items():
-                                if data_field.lower() in field.lower():
-                                    self.logger.info(f"Found field '{field}' matching data_field '{data_field}'")
-                                    result[source] = {field: field_data}
-                                    found = True
-                                    break
-                        
-                        # If still not found, log and continue
-                        if not found:
-                            self.logger.warning(f"Could not find data field '{data_field}' in source '{source}'")
-                    else:
-                        # Otherwise take all data for this source
-                        result[source] = source_data
-        else:
-            # Handle ResearchState object
-            if hasattr(state, "data"):
-                state_data = state.data
+        # Get the main 'data' attribute from state object or dict
+        is_state_dict = isinstance(state, dict)
+        state_data = state.get("data") if is_state_dict else getattr(state, "data", {})
+        
+        if not state_data:
+            self.logger.warning("State object or dict has no 'data' attribute or key, or it is empty.")
+            return result
+
+        # Get the data specific to the current section
+        section_actual_data = state_data.get(normalized_section_name, {})
+        if not section_actual_data:
+            self.logger.warning(f"No data found in state.data for section '{normalized_section_name}'.")
+            return result
+
+        for source in sources_to_check:
+            source_data = section_actual_data.get(source, {}) # Look for the source within the section's data
+            if not source_data: # Skip if source itself is not in section_actual_data or is empty
+                self.logger.debug(f"No data found for source '{source}' in section '{normalized_section_name}'.")
+                continue
+
+            extracted_value = None # To store the data we find
+
+            if data_field:
+                # Attempt 1: Direct lookup from source_data
+                if isinstance(source_data, dict):
+                    extracted_value = source_data.get(data_field)
                 
-                # Check each data source
-                for source in data_sources:
-                    if hasattr(state_data, source):
-                        source_data = getattr(state_data, source)
-                        
-                        # If data_field specified, look for it
-                        if data_field and isinstance(source_data, dict):
-                            found = False
-                            # First look for exact match
-                            if data_field in source_data:
-                                result[source] = {data_field: source_data[data_field]}
-                                found = True
-                            else:
-                                # Then look for field names containing the data_field
-                                for field, field_data in source_data.items():
-                                    if data_field.lower() in field.lower():
-                                        self.logger.info(f"Found field '{field}' matching data_field '{data_field}'")
-                                        result[source] = {field: field_data}
-                                        found = True
-                                        break
-                            
-                            # If still not found, log and continue
-                            if not found:
-                                self.logger.warning(f"Could not find data field '{data_field}' in source '{source}'")
-                        else:
-                            # Otherwise take all data for this source
-                            result[source] = source_data
+                # Attempt 2: Nested lookup for specific cases
+                if extracted_value is None and isinstance(source_data, dict):
+                    if source == "tokenomics":
+                        tokenomics_outer_data = source_data.get("data")
+                        if data_field == "whitepaper_url" or data_field == "documentation_url":
+                            if isinstance(tokenomics_outer_data, str):
+                                extracted_value = tokenomics_outer_data
+                                self.logger.info(f"Found '{data_field}' for '{source}' as direct string in source_data['data'].")
+                            elif isinstance(tokenomics_outer_data, dict):
+                                extracted_value = tokenomics_outer_data.get(data_field)
+                                if extracted_value is not None:
+                                    self.logger.info(f"Found '{data_field}' for '{source}' in source_data['data']['{data_field}'].")
+                        elif isinstance(tokenomics_outer_data, dict):
+                            tokenomics_inner_payload = tokenomics_outer_data.get("data")
+                            if isinstance(tokenomics_inner_payload, dict):
+                                extracted_value = tokenomics_inner_payload.get(data_field)
+                                if extracted_value is not None:
+                                    self.logger.info(f"Found '{data_field}' for '{source}' in source_data['data']['data']['{data_field}'].")
+                    elif source == "coinmarketcap" and data_field in ["price_history", "volume_history"]:
+                        # Handle cases where historical data from CoinMarketCap might be nested under a 'data' key
+                        data_dict = source_data.get('data')
+                        if isinstance(data_dict, dict):
+                            extracted_value = data_dict.get(data_field)
+                            if extracted_value is not None:
+                                self.logger.info(f"Found '{data_field}' for '{source}' in source_data['data']['{data_field}'].")
+                
+                if extracted_value is not None:
+                    result[source] = extracted_value
+                else:
+                    # Enhanced logging for missing field
+                    available_keys_msg = f"Available top-level keys in '{source}': {list(source_data.keys()) if isinstance(source_data, dict) else 'Not a dict or empty'}"
+                    if source == "tokenomics" and isinstance(source_data, dict) and isinstance(source_data.get("data"), dict):
+                        available_keys_msg += f", Available keys in '{source}[\"]': {list(source_data['data'].keys())}"
+                    self.logger.warning(f"Could not find data field '{data_field}' in source '{source}'. {available_keys_msg}")
+            else:
+                # If no specific data_field, take all data for this source
+                result[source] = source_data
         
         return result
     
@@ -259,49 +412,69 @@ class DataStandardizer:
         result = {
             "type": "line_chart",
             "title": viz_config.get("title", ""),
-            "x_title": viz_config.get("x_title", "Date"),
-            "y_title": viz_config.get("y_title", "Value"),
+            "x_title": viz_config.get("x_axis_title", "Date"),
+            "y_title": viz_config.get("y_axis_title", "Value"),
             "series": []
         }
-        
-        # Process raw data to extract time series
-        for source, source_data in raw_data.items():
-            if isinstance(source_data, dict):
-                for field, field_data in source_data.items():
-                    # Look for time series data (list of dicts with date/time and value)
-                    if isinstance(field_data, list):
-                        series = {
-                            "name": field,
-                            "data": []
-                        }
+
+        # Get x and y field keys from viz_config, default to common names
+        config_x_key = viz_config.get("x_field", "date")
+        config_y_key = viz_config.get("y_field") # This is the semantic key like 'price' or 'volume'
+
+        for source, data_payload in raw_data.items():
+            series_data_points = []
+            # Use line_name from viz_config if available, otherwise default to source or field name
+            series_name = viz_config.get("line_name", source)
+
+            if isinstance(data_payload, list):
+                for point in data_payload:
+                    if isinstance(point, dict):
+                        x_value = point.get(config_x_key, point.get("timestamp", point.get("time")))
                         
-                        # Process each data point
-                        for point in field_data:
-                            if isinstance(point, dict):
-                                # Look for common time series formats
-                                x_value = None
-                                y_value = None
-                                
-                                # Try different key patterns for x-axis (date/time)
-                                for x_key in ["date", "timestamp", "time", "x"]:
-                                    if x_key in point:
-                                        x_value = point[x_key]
-                                        break
-                                
-                                # Try different key patterns for y-axis (value)
-                                for y_key in ["value", "price", "amount", "y"]:
-                                    if y_key in point:
-                                        y_value = point[y_key]
-                                        break
-                                
-                                # If both x and y found, add to series
-                                if x_value is not None and y_value is not None:
-                                    series["data"].append({"x": x_value, "y": y_value})
+                        y_value_candidate = None
+                        if config_y_key == "price": # Semantic y_field for price
+                            y_value_candidate = point.get("close", point.get("price"))
+                        elif config_y_key == "volume": # Semantic y_field for volume
+                            y_value_candidate = point.get("volume")
+                        elif config_y_key: # Specific y_field provided in viz_config
+                            y_value_candidate = point.get(config_y_key)
+                        else: # Generic fallback if no y_field in viz_config
+                            for generic_y_key in ["value", "tvl", "amount"]:
+                                if generic_y_key in point:
+                                    y_value_candidate = point[generic_y_key]
+                                    break
                         
-                        # Only add series if it has data
-                        if series["data"]:
-                            result["series"].append(series)
+                        if x_value is not None and y_value_candidate is not None:
+                            try:
+                                y_value_numeric = float(y_value_candidate)
+                                series_data_points.append({"x": x_value, "y": y_value_numeric})
+                            except (ValueError, TypeError):
+                                self.logger.debug(f"Skipping invalid y_value: {y_value_candidate} for x_value: {x_value} in series {series_name}")
+                        else:
+                            self.logger.debug(f"Skipping point in series {series_name} due to missing x ({x_value}) or y ({y_value_candidate}). Point: {point}")
+                            
+                    elif isinstance(point, (list, tuple)) and len(point) >= 2:
+                        # Handle [timestamp, value] format if config_x_key and config_y_key are not specific enough
+                        # This path might be less used if ohlcv data is dicts
+                        x_value, y_value_candidate = point[0], point[1]
+                        try:
+                            y_value_numeric = float(y_value_candidate)
+                            series_data_points.append({"x": x_value, "y": y_value_numeric})
+                        except (ValueError, TypeError):
+                             self.logger.debug(f"Skipping invalid y_value for [timestamp, value] pair: {y_value_candidate}")
+            
+            elif isinstance(data_payload, dict): # Handle cases where data_payload is a dict of values (less common for time series)
+                self.logger.debug(f"Data_payload for source {source} is a dict, attempting to process if suitable for line chart.")
+                # This part would need specific logic if a dict is meant to be a single series.
+                # For now, primarily focusing on list of data points.
+
+            if series_data_points:
+                result["series"].append({
+                    "name": series_name,
+                    "data": series_data_points
+                })
         
+        self.logger.debug(f"Standardized line chart data: {result}")
         return result
     
     def _standardize_bar_chart_data(self, raw_data: Dict, viz_config: Dict) -> Dict:
@@ -309,8 +482,8 @@ class DataStandardizer:
         result = {
             "type": "bar_chart",
             "title": viz_config.get("title", ""),
-            "x_title": viz_config.get("x_title", "Category"),
-            "y_title": viz_config.get("y_title", "Value"),
+            "x_title": viz_config.get("x_axis_title", "Category"),
+            "y_title": viz_config.get("y_axis_title", "Value"),
             "categories": [],
             "series": []
         }
@@ -571,4 +744,4 @@ class DataStandardizer:
             return True, ""
             
         # For unknown types, just check if raw_data exists
-        return "raw_data" in viz_data, "No raw data available" 
+        return "raw_data" in viz_data, "No raw data available"

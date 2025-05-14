@@ -1,3 +1,4 @@
+# researcher.py
 import os
 import json
 import logging
@@ -59,22 +60,19 @@ class Researcher:
             self.logger.info('Initializing RAG components')
             try:
                 self.logger.info("Getting vector store synchronously")
-                # Call get_vector_store directly as it's synchronous
                 self.vector_store = get_vector_store()
                 self.logger.info("Vector store object created")
-                # Check if the store initialized correctly internally
                 if not self.vector_store or not self.vector_store.is_healthy():
-                     self.logger.error("Vector store initialization failed or store is not healthy.")
-                     self.vector_store = None # Set to None if unhealthy
+                    self.logger.error("Vector store initialization failed or store is not healthy.")
+                    self.vector_store = None
                 else:
-                     self.logger.info("Vector store appears healthy")
+                    self.logger.info("Vector store appears healthy")
             except Exception as e:
                 self.logger.error(f"Error getting vector store instance: {str(e)}", exc_info=True)
                 self.vector_store = None
             
             if self.vector_store:
                 self.logger.info("Initializing RAGRetriever")
-                # Assuming RAGRetriever constructor is synchronous
                 self.rag_retriever = RAGRetriever(self.vector_store, llm_model=self.llm_model)
                 self.logger.info("RAGRetriever initialized")
             else:
@@ -111,8 +109,7 @@ class Researcher:
             
             self.logger.info('RAG and MCP components initialized successfully')
         except Exception as e:
-            self.logger.error(f'Error initializing RAG and MCP components: {str(e)}', exc_info=True) # Added exc_info
-            # Optionally re-raise or handle differently depending on desired behavior
+            self.logger.error(f'Error initializing RAG and MCP components: {str(e)}', exc_info=True)
             raise
         self.logger.info("Completed Researcher.initialize")
     
@@ -121,11 +118,9 @@ class Researcher:
         self.logger.info("Entering Researcher.run")
         
         try:
-            # Use StateManager to get project name consistently
             self.project_name = self.state_manager.get_project_name(state)
             self.logger.info(f"Running researcher for {self.project_name}")
             
-            self.logger.info("Setting up cache directory")
             self.cache_dir = os.path.join("docs", self.project_name.lower(), "cache")
             os.makedirs(self.cache_dir, exist_ok=True)
             self.logger.info(f"Cache directory set to: {self.cache_dir}")
@@ -135,7 +130,6 @@ class Researcher:
             self.logger.info("Initialize completed")
             
             self.logger.info("Calling execute_workflow")
-            # Pass the original state to execute_workflow
             result = await asyncio.wait_for(self.execute_workflow(query_or_state=state), timeout=300.0)
             self.logger.info("Completed Researcher.run")
             return result
@@ -143,23 +137,18 @@ class Researcher:
         except asyncio.TimeoutError:
             self.logger.error("Researcher.run timed out after 300 seconds")
             error_msg = "Researcher timed out"
-            # Add error to state using StateManager
             return self.state_manager.add_error(state, "researcher", error_msg)
         except Exception as e:
             self.logger.error(f"Error in researcher run: {str(e)}", exc_info=True)
             error_msg = f"Researcher error: {str(e)}"
-            # Add error to state using StateManager
             return self.state_manager.add_error(state, "researcher", error_msg)
     
-    async def execute_workflow(self, query_or_state: Any, context: Dict[str, Any] = None) -> Any: # Return type matches input
+    async def execute_workflow(self, query_or_state: Any, context: Dict[str, Any] = None) -> Any:
         """Execute the research workflow using RAG to select MCP endpoints."""
         self.logger.info("Entering execute_workflow")
         context = context or {}
         
-        # Use StateManager to get consistent access to state fields
-        state = query_or_state # Use the original reference
-        
-        # Get project name and report config using StateManager
+        state = query_or_state
         project_name = self.state_manager.get_project_name(state)
         report_config = self.state_manager.get_report_config(state)
         
@@ -170,24 +159,15 @@ class Researcher:
         self.project_name = project_name.lower()
         self.logger.info(f"Project name: {self.project_name}")
         
-        # Initialize state structures if not present
         state = self.state_manager.ensure_state_structure(state)
         
         try:
-            # Track processed endpoints to avoid duplicate API calls
             self.processed_endpoints = set()
-            
-            # First, use RAG-based batch processing for project data
-            # This will get RAG-appropriate data for each section
             await self._batch_process_project_data(report_config, project_name)
             
-            # Store research results from batch processing in state
             if "batch_data" in self.data and "tavily" in self.data["batch_data"]:
                 section_research_results = self.data["batch_data"]["tavily"]
-                
-                # Store these results in the appropriate state locations using StateManager
                 for section_key, section_data in section_research_results.items():
-                    # Find the corresponding section title from report_config
                     section_title = None
                     for section in report_config.get("sections", []):
                         if section.get("title", "").lower().replace(" ", "_") == section_key:
@@ -195,21 +175,15 @@ class Researcher:
                             break
                     
                     if section_title:
-                        # Update state for this section
                         current_section_data = self.state_manager.get_section_data(state, section_title) or {}
                         current_section_data["tavily"] = section_data
-                        
-                        # Store the updated section data using StateManager
                         state = self.state_manager.update_section_data(state, section_title, current_section_data)
             
-            # Process each section from report_config to get non-research data
-            # Research data was already handled by _batch_process_tavily via _batch_process_project_data
             for section in report_config.get("sections", []):
                 section_title = section.get("title")
                 if not section_title:
                     continue
                     
-                # Get required data sources, filtering out web_research as it's handled already
                 required_sources = [source for source in section.get("data_sources", [])
                                     if source != "web_research"]
                 
@@ -219,7 +193,6 @@ class Researcher:
                 
                 self.logger.info(f"Processing section: '{section_title}' | Required sources: {required_sources}")
                 
-                # Use RAG to select endpoints for this section
                 query_template = section.get("query_template", "{project_name}")
                 section_query = query_template.format(project_name=project_name)
                 self.logger.info(f"Section '{section_title}': Running RAG with query: '{section_query}'")
@@ -227,12 +200,10 @@ class Researcher:
                 endpoints_for_section = []
                 try:
                     if self.rag_retriever:
-                        # Pass the required_sources to RAG retriever (excluding web_research)
                         endpoints_for_section = await asyncio.wait_for(
                             self.rag_retriever.get_endpoints_for_project(section_query, required_sources=required_sources), 
                             timeout=5.0
                         )
-                        # Filter out research endpoints as they've been handled in batch processing
                         endpoints_for_section = [
                             endpoint for endpoint in endpoints_for_section
                             if "research" not in endpoint.lower() and "tavily" not in endpoint.lower()
@@ -245,56 +216,40 @@ class Researcher:
                     self.logger.error(f"Error in RAG retrieval for section '{section_title}': {str(e)}")
                     endpoints_for_section = []
                 
-                # Process each endpoint from RAG for this section
                 for endpoint in endpoints_for_section:
-                    # Skip if this endpoint has already been processed
                     if endpoint in self.processed_endpoints:
                         self.logger.info(f"Endpoint {endpoint} already processed. Skipping.")
                         continue
                         
                     try:
-                        # Invoke the tool for this endpoint
                         self.logger.info(f"Section '{section_title}': Invoking tool for endpoint: {endpoint}")
                         result = await self._invoke_tool_for_endpoint(endpoint, project_name, query=section_query, cache_key=section_title)
-                        
-                        # Mark as processed to avoid duplicate calls
                         self.processed_endpoints.add(endpoint)
                         
-                        # Store result in state using StateManager
                         if result:
-                            # Extract source from endpoint
                             source = endpoint.split("://")[1].split("/")[0] if "://" in endpoint else "unknown"
-                            
-                            # Get current section data
                             current_section_data = self.state_manager.get_section_data(state, section_title) or {}
                             current_section_data[source] = result
-                            
-                            # Update state with new section data
                             state = self.state_manager.update_section_data(state, section_title, current_section_data)
                     except Exception as e:
                         self.logger.error(f"Error processing endpoint {endpoint} for section '{section_title}': {str(e)}")
-                        # Add to problem sections if there's an error
                         problem_sections = self.state_manager.get_problem_sections(state) or []
                         if not any(ps.get("title") == section_title for ps in problem_sections):
                             problem_sections.append({"title": section_title, "missing_fields": [source]})
                             state = self.state_manager.update_problem_sections(state, problem_sections)
             
-            # Consolidate all fetched data into state (for any non-section specific data)
+            # Consolidate all fetched data into state
             self.logger.info("Consolidating additional fetched data into state...")
-            
-            # Process each key in self.data
             for key, value in self.data.items():
-                if key != "batch_data":  # We've already processed batch_data above
-                    # Handle other data sources
+                if key != "batch_data":
                     for field_key, field_data in value.items():
-                        # For general data not tied to a specific section
                         state = self.state_manager.update_data_field(state, key, field_key, field_data)
             
             # Report problem sections
             problem_sections = self.state_manager.get_problem_sections(state) or []
             self.logger.info(f"Problem sections reported: {len(problem_sections)}")
             
-            # Standardize data for visualizations using DataStandardizer
+            # Standardize data for visualizations
             self.logger.info("Standardizing data for visualizations")
             try:
                 data_standardizer = DataStandardizer(logger=self.logger)
@@ -302,99 +257,82 @@ class Researcher:
                 self.logger.info("Data standardization complete")
             except Exception as e:
                 self.logger.error(f"Error standardizing data: {str(e)}", exc_info=True)
-                # Continue even if standardization fails - we'll use raw data
+                state = self.state_manager.add_error(state, "data_standardizer", f"Error standardizing data: {str(e)}")
             
             self.logger.info("Completed execute_workflow")
             return state
             
         except Exception as e:
             self.logger.error(f"Error in execute_workflow: {str(e)}", exc_info=True)
-            # Add error to state using StateManager
             return self.state_manager.add_error(state, "researcher", f"Error in execute_workflow: {str(e)}")
 
     async def _invoke_tool_for_endpoint(self, endpoint_pattern: str, project_name: str, query: Optional[str] = None, cache_key: Optional[str] = None) -> Dict[str, Any]:
         """Formats endpoint pattern INCLUDING identifiers in the path and calls fetch_data."""
-        logger.info(f"Invoking tool for endpoint pattern: '{endpoint_pattern}' for project '{project_name}' with query '{query}'")
+        self.logger.info(f"Invoking tool for endpoint pattern: '{endpoint_pattern}' for project '{project_name}' with query '{query}'")
         
         source = "unknown"
         tool_name_for_cache = "unknown"
-        query_param_for_cache = project_name.lower() # Default for cache key
-        formatted_endpoint_for_call = endpoint_pattern # Start with pattern
-        call_params = {} # Parameters to pass to fetch_data
+        query_param_for_cache = project_name.lower()
+        formatted_endpoint_for_call = endpoint_pattern
+        call_params = {}
         safe_name = project_name.lower().strip()
 
         try:
-            # --- 1. Format Endpoint Path with Identifiers --- 
             if "://" in endpoint_pattern:
-                 parts = endpoint_pattern.split("://")
-                 path = parts[1]
-                 source = path.strip("/").split("/")[0]
+                parts = endpoint_pattern.split("://")
+                path = parts[1]
+                source = path.strip("/").split("/")[0]
             else:
-                 logger.warning(f"Received endpoint pattern '{endpoint_pattern}' is not a valid URI.")
-                 # Attempt to proceed? Or return error? Let's try proceeding cautiously.
-                 source = endpoint_pattern # Best guess for source
-                 formatted_endpoint_for_call = endpoint_pattern # Use as is
+                self.logger.warning(f"Received endpoint pattern '{endpoint_pattern}' is not a valid URI.")
+                source = endpoint_pattern
+                formatted_endpoint_for_call = endpoint_pattern
 
-            # Replace placeholders WITHIN the endpoint string
             if '{coin}' in formatted_endpoint_for_call: formatted_endpoint_for_call = formatted_endpoint_for_call.replace('{coin}', safe_name)
             if '{protocol}' in formatted_endpoint_for_call: formatted_endpoint_for_call = formatted_endpoint_for_call.replace('{protocol}', safe_name)
             if '{project}' in formatted_endpoint_for_call: formatted_endpoint_for_call = formatted_endpoint_for_call.replace('{project}', safe_name)
             
-            # Handle {query} placeholder - key area for tavily fix
             if '{query}' in formatted_endpoint_for_call:
                 if query:
-                    # Use the full, formatted query from the section template
                     formatted_endpoint_for_call = formatted_endpoint_for_call.replace('{query}', query)
-                    tool_name_for_cache = "research"  # Use a consistent tool name 
-                    query_param_for_cache = query     # Use the FULL query for caching
-                    logger.info(f"Using full query string '{query}' for research endpoint")
+                    tool_name_for_cache = "research"
+                    query_param_for_cache = query
+                    self.logger.info(f"Using full query string '{query}' for research endpoint")
                 else:
-                    # If no query provided, use project name as a fallback
                     formatted_endpoint_for_call = formatted_endpoint_for_call.replace('{query}', safe_name)
                     tool_name_for_cache = "research"
                     query_param_for_cache = safe_name
-                    logger.warning(f"No query string for pattern '{endpoint_pattern}', using project name for {{query}}.")
+                    self.logger.warning(f"No query string for pattern '{endpoint_pattern}', using project name for {{query}}.")
                   
-            # Handle {project_name} placeholder - replace it if present
             if '{project_name}' in formatted_endpoint_for_call:
-                 formatted_endpoint_for_call = formatted_endpoint_for_call.replace('{project_name}', safe_name)
+                formatted_endpoint_for_call = formatted_endpoint_for_call.replace('{project_name}', safe_name)
 
-            # --- 2. Prepare Minimal Params for fetch_data --- 
-            # The original fetch_data extracts main id from path, so only pass project_name if needed.
-            # Crucially, DO NOT pass coin/protocol/query here if they are already in the path.
             call_params['project_name'] = project_name
             
-            # Determine tool name for cache based on the *original pattern* before param substitution
             try:
-                 path_parts_cache = endpoint_pattern.split("://")[1].strip("/").split("/")
-                 if tool_name_for_cache == "unknown": # If not set by {query}
-                     if len(path_parts_cache) > 1:
-                          tool_name_for_cache = path_parts_cache[1] # Use resource part (e.g., 'market', 'tvl')
-                     else:
-                          tool_name_for_cache = source # Fallback to source
+                path_parts_cache = endpoint_pattern.split("://")[1].strip("/").split("/")
+                if tool_name_for_cache == "unknown":
+                    if len(path_parts_cache) > 1:
+                        tool_name_for_cache = path_parts_cache[1]
+                    else:
+                        tool_name_for_cache = source
             except Exception:
-                 tool_name_for_cache = endpoint_pattern # Fallback
+                tool_name_for_cache = endpoint_pattern
                  
-            logger.info(f"Prepared call: Endpoint='{formatted_endpoint_for_call}', Params={call_params}, CacheKey=({source}, {tool_name_for_cache}, {query_param_for_cache})")
+            self.logger.info(f"Prepared call: Endpoint='{formatted_endpoint_for_call}', Params={call_params}, CacheKey=({source}, {tool_name_for_cache}, {query_param_for_cache})")
 
         except Exception as format_err:
-             logger.error(f"Error preparing call for endpoint pattern '{endpoint_pattern}': {str(format_err)}", exc_info=True)
-             return {
-                 "error": f"Endpoint preparation error: {str(format_err)}",
-                 "endpoint_pattern": endpoint_pattern,
-                 "data_unavailable": True,
-                 "source": "error"
-             }
+            self.logger.error(f"Error preparing call for endpoint pattern '{endpoint_pattern}': {str(format_err)}", exc_info=True)
+            return {
+                "error": f"Endpoint preparation error: {str(format_err)}",
+                "endpoint_pattern": endpoint_pattern,
+                "data_unavailable": True,
+                "source": "error"
+            }
 
-        # --- 3. Check Cache --- 
         try:
             cache_mgr = CacheManager(project_name=project_name)
             
-            # Use standardized cache path generation
-            # If a specific cache_key is provided, use it instead of derived query_param_for_cache
             if cache_key:
-                # For section-specific caching (e.g., format section name for cache file)
-                # Convert any spaces in section names to underscores for cache path
                 formatted_cache_key = cache_key.lower().replace(' ', '_')
                 cache_path = cache_mgr.get_cache_path(source, tool_name_for_cache, formatted_cache_key)
                 self.logger.info(f"Using section-specific cache path with key '{formatted_cache_key}': {cache_path}")
@@ -407,18 +345,28 @@ class Researcher:
             if cached_data:
                 self.logger.info(f"Using cached data for {endpoint_pattern} (key: {source}_{tool_name_for_cache}_{cache_key or query_param_for_cache})")
                 if isinstance(cached_data, dict):
-                     cached_data.setdefault("source", source)
-                     return cached_data
+                    cached_data.setdefault("source", source)
+                    return cached_data
+                elif isinstance(cached_data, str):
+                    try:
+                        parsed_data = json.loads(cached_data)
+                        if isinstance(parsed_data, dict):
+                            parsed_data.setdefault("source", source)
+                            return parsed_data
+                        else:
+                            self.logger.warning(f"Cached data is a string but parses to {type(parsed_data)}, not a dict")
+                            return {"data": parsed_data, "source": source, "from_cache": True}
+                    except json.JSONDecodeError:
+                        self.logger.error(f"Failed to parse cached data as JSON for {endpoint_pattern}")
+                        return {"error": "Invalid cached data format", "source": source, "from_cache": True}
                 else:
-                     return {"data": cached_data, "source": source, "from_cache": True}
+                    return {"data": cached_data, "source": source, "from_cache": True}
 
-            # --- 4. Fetch from MCP (using formatted endpoint and minimal params) --- 
             self.logger.info(f"No cache hit for {endpoint_pattern}. Calling fetch_data with Endpoint='{formatted_endpoint_for_call}', Params={call_params}")
             
-            # Call fetch_data with the formatted endpoint string and minimal params with a timeout
             try:
                 self.logger.info(f"Setting 15-second timeout for fetch_data call to {formatted_endpoint_for_call}")
-                async with asyncio.timeout(15.0):  # 15-second timeout to prevent hanging
+                async with asyncio.timeout(15.0):
                     fetched_data = await self.mcp_client.fetch_data(formatted_endpoint_for_call, params=call_params)
                     self.logger.info(f"fetch_data completed successfully for {formatted_endpoint_for_call}")
             except asyncio.TimeoutError:
@@ -430,12 +378,10 @@ class Researcher:
                     "source": "timeout"
                 }
             
-            # Process the response
             processed_result = self._safe_handle_response(fetched_data, formatted_endpoint_for_call, query_param_for_cache)
             processed_result["source"] = source
 
-            # Save the processed result to cache
-            if "error" not in processed_result: # Only cache successful results
+            if "error" not in processed_result:
                 if cache_key:
                     formatted_cache_key = cache_key.lower().replace(' ', '_')
                     cache_mgr.save(processed_result, source, tool_name_for_cache, formatted_cache_key)
@@ -444,11 +390,10 @@ class Researcher:
                     cache_mgr.save(processed_result, source, tool_name_for_cache, query_param_for_cache)
                     self.logger.info(f"Saved fetched data to cache for {endpoint_pattern} (key: {source}_{tool_name_for_cache}_{query_param_for_cache})")
             else:
-                 self.logger.warning(f"Result for {endpoint_pattern} contained an error, not caching. Error: {processed_result.get('error')}")
+                self.logger.warning(f"Result for {endpoint_pattern} contained an error, not caching. Error: {processed_result.get('error')}")
             
             return processed_result
             
-        # --- 5. Handle Exceptions during Cache/Fetch --- 
         except Exception as e:
             self.logger.error(f"Error executing tool for endpoint pattern '{endpoint_pattern}' (Formatted Endpoint: {formatted_endpoint_for_call}, Params: {call_params}): {str(e)}", exc_info=True)
             return {
@@ -463,26 +408,28 @@ class Researcher:
 
     def _safe_handle_response(self, result, endpoint, project_param):
         """Process API responses to ensure they're properly formatted as dictionaries."""
-        self.logger.debug(f"Handling response for endpoint: {endpoint}")
+        self.logger.debug(f"Handling response for endpoint: {endpoint}, type: {type(result)}")
         if isinstance(result, dict):
             return result
         elif isinstance(result, str):
             try:
                 parsed = json.loads(result)
                 if isinstance(parsed, dict):
+                    self.logger.debug(f"Successfully parsed string response to dict for {endpoint}")
                     return parsed
                 return {
                     "data": parsed,
                     "endpoint": endpoint,
                     "query": project_param,
-                    "warning": "Response was parsed JSON but not a dictionary"
+                    "warning": f"Response was parsed JSON but not a dictionary, type: {type(parsed)}"
                 }
-            except:
+            except json.JSONDecodeError:
+                self.logger.error(f"Failed to parse string response as JSON for {endpoint}: {result[:200]}...")
                 return {
                     "text": result,
                     "endpoint": endpoint,
                     "query": project_param,
-                    "warning": "Unexpected string response"
+                    "warning": "Unexpected string response, failed to parse as JSON"
                 }
         elif isinstance(result, list):
             return {
@@ -561,14 +508,12 @@ class Researcher:
         """
         self.logger.info(f"Attempting fallback data retrieval for {project_name}")
         
-        # Generate fallback endpoints to try
         fallback_endpoints = [
             f"data://huggingface/tokenomics/{project_name.lower()}",
             f"data://tokenomics/distribution/{project_name.lower()}",
             f"research://tavily/tokenomics {project_name}"
         ]
         
-        # Try each fallback endpoint
         for endpoint in fallback_endpoints:
             try:
                 self.logger.info(f"Trying fallback endpoint: {endpoint}")
@@ -580,7 +525,6 @@ class Researcher:
             except Exception as e:
                 self.logger.warning(f"Fallback endpoint {endpoint} failed: {str(e)}")
         
-        # Return unavailable data response if all fallbacks fail
         self.logger.info(f"No fallback data available for {project_name}")
         return {
             "data_unavailable": True,
@@ -608,11 +552,8 @@ class Researcher:
                 query = section_queries[section_title]
                 self.logger.info(f"Executing Tavily search for section: {section_title}")
                 
-                # Use direct tool call to tavily research
                 try:
-                    # Create a cache key for this specific search - use section_title as the key
                     cache_manager = CacheManager(project_name=project_name)
-                    # The section_title serves as the cache key
                     cached_data = cache_manager.load("tavily", "research", section_title)
                     
                     if cached_data:
@@ -620,7 +561,6 @@ class Researcher:
                         section_data[section_title] = cached_data
                     else:
                         self.logger.info(f"Fetching fresh Tavily data for section '{section_title}'")
-                        # FIXED: Specify "tavily" as the server name
                         result = await self.mcp_client.call_tool("tavily", "research", query=query, project_name=project_name, cache_key=section_title)
                         section_data[section_title] = result
                         self.logger.info(f"Successfully retrieved Tavily data for section '{section_title}'")
@@ -631,7 +571,6 @@ class Researcher:
                 self.logger.error(f"Error processing section '{section_title}': {str(e)}")
                 section_data[section_title] = {"error": str(e), "results": []}
         
-        # Run all searches in parallel
         await asyncio.gather(*[search_section(title) for title in section_queries])
         
         return section_data
@@ -648,30 +587,43 @@ class Researcher:
         """
         self.logger.info(f"Extracting token distribution data for {project_name}")
         
-        # Use the CacheManager to check for cached data first
         cache_manager = CacheManager(project_name=project_name)
         cached_data = cache_manager.load("tokenomics", "distribution", project_name.lower())
         
-        # If we have valid cached data, return it
         if cached_data:
             self.logger.info(f"Using cached token distribution data for {project_name}")
-            return cached_data
+            if isinstance(cached_data, str):
+                try:
+                    cached_data = json.loads(cached_data)
+                    self.logger.debug(f"Parsed cached tokenomics data keys: {list(cached_data.keys())}")
+                except json.JSONDecodeError:
+                    self.logger.error(f"Failed to parse cached tokenomics data as JSON for {project_name}")
+                    cached_data = {"error": "Invalid cached data format"}
+            if isinstance(cached_data, dict) and "error" not in cached_data:
+                return cached_data
+            else:
+                self.logger.warning(f"Cached tokenomics data is invalid, fetching fresh data")
             
-        # Otherwise, fetch fresh data using the tokenomics tool
         self.logger.info(f"Fetching fresh token distribution data for {project_name}")
         
         try:
-            # Use named parameters for call_tool method
             tokenomics_data = await self.mcp_client.call_tool("tokenomics", "get_distribution", project=project_name, project_name=project_name)
             
-            # Cache the results if we got valid data
-            if tokenomics_data and "error" not in tokenomics_data:
-                self.logger.info(f"Successfully retrieved token distribution for {project_name}")
+            if isinstance(tokenomics_data, str):
+                try:
+                    tokenomics_data = json.loads(tokenomics_data)
+                    self.logger.debug(f"Parsed tokenomics response keys: {list(tokenomics_data.keys())}")
+                except json.JSONDecodeError:
+                    self.logger.error(f"Failed to parse tokenomics response as JSON for {project_name}")
+                    return {"error": "Invalid tokenomics response format"}
+            
+            if tokenomics_data and isinstance(tokenomics_data, dict) and "error" not in tokenomics_data:
+                self.logger.info(f"Successfully retrieved token distribution for {project_name}, keys: {list(tokenomics_data.keys())}")
                 cache_manager.save(tokenomics_data, "tokenomics", "distribution", project_name.lower())
                 return tokenomics_data
             else:
                 self.logger.warning(f"Failed to retrieve token distribution for {project_name}")
-                error_msg = tokenomics_data.get('error', 'Unknown error') if tokenomics_data else "Failed to retrieve token distribution data"
+                error_msg = tokenomics_data.get('error', 'Unknown error') if isinstance(tokenomics_data, dict) else "Failed to retrieve token distribution data"
                 return {"error": error_msg}
         except Exception as e:
             self.logger.error(f"Error extracting token distribution for {project_name}: {str(e)}", exc_info=True)
@@ -687,53 +639,40 @@ class Researcher:
         """
         self.logger.info(f"Starting batch processing of all API data for project: {project_name}")
         
-        # Initialize batch_data if it doesn't exist
         if not hasattr(self, 'data'):
             self.data = {}
         if "batch_data" not in self.data:
             self.data["batch_data"] = {}
             
-        # Collect all unique required sources from report_config
         all_required_sources = set()
-        
-        # Organize sections by required data sources
         sections_by_source = {}
         
-        # Extract sections and their required sources from report_config
         if "sections" in report_config:
             for section in report_config.get("sections", []):
                 section_title = section.get("title")
                 if not section_title:
                     continue
                 
-                # Format section name consistently
                 section_key = section_title.lower().replace(" ", "_")
-                
-                # Get data sources for this section
                 sources = section.get("data_sources", [])
                 if not sources:
                     continue
                 
-                # Add sources to all_required_sources
                 all_required_sources.update(sources)
                 
-                # Organize sections by source
                 for source in sources:
                     if source not in sections_by_source:
                         sections_by_source[source] = []
                     sections_by_source[source].append(section_key)
         
-        # Log the required sources
         self.logger.info(f"Found {len(all_required_sources)} unique required sources: {all_required_sources}")
         
-        # Always include a "web_research" task for documentation
         if "web_research" in all_required_sources:
             tasks = [self._batch_process_tavily(project_name, report_config)]
             self.logger.info(f"Including research processing for web_research")
         else:
             tasks = []
         
-        # Add required non-web_research data sources to processing tasks
         for source in all_required_sources:
             if source != "web_research":
                 self.logger.info(f"Processing source {source} for project {project_name}")
@@ -748,12 +687,10 @@ class Researcher:
                 else:
                     self.logger.warning(f"No specific handler for source {source}, will rely on RAG")
         
-        # Execute all batch processing tasks in parallel
         if tasks:
             self.logger.info(f"Executing {len(tasks)} batch processing tasks in parallel")
             results = await asyncio.gather(*tasks, return_exceptions=True)
             
-            # Process results
             for i, result in enumerate(results):
                 if isinstance(result, Exception):
                     self.logger.error(f"Error in batch processing task {i}: {str(result)}")
@@ -765,57 +702,155 @@ class Researcher:
         self.logger.info(f"Batch processing CoinGecko data for {project_name}")
         
         try:
-            # Use direct tool call instead of hardcoded endpoint
             cache_manager = CacheManager(project_name=project_name)
             cached_data = cache_manager.load("coingecko", "data", project_name.lower())
             
             if cached_data:
                 self.logger.info(f"Using cached CoinGecko data for {project_name}")
-                self.data["batch_data"]["coingecko"] = cached_data
-                return cached_data
+                if isinstance(cached_data, str):
+                    try:
+                        cached_data = json.loads(cached_data)
+                        self.logger.debug(f"Parsed cached coingecko data keys: {list(cached_data.keys())}")
+                    except json.JSONDecodeError:
+                        self.logger.error(f"Failed to parse cached coingecko data as JSON for {project_name}")
+                        cached_data = {"error": "Invalid cached data format"}
+                if isinstance(cached_data, dict) and "error" not in cached_data:
+                    self.data["batch_data"]["coingecko"] = cached_data
+                    self.logger.debug(f"Cached CoinGecko data keys: {list(cached_data.keys())}")
+                    return cached_data
+                else:
+                    self.logger.warning(f"Cached CoinGecko data is invalid, fetching fresh data")
             
             self.logger.info(f"Calling CoinGecko tool directly for {project_name}")
-            # Use named parameters for call_tool method
             coingecko_data = await self.mcp_client.call_tool("coingecko", "get_batch_data", coin=project_name, project_name=project_name)
             
-            if coingecko_data:
-                self.logger.info(f"Successfully retrieved CoinGecko data for {project_name}")
+            if isinstance(coingecko_data, str):
+                try:
+                    coingecko_data = json.loads(coingecko_data)
+                    self.logger.debug(f"Parsed coingecko response keys: {list(coingecko_data.keys())}")
+                except json.JSONDecodeError:
+                    self.logger.error(f"Failed to parse coingecko response as JSON for {project_name}")
+                    return {"error": "Invalid coingecko response format"}
+            
+            if coingecko_data and isinstance(coingecko_data, dict) and "error" not in coingecko_data:
+                self.logger.info(f"Successfully retrieved CoinGecko data for {project_name}, keys: {list(coingecko_data.keys())}")
                 cache_manager.save(coingecko_data, "coingecko", "data", project_name.lower())
                 self.data["batch_data"]["coingecko"] = coingecko_data
                 return coingecko_data
             else:
                 self.logger.warning(f"Failed to retrieve CoinGecko data for {project_name}")
                 return {"error": "Failed to retrieve CoinGecko data"}
-                
         except Exception as e:
             self.logger.error(f"Error in batch processing CoinGecko data for {project_name}: {str(e)}", exc_info=True)
             return {"error": str(e)}
     
     async def _batch_process_coinmarketcap(self, project_name: str) -> Dict[str, Any]:
-        """Batch process all CoinMarketCap API calls for a project."""
+        """Batch process all CoinMarketCap API calls for a project, including volume_history and ohlcv."""
         self.logger.info(f"Batch processing CoinMarketCap data for {project_name}")
         
         try:
-            # Use direct tool call instead of hardcoded endpoint
             cache_manager = CacheManager(project_name=project_name)
             cached_data = cache_manager.load("coinmarketcap", "data", project_name.lower())
             
             if cached_data:
                 self.logger.info(f"Using cached CoinMarketCap data for {project_name}")
-                self.data["batch_data"]["coinmarketcap"] = cached_data
-                return cached_data
+                if isinstance(cached_data, str):
+                    try:
+                        cached_data = json.loads(cached_data)
+                        self.logger.debug(f"Parsed cached CMC data keys: {list(cached_data.keys())}")
+                    except json.JSONDecodeError:
+                        self.logger.error(f"Failed to parse cached CMC data as JSON for {project_name}")
+                        cached_data = {"error": "Invalid cached data format"}
+                if isinstance(cached_data, dict) and "error" not in cached_data:
+                    self.logger.debug(f"Cached CMC data keys: {list(cached_data.keys())}")
+                    if "volume_history" in cached_data and isinstance(cached_data["volume_history"], list) and len(cached_data["volume_history"]) > 0:
+                        self.logger.debug(f"Cached volume_history sample: {cached_data['volume_history'][:5]}")
+                    if "ohlcv" in cached_data and isinstance(cached_data["ohlcv"], list) and len(cached_data["ohlcv"]) > 0:
+                        self.logger.debug(f"Cached ohlcv sample: {cached_data['ohlcv'][:5]}")
+                    self.data["batch_data"]["coinmarketcap"] = cached_data
+                    return cached_data
+                else:
+                    self.logger.warning(f"Cached CMC data is invalid, fetching fresh data")
             
-            self.logger.info(f"Calling CoinMarketCap tool directly for {project_name}")
-            # Use named parameters for call_tool method
-            cmc_data = await self.mcp_client.call_tool("coinmarketcap", "get_batch_data", coin=project_name, project_name=project_name)
+            self.logger.info(f"Calling CoinMarketCap tools for {project_name}")
+            cmc_data = {}
             
-            if cmc_data:
-                self.logger.info(f"Successfully retrieved CoinMarketCap data for {project_name}")
+            # Fetch overview data (current_price, price_change_percentage_24h, etc.)
+            overview_data = await self.mcp_client.call_tool(
+                "coinmarketcap", "get_batch_data", coin=project_name, project_name=project_name
+            )
+            if isinstance(overview_data, str):
+                try:
+                    overview_data = json.loads(overview_data)
+                    self.logger.debug(f"Parsed CMC overview response keys: {list(overview_data.keys())}")
+                except json.JSONDecodeError:
+                    self.logger.error(f"Failed to parse CMC overview response as JSON for {project_name}")
+                    overview_data = {"error": "Invalid overview response format"}
+            
+            if overview_data and isinstance(overview_data, dict) and "error" not in overview_data:
+                cmc_data.update(overview_data)
+                self.logger.info(f"Successfully retrieved CoinMarketCap overview data for {project_name}")
+            else:
+                self.logger.warning(f"Failed to retrieve CoinMarketCap overview data for {project_name}")
+                cmc_data["error"] = overview_data.get('error', 'Failed to retrieve overview data') if isinstance(overview_data, dict) else "Failed to retrieve overview data"
+            
+            # Fetch volume_history
+            volume_data = await self.mcp_client.call_tool(
+                "coinmarketcap", "get_volume_history", coin=project_name, project_name=project_name
+            )
+            if isinstance(volume_data, str):
+                try:
+                    volume_data = json.loads(volume_data)
+                    self.logger.debug(f"Parsed CMC volume_history response keys: {list(volume_data.keys())}")
+                except json.JSONDecodeError:
+                    self.logger.error(f"Failed to parse CMC volume_history response as JSON for {project_name}")
+                    volume_data = {"error": "Invalid volume_history response format"}
+            
+            if volume_data and isinstance(volume_data, dict) and "error" not in volume_data:
+                volume_history = volume_data.get("volume_history", [])
+                if isinstance(volume_history, list) and len(volume_history) > 0:
+                    cmc_data["volume_history"] = volume_history
+                    self.logger.info(f"Successfully retrieved CoinMarketCap volume_history for {project_name}")
+                    self.logger.debug(f"Volume history sample: {volume_history[:5]}")
+                else:
+                    self.logger.warning(f"CoinMarketCap volume_history is empty or invalid for {project_name}")
+                    cmc_data["volume_history"] = []
+            else:
+                self.logger.warning(f"Failed to retrieve CoinMarketCap volume_history for {project_name}")
+                cmc_data["volume_history"] = []
+            
+            # Fetch ohlcv data
+            ohlcv_data = await self.mcp_client.call_tool(
+                "coinmarketcap", "get_ohlcv", coin=project_name, project_name=project_name
+            )
+            if isinstance(ohlcv_data, str):
+                try:
+                    ohlcv_data = json.loads(ohlcv_data)
+                    self.logger.debug(f"Parsed CMC ohlcv response keys: {list(ohlcv_data.keys())}")
+                except json.JSONDecodeError:
+                    self.logger.error(f"Failed to parse CMC ohlcv response as JSON for {project_name}")
+                    ohlcv_data = {"error": "Invalid ohlcv response format"}
+            
+            if ohlcv_data and isinstance(ohlcv_data, dict) and "error" not in ohlcv_data:
+                ohlcv = ohlcv_data.get("ohlcv", [])
+                if isinstance(ohlcv, list) and len(ohlcv) > 0:
+                    cmc_data["ohlcv"] = ohlcv
+                    self.logger.info(f"Successfully retrieved CoinMarketCap ohlcv for {project_name}")
+                    self.logger.debug(f"OHLCV sample: {ohlcv[:5]}")
+                else:
+                    self.logger.warning(f"CoinMarketCap ohlcv is empty or invalid for {project_name}")
+                    cmc_data["ohlcv"] = []
+            else:
+                self.logger.warning(f"Failed to retrieve CoinMarketCap ohlcv for {project_name}")
+                cmc_data["ohlcv"] = []
+            
+            if cmc_data and ("error" not in cmc_data or len(cmc_data) > 1):
+                self.logger.info(f"Successfully retrieved CoinMarketCap data for {project_name}, keys: {list(cmc_data.keys())}")
                 cache_manager.save(cmc_data, "coinmarketcap", "data", project_name.lower())
                 self.data["batch_data"]["coinmarketcap"] = cmc_data
                 return cmc_data
             else:
-                self.logger.warning(f"Failed to retrieve CoinMarketCap data for {project_name}")
+                self.logger.warning(f"Failed to retrieve any valid CoinMarketCap data for {project_name}")
                 return {"error": "Failed to retrieve CoinMarketCap data"}
         except Exception as e:
             self.logger.error(f"Error in batch processing CoinMarketCap data for {project_name}: {str(e)}", exc_info=True)
@@ -826,28 +861,79 @@ class Researcher:
         self.logger.info(f"Batch processing DeFiLlama data for {project_name}")
         
         try:
-            # Use direct tool call instead of hardcoded endpoint
             cache_manager = CacheManager(project_name=project_name)
             cached_data = cache_manager.load("defillama", "tvl", project_name.lower())
             
             if cached_data:
                 self.logger.info(f"Using cached DeFiLlama data for {project_name}")
-                self.data["batch_data"]["defillama"] = cached_data
-                return cached_data
+                if isinstance(cached_data, str):
+                    try:
+                        cached_data = json.loads(cached_data)
+                        self.logger.debug(f"Parsed cached DeFiLlama data keys: {list(cached_data.keys())}")
+                    except json.JSONDecodeError:
+                        self.logger.error(f"Failed to parse cached DeFiLlama data as JSON for {project_name}")
+                        cached_data = {"error": "Invalid cached data format"}
+                if isinstance(cached_data, dict) and "error" not in cached_data:
+                    self.logger.debug(f"Cached DeFiLlama data keys: {list(cached_data.keys())}")
+                    tvl_history = cached_data.get("tvl_history", [])
+                    if isinstance(tvl_history, list) and len(tvl_history) > 0:
+                        self.logger.debug(f"Cached tvl_history sample: {tvl_history[:5]}")
+                        # Validate format
+                        valid_format = True
+                        for item in tvl_history[:5]:
+                            if isinstance(item, (list, tuple)) and len(item) >= 2:
+                                try:
+                                    _, value = item[:2]
+                                    float(value)
+                                except (ValueError, TypeError):
+                                    valid_format = False
+                                    break
+                            elif isinstance(item, dict) and any(key in item for key in ["tvl", "value"]) and any(key in item for key in ["date", "timestamp"]):
+                                try:
+                                    value = item.get("tvl", item.get("value"))
+                                    float(value)
+                                except (ValueError, TypeError):
+                                    valid_format = False
+                                    break
+                            else:
+                                valid_format = False
+                                break
+                        if valid_format:
+                            self.data["batch_data"]["defillama"] = cached_data
+                            return cached_data
+                        else:
+                            self.logger.warning(f"Cached DeFiLlama tvl_history has invalid format, fetching fresh data")
+                    else:
+                        self.logger.warning(f"Cached DeFiLlama tvl_history is empty or invalid, fetching fresh data")
+                else:
+                    self.logger.warning(f"Cached DeFiLlama data is invalid, fetching fresh data")
             
             self.logger.info(f"Calling DeFiLlama tool directly for {project_name}")
-            # Use named parameters for call_tool method
             defillama_data = await self.mcp_client.call_tool("defillama", "get_protocol_data", protocol=project_name, project_name=project_name)
             
-            if defillama_data:
-                self.logger.info(f"Successfully retrieved DeFiLlama data for {project_name}")
-                cache_manager.save(defillama_data, "defillama", "tvl", project_name.lower())
-                self.data["batch_data"]["defillama"] = defillama_data
-                return defillama_data
+            if isinstance(defillama_data, str):
+                try:
+                    defillama_data = json.loads(defillama_data)
+                    self.logger.debug(f"Parsed DeFiLlama response keys: {list(defillama_data.keys())}")
+                except json.JSONDecodeError:
+                    self.logger.error(f"Failed to parse DeFiLlama response as JSON for {project_name}")
+                    return {"error": "Invalid DeFiLlama response format"}
+            
+            if defillama_data and isinstance(defillama_data, dict) and "error" not in defillama_data:
+                self.logger.info(f"Successfully retrieved DeFiLlama data for {project_name}, keys: {list(defillama_data.keys())}")
+                tvl_history = defillama_data.get("tvl_history", [])
+                if isinstance(tvl_history, list) and len(tvl_history) > 0:
+                    self.logger.debug(f"Fresh tvl_history sample: {tvl_history[:5]}")
+                    cache_manager.save(defillama_data, "defillama", "tvl", project_name.lower())
+                    self.data["batch_data"]["defillama"] = defillama_data
+                    return defillama_data
+                else:
+                    self.logger.warning(f"DeFiLlama tvl_history is empty or invalid for {project_name}")
+                    return {"error": "DeFiLlama tvl_history is empty or invalid"}
             else:
                 self.logger.warning(f"Failed to retrieve DeFiLlama data for {project_name}")
-                return {"error": "Failed to retrieve DeFiLlama data"}
-                
+                error_msg = defillama_data.get('error', 'Failed to retrieve DeFiLlama data') if isinstance(defillama_data, dict) else "Failed to retrieve DeFiLlama data"
+                return {"error": error_msg}
         except Exception as e:
             self.logger.error(f"Error in batch processing DeFiLlama data for {project_name}: {str(e)}", exc_info=True)
             return {"error": str(e)}
@@ -857,42 +943,51 @@ class Researcher:
         self.logger.info(f"Batch processing Tokenomics data for {project_name}")
         
         try:
-            # Use direct tool call instead of hardcoded endpoint
             cache_manager = CacheManager(project_name=project_name)
             cached_data = cache_manager.load("tokenomics", "distribution", project_name.lower())
             
             if cached_data:
                 self.logger.info(f"Using cached Tokenomics data for {project_name}")
-                self.data["batch_data"]["tokenomics"] = cached_data
-                return cached_data
+                if isinstance(cached_data, str):
+                    try:
+                        cached_data = json.loads(cached_data)
+                        self.logger.debug(f"Parsed cached Tokenomics data keys: {list(cached_data.keys())}")
+                    except json.JSONDecodeError:
+                        self.logger.error(f"Failed to parse cached Tokenomics data as JSON for {project_name}")
+                        cached_data = {"error": "Invalid cached data format"}
+                if isinstance(cached_data, dict) and "error" not in cached_data:
+                    self.data["batch_data"]["tokenomics"] = cached_data
+                    self.logger.debug(f"Cached Tokenomics data keys: {list(cached_data.keys())}")
+                    return cached_data
+                else:
+                    self.logger.warning(f"Cached Tokenomics data is invalid, fetching fresh data")
             
             self.logger.info(f"Calling Tokenomics tool directly for {project_name}")
-            # Use named parameters for call_tool method
             tokenomics_data = await self.mcp_client.call_tool("tokenomics", "get_distribution", project=project_name, project_name=project_name)
             
-            if tokenomics_data:
-                self.logger.info(f"Successfully retrieved Tokenomics data for {project_name}")
+            if isinstance(tokenomics_data, str):
+                try:
+                    tokenomics_data = json.loads(tokenomics_data)
+                    self.logger.debug(f"Parsed Tokenomics response keys: {list(tokenomics_data.keys())}")
+                except json.JSONDecodeError:
+                    self.logger.error(f"Failed to parse Tokenomics response as JSON for {project_name}")
+                    return {"error": "Invalid Tokenomics response format"}
+            
+            if tokenomics_data and isinstance(tokenomics_data, dict) and "error" not in tokenomics_data:
+                self.logger.info(f"Successfully retrieved Tokenomics data for {project_name}, keys: {list(tokenomics_data.keys())}")
                 cache_manager.save(tokenomics_data, "tokenomics", "distribution", project_name.lower())
                 self.data["batch_data"]["tokenomics"] = tokenomics_data
                 return tokenomics_data
             else:
                 self.logger.warning(f"Failed to retrieve Tokenomics data for {project_name}")
-                return {"error": "Failed to retrieve Tokenomics data"}
-                
+                error_msg = tokenomics_data.get('error', 'Failed to retrieve Tokenomics data') if isinstance(tokenomics_data, dict) else "Failed to retrieve Tokenomics data"
+                return {"error": error_msg}
         except Exception as e:
             self.logger.error(f"Error in batch processing Tokenomics data for {project_name}: {str(e)}", exc_info=True)
             return {"error": str(e)}
 
     async def _batch_process_tavily(self, project_name: str, report_config: Dict = None) -> Dict[str, Any]:
-        """Use RAG to process research needs for each section rather than direct Tavily calls.
-        
-        Args:
-            project_name: Name of the project to research
-            report_config: Optional report configuration with sections
-            
-        Returns:
-            Dict containing research results organized by section
-        """
+        """Use RAG to process research needs for each section rather than direct Tavily calls."""
         self.logger.info(f"Processing Tavily research for {project_name} using section query_templates")
         
         try:
@@ -942,15 +1037,12 @@ class Researcher:
                     details = section_details_map[s_key]
                     template = details["query_template"]
                     try:
-                        # Format the query_template, primarily expecting {project_name}
-                        # Other placeholders could be added to .format() if templates use them
                         query_for_tavily = template.format(project_name=project_name)
                     except KeyError as e:
                         self.logger.warning(f"Query template for section '{details['title']}' (key: {s_key}) has a missing key: {e}. Using default query format.")
                         query_for_tavily = f"{project_name} cryptocurrency {details['title']}"
                     section_tavily_queries[s_key] = query_for_tavily
                 else:
-                    # Fallback for standard_sections_fallback or if details somehow missing
                     formatted_name = s_key.replace('_', ' ')
                     section_tavily_queries[s_key] = f"{project_name} cryptocurrency {formatted_name}"
             
@@ -960,7 +1052,7 @@ class Researcher:
                 try:
                     self.logger.info(f"Tavily processing section_key '{current_section_key}' with search query: '{tavily_search_query_content}'")
                     
-                    cache_manager = CacheManager(project_name=project_name, logger=self.logger) # Ensure logger is passed
+                    cache_manager = CacheManager(project_name=project_name, logger=self.logger)
                     cached_data = cache_manager.load("tavily", "research", current_section_key) 
                     
                     if cached_data:
@@ -973,10 +1065,6 @@ class Researcher:
                     else:
                         self.logger.info(f"No Tavily cache for section_key '{current_section_key}'. Fetching. Target server cache key: {current_section_key}")
                         
-                        # We've determined this is for Tavily research.
-                        # Instead of _invoke_tool_for_endpoint, directly call the MCP tool on the Tavily server.
-                        # This ensures the cache_key is correctly passed and used by the server.
-                        
                         research_data_found = None
                         try:
                             self.logger.info(f"Calling MCP client.call_tool for tavily.research: query='{tavily_search_query_content}', cache_key='{current_section_key}'")
@@ -988,8 +1076,7 @@ class Researcher:
                                 cache_key=current_section_key 
                             )
 
-                            # Enhanced Debugging and Type Handling for fetched_result
-                            self.logger.info(f"MCP call_tool raw fetched_result for section '{current_section_key}': TYPE={type(fetched_result)}, CONTENT='{str(fetched_result)[:500]}...")
+                            self.logger.info(f"MCP call_tool raw fetched_result for section '{current_section_key}': TYPE={type(fetched_result)}, CONTENT='{str(fetched_result)[:500]}...'")
 
                             if isinstance(fetched_result, str):
                                 self.logger.warning(f"MCP call_tool returned a STRING for section '{current_section_key}'. Attempting to parse as JSON.")
@@ -1005,46 +1092,40 @@ class Researcher:
                                 except json.JSONDecodeError as jde:
                                     error_detail = f"JSONDecodeError for '{current_section_key}': {str(jde)}. Original: '{fetched_result[:200]}...'"
                                     self.logger.error(error_detail)
-                                    fetched_result = {"error": error_detail, "data_unavailable": True, "original_response_snippet": fetched_result[:200]}
+                                    fetched_result = {"error": error_detail, "data_unavailable": True, "original_response_snippet": f"{fetched_result[:200]}"}
                                 except Exception as e_parse:
                                     error_detail = f"Unexpected error parsing str response for '{current_section_key}': {str(e_parse)}. Original: '{fetched_result[:200]}...'"
                                     self.logger.error(error_detail)
-                                    fetched_result = {"error": error_detail, "data_unavailable": True, "original_response_snippet": fetched_result[:200]}
+                                    fetched_result = {"error": error_detail, "data_unavailable": True, "original_response_snippet": f"{fetched_result[:200]}"}
                             
-                            # Check if fetched_result is now a dict and proceed
                             if fetched_result and isinstance(fetched_result, dict) and not fetched_result.get("error") and (fetched_result.get("results") or fetched_result.get("data")):
-                                # Ensure 'results' key exists if 'data' key is primary and vice-versa, or just ensure one is present
                                 if "data" in fetched_result and "results" not in fetched_result:
-                                     # If 'data' exists and might contain the list of results, or is the result itself
-                                     if isinstance(fetched_result["data"], list):
-                                         fetched_result["results"] = fetched_result["data"]
-                                     elif fetched_result["data"] is not None: # If data is a single item, wrap it
-                                         fetched_result["results"] = [fetched_result["data"]]
-                                     else:
-                                         fetched_result["results"] = [] # Ensure results key exists
+                                    if isinstance(fetched_result["data"], list):
+                                        fetched_result["results"] = fetched_result["data"]
+                                    elif fetched_result["data"] is not None:
+                                        fetched_result["results"] = [fetched_result["data"]]
+                                    else:
+                                        fetched_result["results"] = []
                                 elif "results" in fetched_result and "data" not in fetched_result and fetched_result["results"] is not None:
-                                    pass # results key is fine
+                                    pass
                                 elif "results" not in fetched_result and "data" not in fetched_result:
                                     self.logger.warning(f"Fetched result for '{current_section_key}' has neither 'data' nor 'results' key. Setting empty results.")
                                     fetched_result["results"] = []
 
                                 research_data_found = fetched_result
-                                self.logger.info(f"Successfully processed data via mcp.call_tool for Tavily section_key '{current_section_key}'. Server should have cached with key '{current_section_key}'.")
+                                self.logger.info(f"Successfully processed data via mcp.call_tool for Tavily section_key '{current_section_key}'.")
                             else:
-                                # This block will now catch cases where fetched_result is not a dict, or is a dict with an error, 
-                                # or a dict without 'results'/'data'
                                 if isinstance(fetched_result, dict):
                                     err_msg = fetched_result.get('error', 'No usable data fields (results/data) in dict')
-                                else: # Should not happen if string parsing creates a dict error
+                                else:
                                     err_msg = f'Non-dict result of type {type(fetched_result)} after processing'
                                 self.logger.warning(f"mcp.call_tool for tavily.research on section '{current_section_key}' yielded no usable data or an error: {err_msg}")
                                 if not (isinstance(fetched_result, dict) and fetched_result.get("error")):
-                                    # If not already an error dict, make it one.
                                     fetched_result = {"error": err_msg, "data_unavailable": True, "original_result": str(fetched_result)[:200]}
 
                         except Exception as e_call_tool:
                             self.logger.error(f"Exception during mcp_client.call_tool for tavily.research on section '{current_section_key}': {str(e_call_tool)}", exc_info=True)
-                            research_data_found = None # Ensure it's None on exception
+                            research_data_found = None
 
                         if research_data_found:
                             all_section_results[current_section_key] = research_data_found
@@ -1063,16 +1144,15 @@ class Researcher:
                 if os.path.exists(cache_file_path):
                     self.logger.info(f"✅ Verified Tavily cache for '{key_check}' exists: {cache_file_path}")
                 else:
-                    self.logger.warning(f"❌ Tavily cache file missing for '{key_check}': {cache_file_path}. (May be ok if data was unavailable/error).")
+                    self.logger.warning(f"❌ Tavily cache file missing for '{key_check}': {cache_file_path}.")
             
             return all_section_results
                 
         except Exception as e:
             self.logger.error(f"General error in _batch_process_tavily for {project_name}: {str(e)}", exc_info=True)
             error_payload = {"error": str(e), "data_unavailable": True}
-            # Attempt to store a summary error if possible
             if hasattr(self, 'data') and "batch_data" in self.data and "tavily" in self.data["batch_data"]:
-                 self.data["batch_data"]["tavily"]["_overall_error"] = error_payload 
+                self.data["batch_data"]["tavily"]["_overall_error"] = error_payload 
             return error_payload
 
 async def researcher(state, llm=None, logger=None, config=None):
@@ -1098,7 +1178,6 @@ def researcher_sync(state: Dict, llm: Optional[Any] = None, logger: Optional[log
         researcher_instance = Researcher(logger=logger)
         logger.info("Researcher instance created")
         logger.info("Running synchronous execution")
-        # Use asyncio.run for sync context (fallback)
         result = asyncio.run(researcher_instance.run(state))
         logger.info("Sync execution completed")
         return result

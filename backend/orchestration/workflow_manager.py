@@ -40,7 +40,7 @@ class WorkflowManager:
     def __init__(
         self,
         logger: logging.Logger,
-        config_path: str = "backend/config/report_config.json",
+        config_path: str = "backend/config/report_structure.json",
         progress_tracker=None,
         error_reporter=None
     ):
@@ -63,7 +63,7 @@ class WorkflowManager:
             with open(self.config_path, 'r') as f:
                 config = json.load(f)
                 if "sections" not in config or not isinstance(config["sections"], list):
-                    self.logger.error("Invalid report_config.json: 'sections' must be a list")
+                    self.logger.error("Invalid report_structure.json: 'sections' must be a list")
                     return {}
                 self.logger.info(f"Loaded report configuration with {len(config.get('sections', []))} sections")
                 return config

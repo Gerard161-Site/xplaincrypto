@@ -14,7 +14,7 @@ XplainCrypto/
 │   │   └── publisher.py           # Report publishing agent
 │   ├── config/                    # Configuration files
 │   │   ├── app_config.json        # Main application configuration
-│   │   ├── report_config.json     # Customizable report configuration
+│   │   ├── report_structure.json     # Customizable report configuration
 │   │   ├── style_config.json      # Visual styling configuration
 │   │   └── error_categories.json  # Error categorization configuration
 │   ├── core/                      # Core application components
@@ -105,7 +105,7 @@ The application uses a layered configuration approach:
 
 Configuration files:
 - `app_config.json`: Main application settings
-- `report_config.json`: Report structure and content settings
+- `report_structure.json`: Report structure and content settings
 - `style_config.json`: Visual styling configuration
 - `error_categories.json`: Error categories and handling strategies
 

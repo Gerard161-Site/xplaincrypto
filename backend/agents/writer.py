@@ -466,6 +466,15 @@ class WriterAgent:
         
         self.logger.info(f"Generating content for section: {section_title} (target: {min_words}-{max_words} words)")
         
+        # Check for cached content first
+        normalized_section_title = section_title.lower().replace(' ', '_')
+        cache_mgr = CacheManager(project_name=project_name, logger=self.logger)
+        cached_content = cache_mgr.load("writer", "section", normalized_section_title)
+        
+        if cached_content and "content" in cached_content:
+            self.logger.info(f"Using cached content for section: {section_title}")
+            return cached_content["content"]
+        
         # Check for existing research summary
         if research_summary and len(research_summary.strip()) > 0:
             self.logger.info(f"Found existing research summary for {section_title}: {len(research_summary.split())} words")
@@ -512,13 +521,24 @@ class WriterAgent:
         # For very limited data, use more flexible generation approach
         if context_items < 3 and not is_problem_section:
             self.logger.info(f"Limited data for section '{section_title}', using lightweight approach")
-            return await self._generate_limited_content(
+            content = await self._generate_limited_content(
                 project_name=project_name,
                 section_title=section_title,
                 description=description,
                 relevant_data=context,
                 min_words=min_words
             )
+            
+            # Cache the generated content
+            cache_mgr.save(
+                {"content": content, "section_title": section_title, "word_count": len(content.split())},
+                "writer",
+                "section",
+                normalized_section_title,
+                ttl_hours=24  # 24-hour TTL for writer content
+            )
+            
+            return content
         
         # Use gpt-3.5-turbo for all sections to improve performance
         section_llm = ChatOpenAI(
@@ -648,6 +668,15 @@ class WriterAgent:
                     if final_word_count > word_count:
                         content = final_content
                         word_count = final_word_count
+            
+            # Cache the generated content
+            cache_mgr.save(
+                {"content": content, "section_title": section_title, "word_count": word_count},
+                "writer",
+                "section",
+                normalized_section_title,
+                ttl_hours=24  # 24-hour TTL for writer content
+            )
             
             return content
             
@@ -1424,7 +1453,7 @@ YOUR RESPONSE MUST CONTAIN AT LEAST {min_words} WORDS of substantive content. Qu
                 retry_content = retry_response.content.strip()
                 retry_word_count = len(retry_content.split())
                 
-                self.logger.info(f"Regenerated content for {section_title}: {retry_word_count} words (previous: {word_count})")
+                self.logger(f"Regenerated content for {section_title}: {retry_word_count} words (previous: {word_count})")
                 
                 # Use the better content
                 if retry_word_count > word_count:
@@ -1497,6 +1526,9 @@ async def writer(state: Dict[str, Any], llm: ChatOpenAI, logger: logging.Logger,
         # Create a draft report structure
         draft = f"# {project_name} Research Report\n\n"
         
+        # Initialize CacheManager for writer content
+        cache_manager = CacheManager(project_name=project_name, logger=logger)
+        
         # Process each section
         for section in sections:
             section_title = section.get("title", "")
@@ -1543,6 +1575,24 @@ async def writer(state: Dict[str, Any], llm: ChatOpenAI, logger: logging.Logger,
             if section_data and "content" in section_data:
                 logger.info(f"Using existing content for section: {section_title}")
                 draft += section_data["content"] + "\n\n"
+                continue
+            
+            # Check for cached content first
+            normalized_section_title = section_title.lower().replace(' ', '_')
+            cached_content = cache_manager.load("writer", "section", normalized_section_title)
+            
+            if cached_content and "content" in cached_content:
+                logger.info(f"Using cached content for section: {section_title}")
+                section_content = cached_content["content"]
+                draft += section_content + "\n\n"
+                
+                # Update section data in state
+                if section_data:
+                    section_data["content"] = section_content
+                    state = state_manager.update_section_data(state, section_title, section_data)
+                else:
+                    state = state_manager.update_section_data(state, section_title, {"content": section_content})
+                    
                 continue
             
             # Create focused subset of data that's relevant to this section
@@ -1645,6 +1695,15 @@ YOUR RESPONSE MUST CONTAIN AT LEAST {min_words} WORDS of substantive content. Qu
                 
                 # Add to draft
                 draft += section_content + "\n\n"
+                
+                # Cache the section content
+                cache_manager.save(
+                    {"content": section_content, "section_title": section_title, "word_count": len(section_content.split())},
+                    "writer", 
+                    "section",
+                    normalized_section_title,
+                    ttl_hours=24  # 24-hour TTL for writer content
+                )
                 
                 # Update section data in state using StateManager
                 if section_data:

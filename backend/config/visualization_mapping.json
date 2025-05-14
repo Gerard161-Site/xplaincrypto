@@ -4,7 +4,7 @@
       "type": "line_chart",
       "title": "Price Trend",
       "description": "Historical price trend of the token",
-      "data_source": "coingecko",
+      "data_source": "coinmarketcap",
       "data_field": "price_history",
       "output_filename": "price_trend_chart",
       "x_field": "date",
@@ -12,7 +12,11 @@
       "line_name": "Price",
       "x_axis_title": "Date",
       "y_axis_title": "Price (USD)",
-      "source": "CoinGecko"
+      "source": "CoinMarketCap",
+      "section": "Market Analysis",
+      "fallback_options": {
+        "message": "Data Unavailable"
+      }
     },
     "volume_chart": {
       "type": "line_chart",
@@ -26,10 +30,14 @@
       "line_name": "Volume",
       "x_axis_title": "Date",
       "y_axis_title": "Volume (USD)",
-      "source": "CoinMarketCap"
+      "source": "CoinMarketCap",
+      "section": "Market Analysis",
+      "fallback_options": {
+        "message": "Data Unavailable"
+      }
     },
     "tvl_chart": {
-      "type": "line_chart",
+      "type": "tvl_chart",
       "title": "Total Value Locked",
       "description": "Historical TVL (Total Value Locked) for the protocol",
       "data_source": "defillama",
@@ -40,10 +48,14 @@
       "line_name": "TVL",
       "x_axis_title": "Date",
       "y_axis_title": "TVL (USD)",
-      "source": "DeFiLlama"
+      "source": "DeFiLlama",
+      "section": "Liquidity and Adoption Metrics",
+      "fallback_options": {
+        "message": "Data Unavailable"
+      }
     },
     "tvl_phases_chart": {
-      "type": "line_chart",
+      "type": "tvl_phases_chart",
       "title": "TVL Growth Phases",
       "description": "TVL growth with key market phases highlighted",
       "data_source": "defillama",
@@ -54,10 +66,14 @@
       "line_name": "TVL",
       "x_axis_title": "Date",
       "y_axis_title": "TVL (USD)",
-      "source": "DeFiLlama"
+      "source": "DeFiLlama",
+      "section": "Liquidity and Adoption Metrics",
+      "fallback_options": {
+        "message": "Data Unavailable"
+      }
     },
     "tvl_milestone_chart": {
-      "type": "line_chart",
+      "type": "tvl_milestone_chart",
       "title": "TVL Milestones",
       "description": "TVL growth with key protocol milestones",
       "data_source": "defillama",
@@ -68,10 +84,14 @@
       "line_name": "TVL",
       "x_axis_title": "Date",
       "y_axis_title": "TVL (USD)",
-      "source": "DeFiLlama"
+      "source": "DeFiLlama",
+      "section": "Liquidity and Adoption Metrics",
+      "fallback_options": {
+        "message": "Data Unavailable"
+      }
     },
     "market_cap_chart": {
-      "type": "line_chart",
+      "type": "market_cap_chart",
       "title": "Market Capitalization",
       "description": "Historical market capitalization of the token",
       "data_source": "coinmarketcap",
@@ -82,28 +102,40 @@
       "line_name": "Market Cap",
       "x_axis_title": "Date",
       "y_axis_title": "Market Cap (USD)",
-      "source": "CoinMarketCap"
+      "source": "CoinMarketCap",
+      "section": "Market Analysis",
+      "fallback_options": {
+        "message": "Data Unavailable"
+      }
     },
     "token_distribution_chart": {
-      "type": "pie_chart",
+      "type": "token_distribution_chart",
       "title": "Token Distribution",
       "description": "Token allocation across different stakeholders",
       "data_source": "tokenomics",
       "data_field": "token_distribution",
       "output_filename": "token_distribution_chart",
-      "source": "Project Documentation"
+      "source": "Project Documentation",
+      "section": "Tokenomics and Distribution",
+      "fallback_options": {
+        "message": "Data Unavailable"
+      }
     },
     "chain_distribution_chart": {
-      "type": "pie_chart",
+      "type": "chain_distribution_chart",
       "title": "Chain Distribution",
       "description": "TVL distribution across different chains",
       "data_source": "defillama",
       "data_field": "chains",
       "output_filename": "chain_distribution_chart",
-      "source": "DeFiLlama"
+      "source": "DeFiLlama",
+      "section": "Tokenomics and Distribution",
+      "fallback_options": {
+        "message": "Data Unavailable"
+      }
     },
     "supply_schedule_chart": {
-      "type": "line_chart",
+      "type": "supply_schedule_chart",
       "title": "Token Supply Schedule",
       "description": "Projected token supply schedule over time",
       "data_source": "tokenomics",
@@ -114,19 +146,27 @@
       "line_name": "Circulating Supply",
       "x_axis_title": "Date",
       "y_axis_title": "Token Supply",
-      "source": "Project Documentation"
+      "source": "Project Documentation",
+      "section": "Tokenomics and Distribution",
+      "fallback_options": {
+        "message": "Data Unavailable"
+      }
     },
     "key_metrics_table": {
-      "type": "table",
+      "type": "key_metrics_table",
       "title": "Key Metrics",
       "description": "Important metrics for the project",
       "data_source": "coinmarketcap",
-      "data_field": "metrics",
+      "data_field": "",
       "output_filename": "key_metrics_table",
-      "source": "CoinMarketCap"
+      "source": "CoinMarketCap",
+      "section": "Executive Summary",
+      "fallback_options": {
+        "message": "Data Unavailable"
+      }
     },
     "revenue_chart": {
-      "type": "line_chart",
+      "type": "revenue_chart",
       "title": "Protocol Revenue",
       "description": "Historical revenue of the protocol",
       "data_source": "defillama",
@@ -137,10 +177,14 @@
       "line_name": "Revenue",
       "x_axis_title": "Date",
       "y_axis_title": "Revenue (USD)",
-      "source": "DeFiLlama"
+      "source": "DeFiLlama",
+      "section": "Liquidity and Adoption Metrics",
+      "fallback_options": {
+        "message": "Data Unavailable"
+      }
     },
     "fee_comparison_chart": {
-      "type": "bar_chart",
+      "type": "fee_comparison_chart",
       "title": "Fee Comparison",
       "description": "Comparison of fees across different protocols",
       "data_source": "research",
@@ -150,49 +194,36 @@
       "y_field": "fee",
       "x_axis_title": "Protocol",
       "y_axis_title": "Fee (%)",
-      "source": "Various Sources"
+      "source": "Various Sources",
+      "section": "Market Analysis",
+      "fallback_options": {
+        "message": "Data Unavailable"
+      }
     },
     "protocol_timeline": {
-      "type": "table",
+      "type": "protocol_timeline",
       "title": "Protocol Timeline",
       "description": "Key events and milestones in the protocol's history",
       "data_source": "research",
       "data_field": "timeline",
       "output_filename": "protocol_timeline",
-      "source": "Various Sources"
+      "source": "Various Sources",
+      "section": "Introduction",
+      "fallback_options": {
+        "message": "Data Unavailable"
+      }
     },
     "competitors_table": {
-      "type": "table",
+      "type": "competitors_table",
       "title": "Competitor Analysis",
       "description": "Comparison with competing protocols",
       "data_source": "research",
       "data_field": "competitors",
       "output_filename": "competitors_table",
-      "source": "Various Sources"
-    }
-  },
-  "fallback_options": {
-    "token_distribution_chart": {
-      "sample_data": {
-        "Team": 20,
-        "Foundation": 15,
-        "Community": 25,
-        "Investors": 20,
-        "Ecosystem": 20
-      }
-    },
-    "tvl_chart": {
-      "sample_data": {
-        "timestamps": ["2022-01", "2022-02", "2022-03", "2022-04", "2022-05", "2022-06"],
-        "values": [100000, 250000, 400000, 350000, 500000, 750000],
-        "label": "TVL"
-      }
-    },
-    "price_trend_chart": {
-      "sample_data": {
-        "timestamps": ["2022-01", "2022-02", "2022-03", "2022-04", "2022-05", "2022-06"],
-        "values": [1.2, 1.5, 2.1, 1.8, 2.3, 2.7],
-        "label": "Price"
+      "source": "Various Sources",
+      "section": "Market Analysis",
+      "fallback_options": {
+        "message": "Data Unavailable"
       }
     }
   },
@@ -224,4 +255,4 @@
       "left": 50
     }
   }
-} 
+}

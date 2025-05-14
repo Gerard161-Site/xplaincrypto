@@ -21,11 +21,10 @@
             "required": true,
             "min_words": 250,
             "max_words": 350,
-            
             "prompt": "Introduce the project's core value proposition, background, and strategic goals. Provide context on its founding, mission, and role in the cryptocurrency market, without delving into detailed metrics or analysis covered in later sections.",
             "fallback_template": "Data unavailable for {section_title}.",
             "fallback_fields": ["current_price", "market_cap"],
-            "data_sources": ["web_research", "coinmarketcap"],
+            "data_sources": ["web_research", "coinmarketcap", "tokenomics"],
             "visualizations": ["key_metrics_table", "whitepaper_link"]
         },
         {
@@ -37,7 +36,7 @@
             "prompt": "Analyze the token's economic model, supply metrics, and distribution strategy...",
             "fallback_template": "Data unavailable for {section_title}.",
             "fallback_fields": ["total_supply", "circulating_supply", "token_allocation"],
-            "data_sources": ["web_research","coinmarketcap", "tokenomics"],
+            "data_sources": ["web_research", "coinmarketcap", "tokenomics", "defillama"],
             "visualizations": ["tokenomics_pie_chart", "chain_distribution_chart"]
         },
         {
@@ -50,7 +49,7 @@
             "fallback_template": "Data unavailable for {section_title}.",
             "fallback_fields": ["market_cap", "price_change_percentage_24h", "competitors"],
             "data_sources": ["web_research", "coinmarketcap", "defillama"],
-            "visualizations": ["price_chart", "volume_chart", "competitor_comparison_chart"]
+            "visualizations": ["price_trend_chart", "volume_chart", "competitor_comparison_chart"]
         },
         {
             "title": "Technical Analysis",
@@ -98,7 +97,7 @@
             "fallback_template": "Data unavailable for {section_title}.",
             "fallback_fields": ["tvl", "active_addresses", "exchange_count"],
             "data_sources": ["web_research", "coinmarketcap", "defillama"],
-            "visualizations": ["tvl_chart", "adoption_metrics_table", "tvl_milestone_chart"]
+            "visualizations": ["tvl_chart", "adoption_metrics_table", "tvl_milestone_chart", "tvl_phases_chart", "monthly_growth_chart"]
         },
         {
             "title": "Governance and Community",
@@ -161,4 +160,4 @@
             "visualizations": []
         }
     ]
-} 
+}

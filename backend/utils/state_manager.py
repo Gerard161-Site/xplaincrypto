@@ -359,11 +359,38 @@ class StateManager:
         # Check if we have DeFiLlama data
         defillama_data = data_sources.get("defillama", {})
         if defillama_data:
-            tvl = defillama_data.get("tvl", {})
-            if tvl:
-                key_metrics["tvl"] = tvl.get("current_tvl", "N/A")
-                key_metrics["tvl_change_24h"] = tvl.get("change_24h", "N/A")
-                
+            current_tvl_value = "N/A"
+            tvl_history_list = defillama_data.get("tvl_history")
+
+            if isinstance(tvl_history_list, list) and tvl_history_list:
+                # Assuming tvl_history_list is sorted, latest entry last,
+                # and each entry is a dict like {'date': ..., 'totalLiquidityUSD': ...}
+                # (This structure is hinted at by adoption_metrics_table logs)
+                latest_tvl_record = tvl_history_list[-1]
+                if isinstance(latest_tvl_record, dict):
+                    current_tvl_value = latest_tvl_record.get("totalLiquidityUSD", "N/A")
+                else:
+                    self.logger.warning(f"Latest TVL record in DeFiLlama history is not a dict: {latest_tvl_record}")
+            elif "tvl" in defillama_data and isinstance(defillama_data["tvl"], (int, float)):
+                # Fallback if a direct 'tvl' numeric value exists at the top level of defillama_data
+                current_tvl_value = defillama_data["tvl"]
+            elif "mcap" in defillama_data and isinstance(defillama_data.get("mcap"), (int, float)):
+                # Based on the example log, 'mcap' might be total TVL if no 'tvl_history' or direct 'tvl' field.
+                # WARNING: The log sample '{'mcap': 3271665433.2157536, 'tvl_history': []}'
+                # usually 'mcap' from defillama refers to the protocol token's market cap, not TVL.
+                # This path might be incorrect for general TVL.
+                # For ONDO, the project itself is about tokenized real-world assets, so its mcap might be used as a proxy for TVL in some contexts.
+                # self.logger.info(f"Using 'mcap' from DeFiLlama data as TVL: {defillama_data.get('mcap')}")
+                # current_tvl_value = defillama_data.get("mcap", "N/A") 
+                # Re-evaluating: 'mcap' is unlikely to be generic TVL. Let's stick to tvl_history or a direct 'tvl' field.
+                self.logger.warning("DeFiLlama data has 'mcap' but 'tvl_history' is empty/missing, and no direct 'tvl' number. 'mcap' is not used as TVL by default.")
+            else:
+                self.logger.warning("Could not determine current TVL from DeFiLlama data structure (tvl_history or direct 'tvl' field).")
+
+            key_metrics["tvl"] = current_tvl_value
+            # For "tvl_change_24h", the source is still unclear from current data structure.
+            key_metrics["tvl_change_24h"] = "N/A" # Placeholder
+
         # Check if we have tokenomics data
         tokenomics_data = data_sources.get("tokenomics", {})
         if tokenomics_data:
