@@ -238,16 +238,46 @@ class Researcher:
                             problem_sections.append({"title": section_title, "missing_fields": [source]})
                             state = self.state_manager.update_problem_sections(state, problem_sections)
             
-            # Consolidate all fetched data into state
-            self.logger.info("Consolidating additional fetched data into state...")
-            for key, value in self.data.items():
-                if key != "batch_data":
-                    for field_key, field_data in value.items():
-                        state = self.state_manager.update_data_field(state, key, field_key, field_data)
-            
             # Report problem sections
             problem_sections = self.state_manager.get_problem_sections(state) or []
             self.logger.info(f"Problem sections reported: {len(problem_sections)}")
+            
+            # NEW: Consolidate batch-processed API data into the top level of state.data
+            self.logger.info("Consolidating batch-processed API data into state.data...")
+            if hasattr(self, 'data') and "batch_data" in self.data:
+                for source_name, source_data_payload in self.data["batch_data"].items():
+                    if source_name == "tavily": # Skip Tavily as it's handled section-specifically
+                        self.logger.info(f"Skipping Tavily data consolidation at this top level for source: {source_name}")
+                        continue
+
+                    if source_data_payload and not (isinstance(source_data_payload, dict) and source_data_payload.get("error")):
+                        self.logger.info(f"Consolidating data for source: {source_name} into state.data.{source_name}")
+                        
+                        # Access state.data (which is a dict)
+                        if isinstance(state, dict): # If state itself is a dict
+                            if "data" not in state or not isinstance(state["data"], dict):
+                                state["data"] = {} # Should be initialized by ensure_state_structure
+                            state["data"][source_name] = source_data_payload
+                        elif hasattr(state, "data") and isinstance(state.data, dict): # If state is ResearchState object
+                            state.data[source_name] = source_data_payload
+                        else:
+                            self.logger.error(f"Cannot consolidate batch data for {source_name}: state.data is not accessible as a dict.")
+                        
+                        # Log sample of consolidated data
+                        if isinstance(source_data_payload, dict):
+                            sample_keys = list(source_data_payload.keys())[:5]
+                            self.logger.debug(f"Consolidated {source_name} data. Sample keys: {sample_keys}")
+                        elif isinstance(source_data_payload, list):
+                            self.logger.debug(f"Consolidated {source_name} data. Sample length: {len(source_data_payload)}")
+                            if source_data_payload:
+                                self.logger.debug(f"First item sample: {str(source_data_payload[0])[:100]}")
+                                
+                    elif isinstance(source_data_payload, dict) and source_data_payload.get("error"):
+                        self.logger.warning(f"Skipping consolidation for source {source_name} due to error in fetched data: {source_data_payload.get('error')}")
+                    else:
+                        self.logger.warning(f"No data or invalid data structure for source {source_name} in batch_data. Skipping consolidation.")
+            else:
+                self.logger.warning("No 'batch_data' found in self.data to consolidate.")
             
             # Standardize data for visualizations
             self.logger.info("Standardizing data for visualizations")
