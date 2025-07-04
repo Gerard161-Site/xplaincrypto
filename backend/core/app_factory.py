@@ -88,7 +88,7 @@ def create_app(config_path: str = "backend/config/app_config.json"):
         fastapi_app=fastapi_app,
         socket_service=socket_service,
         workflow_manager=workflow_manager,
-        static_dir=config.get("static_dir", "docs")
+        static_dir=config.get("static_dir", "reports")
     )
     
     @fastapi_app.on_event("startup")

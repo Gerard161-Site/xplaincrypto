@@ -5,6 +5,27 @@ from typing import Dict, Any, Optional, List
 from langchain_openai import ChatOpenAI
 from backend.state import ResearchState
 from backend.utils.state_manager import StateManager
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+
+logger = logging.getLogger(__name__)
+
+# Define openai_retry_decorator directly in reviewer.py
+def openai_retry_decorator(func):
+    """
+    Decorator to retry OpenAI API calls with exponential backoff.
+    Retries up to 3 times with a wait time of 1-5 seconds between attempts.
+    """
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=5),
+        retry=retry_if_exception_type(Exception),
+        before_sleep=lambda retry_state: logger.warning(
+            f"Retrying {func.__name__} (attempt {retry_state.attempt_number}/3) due to {retry_state.outcome.exception()}"
+        )
+    )
+    async def wrapper(*args, **kwargs):
+        return await func(*args, **kwargs)
+    return wrapper
 
 class Reviewer:
     def __init__(self, llm: Optional[ChatOpenAI] = None, logger: Optional[logging.Logger] = None):
@@ -223,7 +244,6 @@ IMPORTANT INSTRUCTIONS:
             except Exception as e:
                 self.logger.error(f"Error reviewing draft: {str(e)}", exc_info=True)
                 # Add error to state using StateManager
-                state = self.state_manager.add_error(state, "reviewer", str(e))
                 state = self.state_manager.update_final_report(state, draft)  # Use original draft on error
                 return state
                 

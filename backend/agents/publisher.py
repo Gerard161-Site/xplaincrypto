@@ -161,7 +161,7 @@ def publisher(state, llm, logger, config=None) -> dict:
         logger.info(f"Processed {len(vis_list)} valid visualizations")
         
         safe_project_name = project_name.lower().replace(" ", "_")
-        output_dir = os.path.join("docs", safe_project_name)
+        output_dir = os.path.join("reports", safe_project_name)
         os.makedirs(output_dir, exist_ok=True)
         logger.info(f"Using output directory: {output_dir}")
         

@@ -1,0 +1,687 @@
+2025-05-15 11:06:38,193 - XplainCrypto - workflow_manager._load_report_config - INFO - Loaded report configuration with 13 sections
+2025-05-15 11:06:38,193 - XplainCrypto - workflow_manager.__init__ - INFO - ProgressTracker initialized in WorkflowManager
+2025-05-15 11:06:38,193 - XplainCrypto - workflow_manager.__init__ - INFO - ErrorReporter initialized in WorkflowManager
+2025-05-15 11:06:38,193 - XplainCrypto - workflow_manager.__init__ - INFO - StateManager initialized in WorkflowManager
+2025-05-15 11:06:38,197 - XplainCrypto - main.startup_event - INFO - Starting application initialization
+2025-05-15 11:06:38,197 - XplainCrypto - main.startup_event - INFO - Starting 6 MCP servers...
+2025-05-15 11:06:38,197 - XplainCrypto - main.startup_event - INFO - Starting MCP server: coingecko
+2025-05-15 11:06:39,273 - XplainCrypto - main.startup_event - INFO - Successfully started MCP server: coingecko
+2025-05-15 11:06:39,293 - XplainCrypto - main.startup_event - INFO - Starting MCP server: coinmarketcap
+2025-05-15 11:06:40,317 - XplainCrypto - main.startup_event - INFO - Successfully started MCP server: coinmarketcap
+2025-05-15 11:06:40,318 - XplainCrypto - main.startup_event - INFO - Starting MCP server: defillama
+2025-05-15 11:06:41,326 - XplainCrypto - main.startup_event - INFO - Successfully started MCP server: defillama
+2025-05-15 11:06:41,326 - XplainCrypto - main.startup_event - INFO - Starting MCP server: tavily
+2025-05-15 11:06:42,334 - XplainCrypto - main.startup_event - INFO - Successfully started MCP server: tavily
+2025-05-15 11:06:42,334 - XplainCrypto - main.startup_event - INFO - Starting MCP server: huggingface
+2025-05-15 11:06:43,341 - XplainCrypto - main.startup_event - INFO - Successfully started MCP server: huggingface
+2025-05-15 11:06:43,342 - XplainCrypto - main.startup_event - INFO - Starting MCP server: tokenomics
+2025-05-15 11:06:44,350 - XplainCrypto - main.startup_event - INFO - Successfully started MCP server: tokenomics
+2025-05-15 11:06:44,351 - XplainCrypto - main.startup_event - INFO - MCP client manager initialized
+2025-05-15 11:06:44,351 - XplainCrypto - main.startup_event - INFO - Initializing other components
+2025-05-15 11:06:44,351 - XplainCrypto - main.startup_event - INFO - Application initialization complete
+2025-05-15 11:06:44,359 - XplainCrypto - main.connect - INFO - Client connected: y9Pf34HulDgyJzn_AAAB
+2025-05-15 11:13:09,241 - XplainCrypto - main.disconnect - INFO - Client disconnected: y9Pf34HulDgyJzn_AAAB
+2025-05-15 11:13:10,398 - XplainCrypto - main.connect - INFO - Client connected: UPIenVuBtuMe3oVqAAAE
+2025-05-15 11:13:12,722 - XplainCrypto - main.message - INFO - Received message from client UPIenVuBtuMe3oVqAAAE: {'project_name': 'ONDO', 'fast_mode': False}
+2025-05-15 11:13:12,723 - XplainCrypto - workflow_manager.execute_workflow - INFO - Starting asynchronous workflow execution for ONDO
+2025-05-15 11:13:12,754 - XplainCrypto - workflow_manager.initialize_llm - INFO - Initialized LLM with model gpt-4o-mini
+2025-05-15 11:13:12,754 - XplainCrypto - workflow_manager.execute_workflow - INFO - Running Researcher
+2025-05-15 11:13:12,754 - XplainCrypto - researcher.researcher - INFO - Using async researcher function
+2025-05-15 11:13:12,754 - XplainCrypto - researcher.researcher - INFO - Creating Researcher instance for async function
+2025-05-15 11:13:12,754 - XplainCrypto - researcher.__init__ - INFO - Researcher constructor started
+2025-05-15 11:13:12,754 - XplainCrypto - researcher.__init__ - INFO - Researcher constructor completed
+2025-05-15 11:13:12,755 - XplainCrypto - researcher.researcher - INFO - Calling initialize for async function
+2025-05-15 11:13:12,755 - XplainCrypto - researcher.initialize - INFO - Starting Researcher.initialize
+2025-05-15 11:13:12,755 - XplainCrypto - researcher.initialize - INFO - Initializing RAG components
+2025-05-15 11:13:12,755 - XplainCrypto - researcher.initialize - INFO - Getting vector store synchronously
+2025-05-15 11:13:15,170 - XplainCrypto - researcher.initialize - INFO - Vector store object created
+2025-05-15 11:13:15,170 - XplainCrypto - researcher.initialize - INFO - Vector store appears healthy
+2025-05-15 11:13:15,170 - XplainCrypto - researcher.initialize - INFO - Initializing RAGRetriever
+2025-05-15 11:13:15,184 - XplainCrypto - researcher.initialize - INFO - RAGRetriever initialized
+2025-05-15 11:13:15,184 - XplainCrypto - researcher.initialize - INFO - Initializing MCP client
+2025-05-15 11:13:15,184 - XplainCrypto - researcher.initialize - INFO - Using existing MCP client manager
+2025-05-15 11:13:15,184 - XplainCrypto - researcher.initialize - INFO - All MCP servers already running
+2025-05-15 11:13:15,184 - XplainCrypto - researcher.initialize - INFO - RAG and MCP components initialized successfully
+2025-05-15 11:13:15,184 - XplainCrypto - researcher.initialize - INFO - Completed Researcher.initialize
+2025-05-15 11:13:15,184 - XplainCrypto - researcher.researcher - INFO - Calling run for async function
+2025-05-15 11:13:15,184 - XplainCrypto - researcher.run - INFO - Entering Researcher.run
+2025-05-15 11:13:15,184 - XplainCrypto - researcher.run - INFO - Running researcher for ONDO
+2025-05-15 11:13:15,184 - XplainCrypto - researcher.run - INFO - Cache directory set to: reports/ondo/cache
+2025-05-15 11:13:15,184 - XplainCrypto - researcher.run - INFO - Calling initialize
+2025-05-15 11:13:15,184 - XplainCrypto - researcher.initialize - INFO - Starting Researcher.initialize
+2025-05-15 11:13:15,184 - XplainCrypto - researcher.initialize - INFO - Initializing RAG components
+2025-05-15 11:13:15,184 - XplainCrypto - researcher.initialize - INFO - Getting vector store synchronously
+2025-05-15 11:13:16,990 - XplainCrypto - researcher.initialize - INFO - Vector store object created
+2025-05-15 11:13:16,991 - XplainCrypto - researcher.initialize - INFO - Vector store appears healthy
+2025-05-15 11:13:16,991 - XplainCrypto - researcher.initialize - INFO - Initializing RAGRetriever
+2025-05-15 11:13:17,006 - XplainCrypto - researcher.initialize - INFO - RAGRetriever initialized
+2025-05-15 11:13:17,007 - XplainCrypto - researcher.initialize - INFO - Initializing MCP client
+2025-05-15 11:13:17,007 - XplainCrypto - researcher.initialize - INFO - Using existing MCP client manager
+2025-05-15 11:13:17,007 - XplainCrypto - researcher.initialize - INFO - All MCP servers already running
+2025-05-15 11:13:17,007 - XplainCrypto - researcher.initialize - INFO - RAG and MCP components initialized successfully
+2025-05-15 11:13:17,007 - XplainCrypto - researcher.initialize - INFO - Completed Researcher.initialize
+2025-05-15 11:13:17,007 - XplainCrypto - researcher.run - INFO - Initialize completed
+2025-05-15 11:13:17,007 - XplainCrypto - researcher.run - INFO - Calling execute_workflow
+2025-05-15 11:13:17,007 - XplainCrypto - researcher.execute_workflow - INFO - Entering execute_workflow
+2025-05-15 11:13:17,007 - XplainCrypto - researcher.execute_workflow - INFO - Project name: ondo
+2025-05-15 11:13:17,007 - XplainCrypto - researcher._fetch_core_project_data_via_rag - INFO - Starting RAG-driven fetching of core project data for: ONDO
+2025-05-15 11:13:17,007 - XplainCrypto - researcher._fetch_core_project_data_via_rag - INFO - Processing core concept: 'overview' (Fetches general market overview, current price, market cap, 24h volume, etc.)
+2025-05-15 11:13:17,007 - XplainCrypto - researcher._fetch_core_project_data_via_rag - ERROR - Exception during RAG-driven fetch for core concept 'overview': RAGRetriever.get_endpoints_for_project() got an unexpected keyword argument 'top_k'
+Traceback (most recent call last):
+  File "/Users/gkavanagh/Development/xplaincrypto/backend/agents/researcher.py", line 360, in _fetch_core_project_data_via_rag
+    endpoints = await self.rag_retriever.get_endpoints_for_project(
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: RAGRetriever.get_endpoints_for_project() got an unexpected keyword argument 'top_k'
+2025-05-15 11:13:17,009 - XplainCrypto - researcher._fetch_core_project_data_via_rag - INFO - Processing core concept: 'price_history' (ONDO cryptocurrency 30-day price history OHLCV)
+2025-05-15 11:13:17,009 - XplainCrypto - researcher._fetch_core_project_data_via_rag - ERROR - Exception during RAG-driven fetch for core concept 'price_history': RAGRetriever.get_endpoints_for_project() got an unexpected keyword argument 'top_k'
+Traceback (most recent call last):
+  File "/Users/gkavanagh/Development/xplaincrypto/backend/agents/researcher.py", line 360, in _fetch_core_project_data_via_rag
+    endpoints = await self.rag_retriever.get_endpoints_for_project(
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: RAGRetriever.get_endpoints_for_project() got an unexpected keyword argument 'top_k'
+2025-05-15 11:13:17,010 - XplainCrypto - researcher._fetch_core_project_data_via_rag - INFO - Processing core concept: 'volume_history' (ONDO cryptocurrency 30-day trading volume history)
+2025-05-15 11:13:17,010 - XplainCrypto - researcher._fetch_core_project_data_via_rag - ERROR - Exception during RAG-driven fetch for core concept 'volume_history': RAGRetriever.get_endpoints_for_project() got an unexpected keyword argument 'top_k'
+Traceback (most recent call last):
+  File "/Users/gkavanagh/Development/xplaincrypto/backend/agents/researcher.py", line 360, in _fetch_core_project_data_via_rag
+    endpoints = await self.rag_retriever.get_endpoints_for_project(
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: RAGRetriever.get_endpoints_for_project() got an unexpected keyword argument 'top_k'
+2025-05-15 11:13:17,010 - XplainCrypto - researcher._fetch_core_project_data_via_rag - INFO - Processing core concept: 'protocol_data_tvl' (ONDO DeFi protocol data including Total Value Locked (TVL) and historical TVL)
+2025-05-15 11:13:17,010 - XplainCrypto - researcher._fetch_core_project_data_via_rag - ERROR - Exception during RAG-driven fetch for core concept 'protocol_data_tvl': RAGRetriever.get_endpoints_for_project() got an unexpected keyword argument 'top_k'
+Traceback (most recent call last):
+  File "/Users/gkavanagh/Development/xplaincrypto/backend/agents/researcher.py", line 360, in _fetch_core_project_data_via_rag
+    endpoints = await self.rag_retriever.get_endpoints_for_project(
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: RAGRetriever.get_endpoints_for_project() got an unexpected keyword argument 'top_k'
+2025-05-15 11:13:17,010 - XplainCrypto - researcher._fetch_core_project_data_via_rag - INFO - Processing core concept: 'token_distribution' (ONDO cryptocurrency tokenomics, supply, and distribution details)
+2025-05-15 11:13:17,010 - XplainCrypto - researcher._fetch_core_project_data_via_rag - ERROR - Exception during RAG-driven fetch for core concept 'token_distribution': RAGRetriever.get_endpoints_for_project() got an unexpected keyword argument 'top_k'
+Traceback (most recent call last):
+  File "/Users/gkavanagh/Development/xplaincrypto/backend/agents/researcher.py", line 360, in _fetch_core_project_data_via_rag
+    endpoints = await self.rag_retriever.get_endpoints_for_project(
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: RAGRetriever.get_endpoints_for_project() got an unexpected keyword argument 'top_k'
+2025-05-15 11:13:17,011 - XplainCrypto - researcher._fetch_core_project_data_via_rag - INFO - Completed RAG-driven fetching of core project data. self.data['batch_data'] keys: ['overview', 'price_history', 'volume_history', 'protocol_data_tvl', 'token_distribution']
+2025-05-15 11:13:17,011 - XplainCrypto - researcher._fetch_core_project_data_via_rag - INFO - Successfully fetched core concepts: set()
+2025-05-15 11:13:17,011 - XplainCrypto - researcher.execute_workflow - INFO - Processing section: 'Executive Summary' | Required sources: ['coinmarketcap', 'defillama']
+2025-05-15 11:13:17,011 - XplainCrypto - researcher.execute_workflow - INFO - Section 'Executive Summary': Running RAG with query: 'ondo executive summary overview' and sources: ['coinmarketcap', 'defillama']
+2025-05-15 11:13:17,011 - XplainCrypto - researcher.execute_workflow - ERROR - Error during RAG processing for section 'Executive Summary': RAGRetriever.get_endpoints_for_project() got an unexpected keyword argument 'top_k'
+Traceback (most recent call last):
+  File "/Users/gkavanagh/Development/xplaincrypto/backend/agents/researcher.py", line 259, in execute_workflow
+    endpoints = await self.rag_retriever.get_endpoints_for_project(
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: RAGRetriever.get_endpoints_for_project() got an unexpected keyword argument 'top_k'
+2025-05-15 11:13:17,011 - XplainCrypto - researcher.execute_workflow - INFO - Processing section: 'Introduction' | Required sources: ['tavily', 'coinmarketcap', 'tokenomics']
+2025-05-15 11:13:17,011 - XplainCrypto - researcher.execute_workflow - WARNING - Section 'Introduction' has required sources ['tavily', 'coinmarketcap', 'tokenomics'] but no query_template. RAG was not performed. Ensure this is intended or core data covers needs.
+2025-05-15 11:13:17,011 - XplainCrypto - researcher.execute_workflow - INFO - Processing section: 'Tokenomics and Distribution' | Required sources: ['tavily', 'coinmarketcap', 'tokenomics', 'defillama']
+2025-05-15 11:13:17,011 - XplainCrypto - researcher.execute_workflow - INFO - Section 'Tokenomics and Distribution': Running RAG with query: 'ondo tokenomics supply distribution utility' and sources: ['tavily', 'coinmarketcap', 'tokenomics', 'defillama']
+2025-05-15 11:13:17,011 - XplainCrypto - researcher.execute_workflow - ERROR - Error during RAG processing for section 'Tokenomics and Distribution': RAGRetriever.get_endpoints_for_project() got an unexpected keyword argument 'top_k'
+Traceback (most recent call last):
+  File "/Users/gkavanagh/Development/xplaincrypto/backend/agents/researcher.py", line 259, in execute_workflow
+    endpoints = await self.rag_retriever.get_endpoints_for_project(
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: RAGRetriever.get_endpoints_for_project() got an unexpected keyword argument 'top_k'
+2025-05-15 11:13:17,011 - XplainCrypto - researcher.execute_workflow - INFO - Processing section: 'Market Analysis' | Required sources: ['tavily', 'coinmarketcap', 'defillama']
+2025-05-15 11:13:17,011 - XplainCrypto - researcher.execute_workflow - INFO - Section 'Market Analysis': Running RAG with query: 'ondo market performance competitors' and sources: ['tavily', 'coinmarketcap', 'defillama']
+2025-05-15 11:13:17,011 - XplainCrypto - researcher.execute_workflow - ERROR - Error during RAG processing for section 'Market Analysis': RAGRetriever.get_endpoints_for_project() got an unexpected keyword argument 'top_k'
+Traceback (most recent call last):
+  File "/Users/gkavanagh/Development/xplaincrypto/backend/agents/researcher.py", line 259, in execute_workflow
+    endpoints = await self.rag_retriever.get_endpoints_for_project(
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: RAGRetriever.get_endpoints_for_project() got an unexpected keyword argument 'top_k'
+2025-05-15 11:13:17,011 - XplainCrypto - researcher.execute_workflow - INFO - Processing section: 'Technical Analysis' | Required sources: ['tavily', 'coinmarketcap']
+2025-05-15 11:13:17,011 - XplainCrypto - researcher.execute_workflow - INFO - Section 'Technical Analysis': Running RAG with query: 'ondo technical architecture blockchain' and sources: ['tavily', 'coinmarketcap']
+2025-05-15 11:13:17,012 - XplainCrypto - researcher.execute_workflow - ERROR - Error during RAG processing for section 'Technical Analysis': RAGRetriever.get_endpoints_for_project() got an unexpected keyword argument 'top_k'
+Traceback (most recent call last):
+  File "/Users/gkavanagh/Development/xplaincrypto/backend/agents/researcher.py", line 259, in execute_workflow
+    endpoints = await self.rag_retriever.get_endpoints_for_project(
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: RAGRetriever.get_endpoints_for_project() got an unexpected keyword argument 'top_k'
+2025-05-15 11:13:17,012 - XplainCrypto - researcher.execute_workflow - INFO - Processing section: 'Developer Tools and User Experience' | Required sources: ['tavily']
+2025-05-15 11:13:17,012 - XplainCrypto - researcher.execute_workflow - INFO - Section 'Developer Tools and User Experience': Running RAG with query: 'ondo developer tools user experience' and sources: ['tavily']
+2025-05-15 11:13:17,012 - XplainCrypto - researcher.execute_workflow - ERROR - Error during RAG processing for section 'Developer Tools and User Experience': RAGRetriever.get_endpoints_for_project() got an unexpected keyword argument 'top_k'
+Traceback (most recent call last):
+  File "/Users/gkavanagh/Development/xplaincrypto/backend/agents/researcher.py", line 259, in execute_workflow
+    endpoints = await self.rag_retriever.get_endpoints_for_project(
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: RAGRetriever.get_endpoints_for_project() got an unexpected keyword argument 'top_k'
+2025-05-15 11:13:17,012 - XplainCrypto - researcher.execute_workflow - INFO - Processing section: 'Security' | Required sources: ['tavily']
+2025-05-15 11:13:17,012 - XplainCrypto - researcher.execute_workflow - INFO - Section 'Security': Running RAG with query: 'ondo security audits vulnerabilities' and sources: ['tavily']
+2025-05-15 11:13:17,012 - XplainCrypto - researcher.execute_workflow - ERROR - Error during RAG processing for section 'Security': RAGRetriever.get_endpoints_for_project() got an unexpected keyword argument 'top_k'
+Traceback (most recent call last):
+  File "/Users/gkavanagh/Development/xplaincrypto/backend/agents/researcher.py", line 259, in execute_workflow
+    endpoints = await self.rag_retriever.get_endpoints_for_project(
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: RAGRetriever.get_endpoints_for_project() got an unexpected keyword argument 'top_k'
+2025-05-15 11:13:17,012 - XplainCrypto - researcher.execute_workflow - INFO - Processing section: 'Liquidity and Adoption Metrics' | Required sources: ['tavily', 'coinmarketcap', 'defillama']
+2025-05-15 11:13:17,012 - XplainCrypto - researcher.execute_workflow - INFO - Section 'Liquidity and Adoption Metrics': Running RAG with query: 'ondo liquidity adoption metrics' and sources: ['tavily', 'coinmarketcap', 'defillama']
+2025-05-15 11:13:17,013 - XplainCrypto - researcher.execute_workflow - ERROR - Error during RAG processing for section 'Liquidity and Adoption Metrics': RAGRetriever.get_endpoints_for_project() got an unexpected keyword argument 'top_k'
+Traceback (most recent call last):
+  File "/Users/gkavanagh/Development/xplaincrypto/backend/agents/researcher.py", line 259, in execute_workflow
+    endpoints = await self.rag_retriever.get_endpoints_for_project(
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: RAGRetriever.get_endpoints_for_project() got an unexpected keyword argument 'top_k'
+2025-05-15 11:13:17,014 - XplainCrypto - researcher.execute_workflow - INFO - Processing section: 'Governance and Community' | Required sources: ['tavily']
+2025-05-15 11:13:17,014 - XplainCrypto - researcher.execute_workflow - INFO - Section 'Governance and Community': Running RAG with query: 'ondo governance voting community' and sources: ['tavily']
+2025-05-15 11:13:17,014 - XplainCrypto - researcher.execute_workflow - ERROR - Error during RAG processing for section 'Governance and Community': RAGRetriever.get_endpoints_for_project() got an unexpected keyword argument 'top_k'
+Traceback (most recent call last):
+  File "/Users/gkavanagh/Development/xplaincrypto/backend/agents/researcher.py", line 259, in execute_workflow
+    endpoints = await self.rag_retriever.get_endpoints_for_project(
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: RAGRetriever.get_endpoints_for_project() got an unexpected keyword argument 'top_k'
+2025-05-15 11:13:17,014 - XplainCrypto - researcher.execute_workflow - INFO - Processing section: 'Ecosystem and Partnerships' | Required sources: ['tavily', 'defillama']
+2025-05-15 11:13:17,014 - XplainCrypto - researcher.execute_workflow - INFO - Section 'Ecosystem and Partnerships': Running RAG with query: 'ondo ecosystem partnerships integrations' and sources: ['tavily', 'defillama']
+2025-05-15 11:13:17,014 - XplainCrypto - researcher.execute_workflow - ERROR - Error during RAG processing for section 'Ecosystem and Partnerships': RAGRetriever.get_endpoints_for_project() got an unexpected keyword argument 'top_k'
+Traceback (most recent call last):
+  File "/Users/gkavanagh/Development/xplaincrypto/backend/agents/researcher.py", line 259, in execute_workflow
+    endpoints = await self.rag_retriever.get_endpoints_for_project(
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: RAGRetriever.get_endpoints_for_project() got an unexpected keyword argument 'top_k'
+2025-05-15 11:13:17,014 - XplainCrypto - researcher.execute_workflow - INFO - Processing section: 'Risks and Opportunities' | Required sources: ['tavily']
+2025-05-15 11:13:17,014 - XplainCrypto - researcher.execute_workflow - INFO - Section 'Risks and Opportunities': Running RAG with query: 'ondo risks opportunities analysis' and sources: ['tavily']
+2025-05-15 11:13:17,014 - XplainCrypto - researcher.execute_workflow - ERROR - Error during RAG processing for section 'Risks and Opportunities': RAGRetriever.get_endpoints_for_project() got an unexpected keyword argument 'top_k'
+Traceback (most recent call last):
+  File "/Users/gkavanagh/Development/xplaincrypto/backend/agents/researcher.py", line 259, in execute_workflow
+    endpoints = await self.rag_retriever.get_endpoints_for_project(
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: RAGRetriever.get_endpoints_for_project() got an unexpected keyword argument 'top_k'
+2025-05-15 11:13:17,014 - XplainCrypto - researcher.execute_workflow - INFO - Processing section: 'Team and Development Activity' | Required sources: ['tavily']
+2025-05-15 11:13:17,014 - XplainCrypto - researcher.execute_workflow - INFO - Section 'Team and Development Activity': Running RAG with query: 'ondo team development activity' and sources: ['tavily']
+2025-05-15 11:13:17,014 - XplainCrypto - researcher.execute_workflow - ERROR - Error during RAG processing for section 'Team and Development Activity': RAGRetriever.get_endpoints_for_project() got an unexpected keyword argument 'top_k'
+Traceback (most recent call last):
+  File "/Users/gkavanagh/Development/xplaincrypto/backend/agents/researcher.py", line 259, in execute_workflow
+    endpoints = await self.rag_retriever.get_endpoints_for_project(
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: RAGRetriever.get_endpoints_for_project() got an unexpected keyword argument 'top_k'
+2025-05-15 11:13:17,014 - XplainCrypto - researcher.execute_workflow - INFO - Processing section: 'Conclusion' | Required sources: []
+2025-05-15 11:13:17,014 - XplainCrypto - researcher.execute_workflow - INFO - Section 'Conclusion': Running RAG with query: 'ondo conclusion investment insights' and sources: []
+2025-05-15 11:13:17,015 - XplainCrypto - researcher.execute_workflow - ERROR - Error during RAG processing for section 'Conclusion': RAGRetriever.get_endpoints_for_project() got an unexpected keyword argument 'top_k'
+Traceback (most recent call last):
+  File "/Users/gkavanagh/Development/xplaincrypto/backend/agents/researcher.py", line 259, in execute_workflow
+    endpoints = await self.rag_retriever.get_endpoints_for_project(
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: RAGRetriever.get_endpoints_for_project() got an unexpected keyword argument 'top_k'
+2025-05-15 11:13:17,015 - XplainCrypto - researcher.execute_workflow - INFO - Consolidating additional fetched data into state...
+2025-05-15 11:13:17,015 - XplainCrypto - researcher.execute_workflow - INFO - Problem sections reported: 0
+2025-05-15 11:13:17,015 - XplainCrypto - researcher.execute_workflow - INFO - Standardizing data for visualizations
+2025-05-15 11:13:17,015 - XplainCrypto - data_standardizer.__init__ - INFO - DataStandardizer initialized with a provided StateManager instance.
+2025-05-15 11:13:17,015 - XplainCrypto - data_standardizer.standardize_state_data - INFO - Standardizing state data
+2025-05-15 11:13:17,015 - XplainCrypto - cache_utils.__init__ - INFO - Cache directory set to: reports/ondo/cache
+2025-05-15 11:13:17,015 - XplainCrypto - cache_manager.load_config - INFO - Loaded cache config: max_size=500MB, max_files_per_project=1000, cleanup_threshold=400MB
+2025-05-15 11:13:17,015 - XplainCrypto - data_standardizer.standardize_state_data - INFO - Attempting to load visualization mapping from: /Users/gkavanagh/Development/xplaincrypto/backend/config/visualization_mapping.json
+2025-05-15 11:13:17,016 - XplainCrypto - data_standardizer.standardize_state_data - INFO - Successfully loaded and merged visualization_mapping.json from /Users/gkavanagh/Development/xplaincrypto/backend/config/visualization_mapping.json
+2025-05-15 11:13:17,016 - XplainCrypto - data_standardizer.standardize_state_data - INFO - Processing string visualization: key_metrics_table
+2025-05-15 11:13:17,016 - XplainCrypto - data_standardizer._prepare_visualization_data - INFO - Preparing data for visualization: key_metrics_table (type: key_metrics_table, field: '', specific_source_config: coinmarketcap) in section 'Executive Summary' (normalized: executive_summary)
+2025-05-15 11:13:17,016 - XplainCrypto - data_standardizer._prepare_visualization_data - INFO - Viz 'key_metrics_table' uses specific source 'coinmarketcap', which is available in section.
+2025-05-15 11:13:17,016 - XplainCrypto - data_standardizer._extract_data_from_state - WARNING - Could not find data field '' in any of the specified sources: ['coinmarketcap'] for section 'executive_summary'.
+2025-05-15 11:13:17,016 - XplainCrypto - data_standardizer._prepare_visualization_data - WARNING - No data found for visualization: key_metrics_table
+2025-05-15 11:13:17,016 - XplainCrypto - data_standardizer.standardize_state_data - WARNING - No viz_data prepared for key_metrics_table
+2025-05-15 11:13:17,016 - XplainCrypto - data_standardizer.standardize_state_data - INFO - Processing string visualization: key_metrics_table
+2025-05-15 11:13:17,016 - XplainCrypto - data_standardizer._prepare_visualization_data - INFO - Preparing data for visualization: key_metrics_table (type: key_metrics_table, field: '', specific_source_config: coinmarketcap) in section 'Introduction' (normalized: introduction)
+2025-05-15 11:13:17,016 - XplainCrypto - data_standardizer._prepare_visualization_data - INFO - Viz 'key_metrics_table' uses specific source 'coinmarketcap', which is available in section.
+2025-05-15 11:13:17,016 - XplainCrypto - data_standardizer._extract_data_from_state - WARNING - Could not find data field '' in any of the specified sources: ['coinmarketcap'] for section 'introduction'.
+2025-05-15 11:13:17,016 - XplainCrypto - data_standardizer._prepare_visualization_data - WARNING - No data found for visualization: key_metrics_table
+2025-05-15 11:13:17,016 - XplainCrypto - data_standardizer.standardize_state_data - WARNING - No viz_data prepared for key_metrics_table
+2025-05-15 11:13:17,016 - XplainCrypto - data_standardizer.standardize_state_data - INFO - Processing string visualization: whitepaper_link
+2025-05-15 11:13:17,016 - XplainCrypto - data_standardizer._prepare_visualization_data - INFO - Preparing data for visualization: whitepaper_link (type: table, field: 'documentation_url', specific_source_config: tokenomics) in section 'Introduction' (normalized: introduction)
+2025-05-15 11:13:17,016 - XplainCrypto - data_standardizer._prepare_visualization_data - INFO - Viz 'whitepaper_link' uses specific source 'tokenomics', which is available in section.
+2025-05-15 11:13:17,016 - XplainCrypto - data_standardizer._extract_data_from_state - WARNING - Could not find data field 'documentation_url' in any of the specified sources: ['tokenomics'] for section 'introduction'.
+2025-05-15 11:13:17,016 - XplainCrypto - data_standardizer._prepare_visualization_data - WARNING - No data found for visualization: whitepaper_link
+2025-05-15 11:13:17,016 - XplainCrypto - data_standardizer.standardize_state_data - WARNING - No viz_data prepared for whitepaper_link
+2025-05-15 11:13:17,016 - XplainCrypto - data_standardizer.standardize_state_data - INFO - Processing string visualization: tokenomics_pie_chart
+2025-05-15 11:13:17,016 - XplainCrypto - data_standardizer._prepare_visualization_data - INFO - Preparing data for visualization: tokenomics_pie_chart (type: pie_chart, field: 'data', specific_source_config: tokenomics) in section 'Tokenomics and Distribution' (normalized: tokenomics_and_distribution)
+2025-05-15 11:13:17,017 - XplainCrypto - data_standardizer._prepare_visualization_data - INFO - Viz 'tokenomics_pie_chart' uses specific source 'tokenomics', which is available in section.
+2025-05-15 11:13:17,017 - XplainCrypto - data_standardizer._extract_data_from_state - WARNING - Could not find data field 'data' in any of the specified sources: ['tokenomics'] for section 'tokenomics_and_distribution'.
+2025-05-15 11:13:17,017 - XplainCrypto - data_standardizer._prepare_visualization_data - WARNING - No data found for visualization: tokenomics_pie_chart
+2025-05-15 11:13:17,017 - XplainCrypto - data_standardizer.standardize_state_data - WARNING - No viz_data prepared for tokenomics_pie_chart
+2025-05-15 11:13:17,017 - XplainCrypto - data_standardizer.standardize_state_data - INFO - Processing string visualization: chain_distribution_chart
+2025-05-15 11:13:17,017 - XplainCrypto - data_standardizer._prepare_visualization_data - INFO - Preparing data for visualization: chain_distribution_chart (type: chain_distribution_chart, field: 'chains', specific_source_config: defillama) in section 'Tokenomics and Distribution' (normalized: tokenomics_and_distribution)
+2025-05-15 11:13:17,017 - XplainCrypto - data_standardizer._prepare_visualization_data - INFO - Viz 'chain_distribution_chart' uses specific source 'defillama', which is available in section.
+2025-05-15 11:13:17,017 - XplainCrypto - data_standardizer._extract_data_from_state - WARNING - Could not find data field 'chains' in any of the specified sources: ['defillama'] for section 'tokenomics_and_distribution'.
+2025-05-15 11:13:17,017 - XplainCrypto - data_standardizer._prepare_visualization_data - WARNING - No data found for visualization: chain_distribution_chart
+2025-05-15 11:13:17,017 - XplainCrypto - data_standardizer.standardize_state_data - WARNING - No viz_data prepared for chain_distribution_chart
+2025-05-15 11:13:17,017 - XplainCrypto - data_standardizer.standardize_state_data - INFO - Processing string visualization: price_trend_chart
+2025-05-15 11:13:17,017 - XplainCrypto - data_standardizer._prepare_visualization_data - INFO - Preparing data for visualization: price_trend_chart (type: line_chart, field: 'price_history', specific_source_config: coinmarketcap) in section 'Market Analysis' (normalized: market_analysis)
+2025-05-15 11:13:17,017 - XplainCrypto - data_standardizer._prepare_visualization_data - INFO - Viz 'price_trend_chart' uses specific source 'coinmarketcap', which is available in section.
+2025-05-15 11:13:17,018 - XplainCrypto - data_standardizer._extract_data_from_state - WARNING - Could not find data field 'price_history' in any of the specified sources: ['coinmarketcap'] for section 'market_analysis'.
+2025-05-15 11:13:17,018 - XplainCrypto - data_standardizer._prepare_visualization_data - WARNING - No data found for visualization: price_trend_chart
+2025-05-15 11:13:17,018 - XplainCrypto - data_standardizer.standardize_state_data - WARNING - No viz_data prepared for price_trend_chart
+2025-05-15 11:13:17,018 - XplainCrypto - data_standardizer.standardize_state_data - INFO - Processing string visualization: volume_chart
+2025-05-15 11:13:17,018 - XplainCrypto - data_standardizer._prepare_visualization_data - INFO - Preparing data for visualization: volume_chart (type: line_chart, field: 'volume_history', specific_source_config: coinmarketcap) in section 'Market Analysis' (normalized: market_analysis)
+2025-05-15 11:13:17,018 - XplainCrypto - data_standardizer._prepare_visualization_data - INFO - Viz 'volume_chart' uses specific source 'coinmarketcap', which is available in section.
+2025-05-15 11:13:17,018 - XplainCrypto - data_standardizer._extract_data_from_state - WARNING - Could not find data field 'volume_history' in any of the specified sources: ['coinmarketcap'] for section 'market_analysis'.
+2025-05-15 11:13:17,018 - XplainCrypto - data_standardizer._prepare_visualization_data - WARNING - No data found for visualization: volume_chart
+2025-05-15 11:13:17,018 - XplainCrypto - data_standardizer.standardize_state_data - WARNING - No viz_data prepared for volume_chart
+2025-05-15 11:13:17,018 - XplainCrypto - data_standardizer.standardize_state_data - INFO - Processing string visualization: competitor_comparison_chart
+2025-05-15 11:13:17,018 - XplainCrypto - data_standardizer._prepare_visualization_data - INFO - Preparing data for visualization: competitor_comparison_chart (type: comparison_chart, field: 'competitors', specific_source_config: multi) in section 'Market Analysis' (normalized: market_analysis)
+2025-05-15 11:13:17,018 - XplainCrypto - data_standardizer._prepare_visualization_data - INFO - Viz 'competitor_comparison_chart' uses 'multi' source, checking all section sources: ['web_research', 'coinmarketcap', 'defillama']
+2025-05-15 11:13:17,019 - XplainCrypto - data_standardizer._extract_data_from_state - WARNING - Could not find data field 'competitors' in any of the specified sources: ['web_research', 'coinmarketcap', 'defillama'] for section 'market_analysis'.
+2025-05-15 11:13:17,019 - XplainCrypto - data_standardizer._prepare_visualization_data - WARNING - No data found for visualization: competitor_comparison_chart
+2025-05-15 11:13:17,019 - XplainCrypto - data_standardizer.standardize_state_data - WARNING - No viz_data prepared for competitor_comparison_chart
+2025-05-15 11:13:17,019 - XplainCrypto - data_standardizer.standardize_state_data - INFO - Processing string visualization: tvl_chart
+2025-05-15 11:13:17,019 - XplainCrypto - data_standardizer._prepare_visualization_data - INFO - Preparing data for visualization: tvl_chart (type: tvl_chart, field: 'tvl_history', specific_source_config: defillama) in section 'Liquidity and Adoption Metrics' (normalized: liquidity_and_adoption_metrics)
+2025-05-15 11:13:17,019 - XplainCrypto - data_standardizer._prepare_visualization_data - INFO - Viz 'tvl_chart' uses specific source 'defillama', which is available in section.
+2025-05-15 11:13:17,019 - XplainCrypto - data_standardizer._extract_data_from_state - WARNING - Could not find data field 'tvl_history' in any of the specified sources: ['defillama'] for section 'liquidity_and_adoption_metrics'.
+2025-05-15 11:13:17,019 - XplainCrypto - data_standardizer._prepare_visualization_data - WARNING - No data found for visualization: tvl_chart
+2025-05-15 11:13:17,019 - XplainCrypto - data_standardizer.standardize_state_data - WARNING - No viz_data prepared for tvl_chart
+2025-05-15 11:13:17,019 - XplainCrypto - data_standardizer.standardize_state_data - INFO - Processing string visualization: adoption_metrics_table
+2025-05-15 11:13:17,019 - XplainCrypto - data_standardizer._prepare_visualization_data - INFO - Preparing data for visualization: adoption_metrics_table (type: table, field: '', specific_source_config: multi) in section 'Liquidity and Adoption Metrics' (normalized: liquidity_and_adoption_metrics)
+2025-05-15 11:13:17,019 - XplainCrypto - data_standardizer._prepare_visualization_data - INFO - Viz 'adoption_metrics_table' uses 'multi' source, checking all section sources: ['web_research', 'coinmarketcap', 'defillama']
+2025-05-15 11:13:17,020 - XplainCrypto - data_standardizer._extract_data_from_state - WARNING - Could not find data field '' in any of the specified sources: ['web_research', 'coinmarketcap', 'defillama'] for section 'liquidity_and_adoption_metrics'.
+2025-05-15 11:13:17,020 - XplainCrypto - data_standardizer._prepare_visualization_data - WARNING - No data found for visualization: adoption_metrics_table
+2025-05-15 11:13:17,020 - XplainCrypto - data_standardizer.standardize_state_data - WARNING - No viz_data prepared for adoption_metrics_table
+2025-05-15 11:13:17,020 - XplainCrypto - data_standardizer.standardize_state_data - INFO - Processing string visualization: tvl_milestone_chart
+2025-05-15 11:13:17,020 - XplainCrypto - data_standardizer._prepare_visualization_data - INFO - Preparing data for visualization: tvl_milestone_chart (type: tvl_milestone_chart, field: 'tvl_history', specific_source_config: defillama) in section 'Liquidity and Adoption Metrics' (normalized: liquidity_and_adoption_metrics)
+2025-05-15 11:13:17,020 - XplainCrypto - data_standardizer._prepare_visualization_data - INFO - Viz 'tvl_milestone_chart' uses specific source 'defillama', which is available in section.
+2025-05-15 11:13:17,020 - XplainCrypto - data_standardizer._extract_data_from_state - WARNING - Could not find data field 'tvl_history' in any of the specified sources: ['defillama'] for section 'liquidity_and_adoption_metrics'.
+2025-05-15 11:13:17,020 - XplainCrypto - data_standardizer._prepare_visualization_data - WARNING - No data found for visualization: tvl_milestone_chart
+2025-05-15 11:13:17,020 - XplainCrypto - data_standardizer.standardize_state_data - WARNING - No viz_data prepared for tvl_milestone_chart
+2025-05-15 11:13:17,020 - XplainCrypto - data_standardizer.standardize_state_data - INFO - Processing string visualization: tvl_phases_chart
+2025-05-15 11:13:17,020 - XplainCrypto - data_standardizer._prepare_visualization_data - INFO - Preparing data for visualization: tvl_phases_chart (type: tvl_phases_chart, field: 'tvl_history', specific_source_config: defillama) in section 'Liquidity and Adoption Metrics' (normalized: liquidity_and_adoption_metrics)
+2025-05-15 11:13:17,020 - XplainCrypto - data_standardizer._prepare_visualization_data - INFO - Viz 'tvl_phases_chart' uses specific source 'defillama', which is available in section.
+2025-05-15 11:13:17,021 - XplainCrypto - data_standardizer._extract_data_from_state - WARNING - Could not find data field 'tvl_history' in any of the specified sources: ['defillama'] for section 'liquidity_and_adoption_metrics'.
+2025-05-15 11:13:17,021 - XplainCrypto - data_standardizer._prepare_visualization_data - WARNING - No data found for visualization: tvl_phases_chart
+2025-05-15 11:13:17,021 - XplainCrypto - data_standardizer.standardize_state_data - WARNING - No viz_data prepared for tvl_phases_chart
+2025-05-15 11:13:17,021 - XplainCrypto - data_standardizer.standardize_state_data - INFO - Processing string visualization: monthly_growth_chart
+2025-05-15 11:13:17,021 - XplainCrypto - data_standardizer._prepare_visualization_data - INFO - Preparing data for visualization: monthly_growth_chart (type: line_chart, field: 'tvl_history', specific_source_config: defillama) in section 'Liquidity and Adoption Metrics' (normalized: liquidity_and_adoption_metrics)
+2025-05-15 11:13:17,021 - XplainCrypto - data_standardizer._prepare_visualization_data - INFO - Viz 'monthly_growth_chart' uses specific source 'defillama', which is available in section.
+2025-05-15 11:13:17,023 - XplainCrypto - data_standardizer._extract_data_from_state - WARNING - Could not find data field 'tvl_history' in any of the specified sources: ['defillama'] for section 'liquidity_and_adoption_metrics'.
+2025-05-15 11:13:17,023 - XplainCrypto - data_standardizer._prepare_visualization_data - WARNING - No data found for visualization: monthly_growth_chart
+2025-05-15 11:13:17,023 - XplainCrypto - data_standardizer.standardize_state_data - WARNING - No viz_data prepared for monthly_growth_chart
+2025-05-15 11:13:17,023 - XplainCrypto - data_standardizer.standardize_state_data - INFO - State data standardization complete
+2025-05-15 11:13:17,023 - XplainCrypto - researcher.execute_workflow - INFO - Data standardization complete
+2025-05-15 11:13:17,023 - XplainCrypto - researcher.execute_workflow - INFO - Completed execute_workflow
+2025-05-15 11:13:17,023 - XplainCrypto - researcher.run - INFO - Completed Researcher.run
+2025-05-15 11:13:17,026 - XplainCrypto - workflow_manager.execute_workflow - INFO - Researcher completed
+2025-05-15 11:13:17,026 - XplainCrypto - workflow_manager.execute_workflow - INFO - Running Writer
+2025-05-15 11:13:17,026 - XplainCrypto - writer.writer - INFO - Writer agent starting for project: ONDO
+2025-05-15 11:13:17,026 - XplainCrypto - writer.writer - INFO - Using report config version: 1.2
+2025-05-15 11:13:17,026 - XplainCrypto - state_manager.update_progress - INFO - Progress: Writing draft report for ONDO...
+2025-05-15 11:13:17,026 - XplainCrypto - writer.writer - INFO - Analyzing data sizes for writer context window management
+2025-05-15 11:13:17,026 - XplainCrypto - writer.writer - INFO - Total data size: ~0 tokens
+2025-05-15 11:13:17,026 - XplainCrypto - cache_utils.__init__ - INFO - Cache directory set to: reports/ondo/cache
+2025-05-15 11:13:17,027 - XplainCrypto - cache_manager.load_config - INFO - Loaded cache config: max_size=500MB, max_files_per_project=1000, cleanup_threshold=400MB
+2025-05-15 11:13:17,027 - XplainCrypto - writer.writer - INFO - Processing section: Executive Summary
+2025-05-15 11:13:17,027 - XplainCrypto - writer.writer - INFO - Section 'Executive Summary' has 1 visualizations: key_metrics_table
+2025-05-15 11:13:17,027 - XplainCrypto - writer.writer - INFO - Section 'Executive Summary' config: 200-300 words (allowing up to 345 for editing)
+2025-05-15 11:13:17,027 - XplainCrypto - writer.writer - INFO - Using cached content for section: Executive Summary
+2025-05-15 11:13:17,028 - XplainCrypto - writer.writer - INFO - Processing section: Introduction
+2025-05-15 11:13:17,028 - XplainCrypto - writer.writer - INFO - Section 'Introduction' has 2 visualizations: key_metrics_table, whitepaper_link
+2025-05-15 11:13:17,028 - XplainCrypto - writer.writer - INFO - Section 'Introduction' config: 250-350 words (allowing up to 402 for editing)
+2025-05-15 11:13:17,028 - XplainCrypto - writer.writer - INFO - Using cached content for section: Introduction
+2025-05-15 11:13:17,028 - XplainCrypto - writer.writer - INFO - Processing section: Tokenomics and Distribution
+2025-05-15 11:13:17,028 - XplainCrypto - writer.writer - INFO - Section 'Tokenomics and Distribution' has 2 visualizations: tokenomics_pie_chart, chain_distribution_chart
+2025-05-15 11:13:17,028 - XplainCrypto - writer.writer - INFO - Section 'Tokenomics and Distribution' config: 400-600 words (allowing up to 690 for editing)
+2025-05-15 11:13:17,029 - XplainCrypto - writer.writer - INFO - Using cached content for section: Tokenomics and Distribution
+2025-05-15 11:13:17,029 - XplainCrypto - writer.writer - INFO - Processing section: Market Analysis
+2025-05-15 11:13:17,029 - XplainCrypto - writer.writer - INFO - Section 'Market Analysis' has 3 visualizations: price_trend_chart, volume_chart, competitor_comparison_chart
+2025-05-15 11:13:17,029 - XplainCrypto - writer.writer - INFO - Section 'Market Analysis' config: 600-1000 words (allowing up to 1150 for editing)
+2025-05-15 11:13:17,030 - XplainCrypto - writer.writer - INFO - Using cached content for section: Market Analysis
+2025-05-15 11:13:17,030 - XplainCrypto - writer.writer - INFO - Processing section: Technical Analysis
+2025-05-15 11:13:17,030 - XplainCrypto - writer.writer - INFO - Section 'Technical Analysis' has no visualizations
+2025-05-15 11:13:17,030 - XplainCrypto - writer.writer - INFO - Section 'Technical Analysis' config: 500-700 words (allowing up to 804 for editing)
+2025-05-15 11:13:17,030 - XplainCrypto - writer.writer - INFO - Using cached content for section: Technical Analysis
+2025-05-15 11:13:17,030 - XplainCrypto - writer.writer - INFO - Processing section: Developer Tools and User Experience
+2025-05-15 11:13:17,030 - XplainCrypto - writer.writer - INFO - Section 'Developer Tools and User Experience' has no visualizations
+2025-05-15 11:13:17,030 - XplainCrypto - writer.writer - INFO - Section 'Developer Tools and User Experience' config: 400-700 words (allowing up to 804 for editing)
+2025-05-15 11:13:17,031 - XplainCrypto - writer.writer - INFO - Using cached content for section: Developer Tools and User Experience
+2025-05-15 11:13:17,031 - XplainCrypto - writer.writer - INFO - Processing section: Security
+2025-05-15 11:13:17,031 - XplainCrypto - writer.writer - INFO - Section 'Security' has no visualizations
+2025-05-15 11:13:17,031 - XplainCrypto - writer.writer - INFO - Section 'Security' config: 400-700 words (allowing up to 804 for editing)
+2025-05-15 11:13:17,031 - XplainCrypto - writer.writer - INFO - Using cached content for section: Security
+2025-05-15 11:13:17,031 - XplainCrypto - writer.writer - INFO - Processing section: Liquidity and Adoption Metrics
+2025-05-15 11:13:17,031 - XplainCrypto - writer.writer - INFO - Section 'Liquidity and Adoption Metrics' has 5 visualizations: tvl_chart, adoption_metrics_table, tvl_milestone_chart, tvl_phases_chart, monthly_growth_chart
+2025-05-15 11:13:17,031 - XplainCrypto - writer.writer - INFO - Section 'Liquidity and Adoption Metrics' config: 500-700 words (allowing up to 804 for editing)
+2025-05-15 11:13:17,032 - XplainCrypto - writer.writer - INFO - Using cached content for section: Liquidity and Adoption Metrics
+2025-05-15 11:13:17,032 - XplainCrypto - writer.writer - INFO - Processing section: Governance and Community
+2025-05-15 11:13:17,032 - XplainCrypto - writer.writer - INFO - Section 'Governance and Community' has no visualizations
+2025-05-15 11:13:17,032 - XplainCrypto - writer.writer - INFO - Section 'Governance and Community' config: 400-700 words (allowing up to 804 for editing)
+2025-05-15 11:13:17,033 - XplainCrypto - writer.writer - INFO - Using cached content for section: Governance and Community
+2025-05-15 11:13:17,033 - XplainCrypto - writer.writer - INFO - Processing section: Ecosystem and Partnerships
+2025-05-15 11:13:17,033 - XplainCrypto - writer.writer - INFO - Section 'Ecosystem and Partnerships' has no visualizations
+2025-05-15 11:13:17,033 - XplainCrypto - writer.writer - INFO - Section 'Ecosystem and Partnerships' config: 400-700 words (allowing up to 804 for editing)
+2025-05-15 11:13:17,033 - XplainCrypto - writer.writer - INFO - Using cached content for section: Ecosystem and Partnerships
+2025-05-15 11:13:17,033 - XplainCrypto - writer.writer - INFO - Processing section: Risks and Opportunities
+2025-05-15 11:13:17,033 - XplainCrypto - writer.writer - INFO - Section 'Risks and Opportunities' has no visualizations
+2025-05-15 11:13:17,033 - XplainCrypto - writer.writer - INFO - Section 'Risks and Opportunities' config: 450-700 words (allowing up to 804 for editing)
+2025-05-15 11:13:17,033 - XplainCrypto - writer.writer - INFO - Using cached content for section: Risks and Opportunities
+2025-05-15 11:13:17,033 - XplainCrypto - writer.writer - INFO - Processing section: Team and Development Activity
+2025-05-15 11:13:17,033 - XplainCrypto - writer.writer - INFO - Section 'Team and Development Activity' has no visualizations
+2025-05-15 11:13:17,033 - XplainCrypto - writer.writer - INFO - Section 'Team and Development Activity' config: 400-700 words (allowing up to 804 for editing)
+2025-05-15 11:13:17,034 - XplainCrypto - writer.writer - INFO - Using cached content for section: Team and Development Activity
+2025-05-15 11:13:17,034 - XplainCrypto - writer.writer - INFO - Processing section: Conclusion
+2025-05-15 11:13:17,034 - XplainCrypto - writer.writer - INFO - Section 'Conclusion' has no visualizations
+2025-05-15 11:13:17,034 - XplainCrypto - writer.writer - INFO - Section 'Conclusion' config: 300-500 words (allowing up to 575 for editing)
+2025-05-15 11:13:17,034 - XplainCrypto - writer.writer - INFO - Using cached content for section: Conclusion
+2025-05-15 11:13:17,034 - XplainCrypto - state_manager.update_progress - INFO - Progress: Draft report completed for ONDO
+2025-05-15 11:13:17,034 - XplainCrypto - workflow_manager.execute_workflow - INFO - Writer completed
+2025-05-15 11:13:17,034 - XplainCrypto - workflow_manager.execute_workflow - INFO - Running Visualizer
+2025-05-15 11:13:17,034 - XplainCrypto - visualizer.visualizer_async - INFO - Starting visualizer_async
+2025-05-15 11:13:17,034 - XplainCrypto - visualizer.__init__ - INFO - Visualizer constructor started
+2025-05-15 11:13:17,034 - XplainCrypto - cache_utils.__init__ - INFO - Cache directory set to: reports/ondo/cache
+2025-05-15 11:13:17,035 - XplainCrypto - cache_manager.load_config - INFO - Loaded cache config: max_size=500MB, max_files_per_project=1000, cleanup_threshold=400MB
+2025-05-15 11:13:17,043 - XplainCrypto - cache_utils.__init__ - INFO - Cache directory set to: reports/ondo/cache
+2025-05-15 11:13:17,043 - XplainCrypto - cache_manager.load_config - INFO - Loaded cache config: max_size=500MB, max_files_per_project=1000, cleanup_threshold=400MB
+2025-05-15 11:13:17,043 - XplainCrypto - line_chart.__init__ - INFO - LINE_CHART_PY_VERSION_2025_05_12
+2025-05-15 11:13:17,043 - XplainCrypto - cache_utils.__init__ - INFO - Cache directory set to: reports/ondo/cache
+2025-05-15 11:13:17,043 - XplainCrypto - cache_manager.load_config - INFO - Loaded cache config: max_size=500MB, max_files_per_project=1000, cleanup_threshold=400MB
+2025-05-15 11:13:17,043 - XplainCrypto - line_chart.__init__ - INFO - LINE_CHART_PY_VERSION_2025_05_12
+2025-05-15 11:13:17,044 - XplainCrypto - cache_utils.__init__ - INFO - Cache directory set to: reports/ondo/cache
+2025-05-15 11:13:17,044 - XplainCrypto - cache_manager.load_config - INFO - Loaded cache config: max_size=500MB, max_files_per_project=1000, cleanup_threshold=400MB
+2025-05-15 11:13:17,044 - XplainCrypto - line_chart.__init__ - INFO - LINE_CHART_PY_VERSION_2025_05_12
+2025-05-15 11:13:17,044 - XplainCrypto - cache_utils.__init__ - INFO - Cache directory set to: reports/ondo/cache
+2025-05-15 11:13:17,044 - XplainCrypto - cache_manager.load_config - INFO - Loaded cache config: max_size=500MB, max_files_per_project=1000, cleanup_threshold=400MB
+2025-05-15 11:13:17,044 - XplainCrypto - line_chart.__init__ - INFO - LINE_CHART_PY_VERSION_2025_05_12
+2025-05-15 11:13:17,044 - XplainCrypto - cache_utils.__init__ - INFO - Cache directory set to: reports/ondo/cache
+2025-05-15 11:13:17,044 - XplainCrypto - cache_manager.load_config - INFO - Loaded cache config: max_size=500MB, max_files_per_project=1000, cleanup_threshold=400MB
+2025-05-15 11:13:17,044 - XplainCrypto - line_chart.__init__ - INFO - LINE_CHART_PY_VERSION_2025_05_12
+2025-05-15 11:13:17,044 - XplainCrypto - cache_utils.__init__ - INFO - Cache directory set to: reports/ondo/cache
+2025-05-15 11:13:17,044 - XplainCrypto - cache_manager.load_config - INFO - Loaded cache config: max_size=500MB, max_files_per_project=1000, cleanup_threshold=400MB
+2025-05-15 11:13:17,044 - XplainCrypto - line_chart.__init__ - INFO - LINE_CHART_PY_VERSION_2025_05_12
+2025-05-15 11:13:17,044 - XplainCrypto - visualizer._load_data_mappings - INFO - Reading data mappings from /Users/gkavanagh/Development/xplaincrypto/map_data.md
+2025-05-15 11:13:17,045 - XplainCrypto - visualizer._load_data_mappings - INFO - Loaded 10 data mappings from map_data.md
+2025-05-15 11:13:17,045 - XplainCrypto - visualizer.__init__ - INFO - Initialized Visualizer for project: ONDO
+2025-05-15 11:13:17,045 - XplainCrypto - visualizer.__init__ - INFO - Visualizer constructor completed
+2025-05-15 11:13:17,045 - XplainCrypto - visualizer.visualizer_async - INFO - Completed visualizer_async
+2025-05-15 11:13:17,045 - XplainCrypto - visualizer.run_with_state_async - INFO - Starting asynchronous visualization generation for ONDO
+2025-05-15 11:13:17,045 - XplainCrypto - visualizer.run_with_state_async - ERROR - No visualization_types found in report_config
+2025-05-15 11:13:17,045 - XplainCrypto - visualizer.run_with_state_async - INFO - Processing section: Executive Summary
+2025-05-15 11:13:17,045 - XplainCrypto - visualizer.run_with_state_async - INFO - Data available for section Executive Summary: ['content']
+2025-05-15 11:13:17,045 - XplainCrypto - visualizer.run_with_state_async - INFO - Data available in market_analysis: ['content']
+2025-05-15 11:13:17,045 - XplainCrypto - visualizer.run_with_state_async - INFO - Data available in executive_summary: ['content']
+2025-05-15 11:13:17,045 - XplainCrypto - visualizer.run_with_state_async - INFO - Creating visualization task for key_metrics_table in section Executive Summary
+2025-05-15 11:13:17,045 - XplainCrypto - visualizer.run_with_state_async - INFO - Processing section: Introduction
+2025-05-15 11:13:17,045 - XplainCrypto - visualizer.run_with_state_async - INFO - Data available for section Introduction: ['content']
+2025-05-15 11:13:17,045 - XplainCrypto - visualizer.run_with_state_async - INFO - Data available in market_analysis: ['content']
+2025-05-15 11:13:17,045 - XplainCrypto - visualizer.run_with_state_async - INFO - Data available in executive_summary: ['content']
+2025-05-15 11:13:17,045 - XplainCrypto - visualizer.run_with_state_async - INFO - Creating visualization task for key_metrics_table in section Introduction
+2025-05-15 11:13:17,045 - XplainCrypto - visualizer.run_with_state_async - INFO - Creating visualization task for whitepaper_link in section Introduction
+2025-05-15 11:13:17,045 - XplainCrypto - visualizer.run_with_state_async - INFO - Processing section: Tokenomics and Distribution
+2025-05-15 11:13:17,045 - XplainCrypto - visualizer.run_with_state_async - INFO - Data available for section Tokenomics and Distribution: ['content']
+2025-05-15 11:13:17,045 - XplainCrypto - visualizer.run_with_state_async - INFO - Data available in market_analysis: ['content']
+2025-05-15 11:13:17,045 - XplainCrypto - visualizer.run_with_state_async - INFO - Data available in executive_summary: ['content']
+2025-05-15 11:13:17,045 - XplainCrypto - visualizer.run_with_state_async - INFO - Creating visualization task for tokenomics_pie_chart in section Tokenomics and Distribution
+2025-05-15 11:13:17,045 - XplainCrypto - visualizer.run_with_state_async - INFO - Creating visualization task for chain_distribution_chart in section Tokenomics and Distribution
+2025-05-15 11:13:17,045 - XplainCrypto - visualizer.run_with_state_async - INFO - Processing section: Market Analysis
+2025-05-15 11:13:17,045 - XplainCrypto - visualizer.run_with_state_async - INFO - Data available for section Market Analysis: ['content']
+2025-05-15 11:13:17,045 - XplainCrypto - visualizer.run_with_state_async - INFO - Data available in market_analysis: ['content']
+2025-05-15 11:13:17,045 - XplainCrypto - visualizer.run_with_state_async - INFO - Data available in executive_summary: ['content']
+2025-05-15 11:13:17,045 - XplainCrypto - visualizer.run_with_state_async - INFO - Creating visualization task for price_trend_chart in section Market Analysis
+2025-05-15 11:13:17,045 - XplainCrypto - visualizer.run_with_state_async - INFO - Creating visualization task for volume_chart in section Market Analysis
+2025-05-15 11:13:17,045 - XplainCrypto - visualizer.run_with_state_async - INFO - Creating visualization task for competitor_comparison_chart in section Market Analysis
+2025-05-15 11:13:17,045 - XplainCrypto - visualizer.run_with_state_async - INFO - Processing section: Liquidity and Adoption Metrics
+2025-05-15 11:13:17,045 - XplainCrypto - visualizer.run_with_state_async - INFO - Data available for section Liquidity and Adoption Metrics: ['content']
+2025-05-15 11:13:17,046 - XplainCrypto - visualizer.run_with_state_async - INFO - Data available in market_analysis: ['content']
+2025-05-15 11:13:17,046 - XplainCrypto - visualizer.run_with_state_async - INFO - Data available in executive_summary: ['content']
+2025-05-15 11:13:17,046 - XplainCrypto - visualizer.run_with_state_async - INFO - Creating visualization task for tvl_chart in section Liquidity and Adoption Metrics
+2025-05-15 11:13:17,046 - XplainCrypto - visualizer.run_with_state_async - INFO - Creating visualization task for adoption_metrics_table in section Liquidity and Adoption Metrics
+2025-05-15 11:13:17,046 - XplainCrypto - visualizer.run_with_state_async - INFO - Creating visualization task for tvl_milestone_chart in section Liquidity and Adoption Metrics
+2025-05-15 11:13:17,046 - XplainCrypto - visualizer.run_with_state_async - INFO - Creating visualization task for tvl_phases_chart in section Liquidity and Adoption Metrics
+2025-05-15 11:13:17,046 - XplainCrypto - visualizer.run_with_state_async - INFO - Creating visualization task for monthly_growth_chart in section Liquidity and Adoption Metrics
+2025-05-15 11:13:17,046 - XplainCrypto - visualizer.run_with_state_async - INFO - Running 13 visualization tasks in parallel
+2025-05-15 11:13:17,046 - XplainCrypto - visualizer._create_visualization_async - INFO - Creating visualization key_metrics_table of type unknown for section Executive Summary
+2025-05-15 11:13:17,046 - XplainCrypto - visualizer._map_data_to_visualization - INFO - Mapping data for visualization type: 
+2025-05-15 11:13:17,046 - XplainCrypto - visualizer._map_data_to_visualization - WARNING - No data mapping found for visualization type: 
+2025-05-15 11:13:17,046 - XplainCrypto - visualizer._get_data_for_visualization - INFO - DIRECT DATA ACCESS: Checking state.data for /
+2025-05-15 11:13:17,046 - XplainCrypto - visualizer._get_data_for_visualization - INFO - DIRECT DATA ACCESS: Searching all sections for /
+2025-05-15 11:13:17,046 - XplainCrypto - visualizer._get_data_for_visualization - ERROR - No data_source specified for visualization key_metrics_table
+2025-05-15 11:13:17,046 - XplainCrypto - visualizer._create_visualization_async - ERROR - Data unavailable for visualization key_metrics_table: No data source specified
+2025-05-15 11:13:17,046 - XplainCrypto - visualizer._create_visualization_async - INFO - Creating visualization key_metrics_table of type unknown for section Introduction
+2025-05-15 11:13:17,046 - XplainCrypto - visualizer._map_data_to_visualization - INFO - Mapping data for visualization type: 
+2025-05-15 11:13:17,046 - XplainCrypto - visualizer._map_data_to_visualization - WARNING - No data mapping found for visualization type: 
+2025-05-15 11:13:17,046 - XplainCrypto - visualizer._get_data_for_visualization - INFO - DIRECT DATA ACCESS: Checking state.data for /
+2025-05-15 11:13:17,046 - XplainCrypto - visualizer._get_data_for_visualization - INFO - DIRECT DATA ACCESS: Searching all sections for /
+2025-05-15 11:13:17,046 - XplainCrypto - visualizer._get_data_for_visualization - ERROR - No data_source specified for visualization key_metrics_table
+2025-05-15 11:13:17,046 - XplainCrypto - visualizer._create_visualization_async - ERROR - Data unavailable for visualization key_metrics_table: No data source specified
+2025-05-15 11:13:17,046 - XplainCrypto - visualizer._create_visualization_async - INFO - Creating visualization whitepaper_link of type unknown for section Introduction
+2025-05-15 11:13:17,046 - XplainCrypto - visualizer._map_data_to_visualization - INFO - Mapping data for visualization type: 
+2025-05-15 11:13:17,046 - XplainCrypto - visualizer._map_data_to_visualization - WARNING - No data mapping found for visualization type: 
+2025-05-15 11:13:17,046 - XplainCrypto - visualizer._get_data_for_visualization - INFO - DIRECT DATA ACCESS: Checking state.data for /
+2025-05-15 11:13:17,046 - XplainCrypto - visualizer._get_data_for_visualization - INFO - DIRECT DATA ACCESS: Searching all sections for /
+2025-05-15 11:13:17,046 - XplainCrypto - visualizer._get_data_for_visualization - ERROR - No data_source specified for visualization whitepaper_link
+2025-05-15 11:13:17,046 - XplainCrypto - visualizer._create_visualization_async - ERROR - Data unavailable for visualization whitepaper_link: No data source specified
+2025-05-15 11:13:17,046 - XplainCrypto - visualizer._create_visualization_async - INFO - Creating visualization tokenomics_pie_chart of type unknown for section Tokenomics and Distribution
+2025-05-15 11:13:17,046 - XplainCrypto - visualizer._map_data_to_visualization - INFO - Mapping data for visualization type: 
+2025-05-15 11:13:17,046 - XplainCrypto - visualizer._map_data_to_visualization - WARNING - No data mapping found for visualization type: 
+2025-05-15 11:13:17,047 - XplainCrypto - visualizer._get_data_for_visualization - INFO - DIRECT DATA ACCESS: Checking state.data for /
+2025-05-15 11:13:17,047 - XplainCrypto - visualizer._get_data_for_visualization - INFO - DIRECT DATA ACCESS: Searching all sections for /
+2025-05-15 11:13:17,047 - XplainCrypto - visualizer._get_data_for_visualization - ERROR - No data_source specified for visualization tokenomics_pie_chart
+2025-05-15 11:13:17,047 - XplainCrypto - visualizer._create_visualization_async - ERROR - Data unavailable for visualization tokenomics_pie_chart: No data source specified
+2025-05-15 11:13:17,047 - XplainCrypto - visualizer._create_visualization_async - INFO - Creating visualization chain_distribution_chart of type unknown for section Tokenomics and Distribution
+2025-05-15 11:13:17,047 - XplainCrypto - visualizer._map_data_to_visualization - INFO - Mapping data for visualization type: 
+2025-05-15 11:13:17,047 - XplainCrypto - visualizer._map_data_to_visualization - WARNING - No data mapping found for visualization type: 
+2025-05-15 11:13:17,047 - XplainCrypto - visualizer._get_data_for_visualization - INFO - DIRECT DATA ACCESS: Checking state.data for /
+2025-05-15 11:13:17,047 - XplainCrypto - visualizer._get_data_for_visualization - INFO - DIRECT DATA ACCESS: Searching all sections for /
+2025-05-15 11:13:17,047 - XplainCrypto - visualizer._get_data_for_visualization - ERROR - No data_source specified for visualization chain_distribution_chart
+2025-05-15 11:13:17,047 - XplainCrypto - visualizer._create_visualization_async - ERROR - Data unavailable for visualization chain_distribution_chart: No data source specified
+2025-05-15 11:13:17,047 - XplainCrypto - visualizer._create_visualization_async - INFO - Creating visualization price_trend_chart of type unknown for section Market Analysis
+2025-05-15 11:13:17,047 - XplainCrypto - visualizer._map_data_to_visualization - INFO - Mapping data for visualization type: 
+2025-05-15 11:13:17,047 - XplainCrypto - visualizer._map_data_to_visualization - WARNING - No data mapping found for visualization type: 
+2025-05-15 11:13:17,047 - XplainCrypto - visualizer._get_data_for_visualization - INFO - DIRECT DATA ACCESS: Checking state.data for /
+2025-05-15 11:13:17,047 - XplainCrypto - visualizer._get_data_for_visualization - INFO - DIRECT DATA ACCESS: Searching all sections for /
+2025-05-15 11:13:17,047 - XplainCrypto - visualizer._get_data_for_visualization - ERROR - No data_source specified for visualization price_trend_chart
+2025-05-15 11:13:17,047 - XplainCrypto - visualizer._create_visualization_async - ERROR - Data unavailable for visualization price_trend_chart: No data source specified
+2025-05-15 11:13:17,047 - XplainCrypto - visualizer._create_visualization_async - INFO - Creating visualization volume_chart of type unknown for section Market Analysis
+2025-05-15 11:13:17,047 - XplainCrypto - visualizer._map_data_to_visualization - INFO - Mapping data for visualization type: 
+2025-05-15 11:13:17,047 - XplainCrypto - visualizer._map_data_to_visualization - WARNING - No data mapping found for visualization type: 
+2025-05-15 11:13:17,047 - XplainCrypto - visualizer._get_data_for_visualization - INFO - DIRECT DATA ACCESS: Checking state.data for /
+2025-05-15 11:13:17,047 - XplainCrypto - visualizer._get_data_for_visualization - INFO - DIRECT DATA ACCESS: Searching all sections for /
+2025-05-15 11:13:17,047 - XplainCrypto - visualizer._get_data_for_visualization - ERROR - No data_source specified for visualization volume_chart
+2025-05-15 11:13:17,047 - XplainCrypto - visualizer._create_visualization_async - ERROR - Data unavailable for visualization volume_chart: No data source specified
+2025-05-15 11:13:17,047 - XplainCrypto - visualizer._create_visualization_async - INFO - Creating visualization competitor_comparison_chart of type unknown for section Market Analysis
+2025-05-15 11:13:17,047 - XplainCrypto - visualizer._map_data_to_visualization - INFO - Mapping data for visualization type: 
+2025-05-15 11:13:17,047 - XplainCrypto - visualizer._map_data_to_visualization - WARNING - No data mapping found for visualization type: 
+2025-05-15 11:13:17,047 - XplainCrypto - visualizer._get_data_for_visualization - INFO - DIRECT DATA ACCESS: Checking state.data for /
+2025-05-15 11:13:17,047 - XplainCrypto - visualizer._get_data_for_visualization - INFO - DIRECT DATA ACCESS: Searching all sections for /
+2025-05-15 11:13:17,047 - XplainCrypto - visualizer._get_data_for_visualization - ERROR - No data_source specified for visualization competitor_comparison_chart
+2025-05-15 11:13:17,047 - XplainCrypto - visualizer._create_visualization_async - ERROR - Data unavailable for visualization competitor_comparison_chart: No data source specified
+2025-05-15 11:13:17,047 - XplainCrypto - visualizer._create_visualization_async - INFO - Creating visualization tvl_chart of type unknown for section Liquidity and Adoption Metrics
+2025-05-15 11:13:17,047 - XplainCrypto - visualizer._map_data_to_visualization - INFO - Mapping data for visualization type: 
+2025-05-15 11:13:17,048 - XplainCrypto - visualizer._map_data_to_visualization - WARNING - No data mapping found for visualization type: 
+2025-05-15 11:13:17,048 - XplainCrypto - visualizer._get_data_for_visualization - INFO - DIRECT DATA ACCESS: Checking state.data for /
+2025-05-15 11:13:17,048 - XplainCrypto - visualizer._get_data_for_visualization - INFO - DIRECT DATA ACCESS: Searching all sections for /
+2025-05-15 11:13:17,048 - XplainCrypto - visualizer._get_data_for_visualization - ERROR - No data_source specified for visualization tvl_chart
+2025-05-15 11:13:17,048 - XplainCrypto - visualizer._create_visualization_async - ERROR - Data unavailable for visualization tvl_chart: No data source specified
+2025-05-15 11:13:17,048 - XplainCrypto - visualizer._create_visualization_async - INFO - Creating visualization adoption_metrics_table of type unknown for section Liquidity and Adoption Metrics
+2025-05-15 11:13:17,048 - XplainCrypto - visualizer._map_data_to_visualization - INFO - Mapping data for visualization type: 
+2025-05-15 11:13:17,048 - XplainCrypto - visualizer._map_data_to_visualization - WARNING - No data mapping found for visualization type: 
+2025-05-15 11:13:17,048 - XplainCrypto - visualizer._get_data_for_visualization - INFO - DIRECT DATA ACCESS: Checking state.data for /
+2025-05-15 11:13:17,048 - XplainCrypto - visualizer._get_data_for_visualization - INFO - DIRECT DATA ACCESS: Searching all sections for /
+2025-05-15 11:13:17,048 - XplainCrypto - visualizer._get_data_for_visualization - ERROR - No data_source specified for visualization adoption_metrics_table
+2025-05-15 11:13:17,048 - XplainCrypto - visualizer._create_visualization_async - ERROR - Data unavailable for visualization adoption_metrics_table: No data source specified
+2025-05-15 11:13:17,048 - XplainCrypto - visualizer._create_visualization_async - INFO - Creating visualization tvl_milestone_chart of type unknown for section Liquidity and Adoption Metrics
+2025-05-15 11:13:17,048 - XplainCrypto - visualizer._map_data_to_visualization - INFO - Mapping data for visualization type: 
+2025-05-15 11:13:17,049 - XplainCrypto - visualizer._map_data_to_visualization - WARNING - No data mapping found for visualization type: 
+2025-05-15 11:13:17,049 - XplainCrypto - visualizer._get_data_for_visualization - INFO - DIRECT DATA ACCESS: Checking state.data for /
+2025-05-15 11:13:17,049 - XplainCrypto - visualizer._get_data_for_visualization - INFO - DIRECT DATA ACCESS: Searching all sections for /
+2025-05-15 11:13:17,049 - XplainCrypto - visualizer._get_data_for_visualization - ERROR - No data_source specified for visualization tvl_milestone_chart
+2025-05-15 11:13:17,049 - XplainCrypto - visualizer._create_visualization_async - ERROR - Data unavailable for visualization tvl_milestone_chart: No data source specified
+2025-05-15 11:13:17,049 - XplainCrypto - visualizer._create_visualization_async - INFO - Creating visualization tvl_phases_chart of type unknown for section Liquidity and Adoption Metrics
+2025-05-15 11:13:17,049 - XplainCrypto - visualizer._map_data_to_visualization - INFO - Mapping data for visualization type: 
+2025-05-15 11:13:17,049 - XplainCrypto - visualizer._map_data_to_visualization - WARNING - No data mapping found for visualization type: 
+2025-05-15 11:13:17,049 - XplainCrypto - visualizer._get_data_for_visualization - INFO - DIRECT DATA ACCESS: Checking state.data for /
+2025-05-15 11:13:17,049 - XplainCrypto - visualizer._get_data_for_visualization - INFO - DIRECT DATA ACCESS: Searching all sections for /
+2025-05-15 11:13:17,049 - XplainCrypto - visualizer._get_data_for_visualization - ERROR - No data_source specified for visualization tvl_phases_chart
+2025-05-15 11:13:17,049 - XplainCrypto - visualizer._create_visualization_async - ERROR - Data unavailable for visualization tvl_phases_chart: No data source specified
+2025-05-15 11:13:17,049 - XplainCrypto - visualizer._create_visualization_async - INFO - Creating visualization monthly_growth_chart of type unknown for section Liquidity and Adoption Metrics
+2025-05-15 11:13:17,049 - XplainCrypto - visualizer._map_data_to_visualization - INFO - Mapping data for visualization type: 
+2025-05-15 11:13:17,050 - XplainCrypto - visualizer._map_data_to_visualization - WARNING - No data mapping found for visualization type: 
+2025-05-15 11:13:17,050 - XplainCrypto - visualizer._get_data_for_visualization - INFO - DIRECT DATA ACCESS: Checking state.data for /
+2025-05-15 11:13:17,050 - XplainCrypto - visualizer._get_data_for_visualization - INFO - DIRECT DATA ACCESS: Searching all sections for /
+2025-05-15 11:13:17,050 - XplainCrypto - visualizer._get_data_for_visualization - ERROR - No data_source specified for visualization monthly_growth_chart
+2025-05-15 11:13:17,050 - XplainCrypto - visualizer._create_visualization_async - ERROR - Data unavailable for visualization monthly_growth_chart: No data source specified
+2025-05-15 11:13:17,050 - XplainCrypto - visualizer.run_with_state_async - WARNING - Failed to create visualization key_metrics_table
+2025-05-15 11:13:17,050 - XplainCrypto - visualizer.run_with_state_async - WARNING - Failed to create visualization key_metrics_table
+2025-05-15 11:13:17,050 - XplainCrypto - visualizer.run_with_state_async - WARNING - Failed to create visualization whitepaper_link
+2025-05-15 11:13:17,050 - XplainCrypto - visualizer.run_with_state_async - WARNING - Failed to create visualization tokenomics_pie_chart
+2025-05-15 11:13:17,050 - XplainCrypto - visualizer.run_with_state_async - WARNING - Failed to create visualization chain_distribution_chart
+2025-05-15 11:13:17,050 - XplainCrypto - visualizer.run_with_state_async - WARNING - Failed to create visualization price_trend_chart
+2025-05-15 11:13:17,050 - XplainCrypto - visualizer.run_with_state_async - WARNING - Failed to create visualization volume_chart
+2025-05-15 11:13:17,050 - XplainCrypto - visualizer.run_with_state_async - WARNING - Failed to create visualization competitor_comparison_chart
+2025-05-15 11:13:17,050 - XplainCrypto - visualizer.run_with_state_async - WARNING - Failed to create visualization tvl_chart
+2025-05-15 11:13:17,050 - XplainCrypto - visualizer.run_with_state_async - WARNING - Failed to create visualization adoption_metrics_table
+2025-05-15 11:13:17,050 - XplainCrypto - visualizer.run_with_state_async - WARNING - Failed to create visualization tvl_milestone_chart
+2025-05-15 11:13:17,050 - XplainCrypto - visualizer.run_with_state_async - WARNING - Failed to create visualization tvl_phases_chart
+2025-05-15 11:13:17,050 - XplainCrypto - visualizer.run_with_state_async - WARNING - Failed to create visualization monthly_growth_chart
+2025-05-15 11:13:17,050 - XplainCrypto - visualizer.run_with_state_async - INFO - Completed asynchronous visualization generation with 0 visualizations
+2025-05-15 11:13:17,050 - XplainCrypto - workflow_manager.execute_workflow - INFO - Visualizer completed
+2025-05-15 11:13:17,050 - XplainCrypto - workflow_manager.execute_workflow - INFO - Merging results
+2025-05-15 11:13:17,050 - XplainCrypto - workflow_manager._merge_results - INFO - Merging results for project: ONDO
+2025-05-15 11:13:17,050 - XplainCrypto - workflow_manager._merge_results - INFO - Merged state keys: ['project_name', 'report_config', 'fast_mode', 'mode', 'visualization_request', 'errors', 'review_status', 'writer_output', 'visualizer_output', 'merged_output', 'final_report', 'report_path', 'visualization_list', 'data', 'visualization_data', 'sections', 'progress', 'visualizations', 'problem_sections', 'draft', 'visualization_data_sources']
+2025-05-15 11:13:17,050 - XplainCrypto - workflow_manager.execute_workflow - INFO - Merge completed
+2025-05-15 11:13:17,050 - XplainCrypto - workflow_manager.execute_workflow - INFO - Running Reviewer
+2025-05-15 11:13:17,051 - XplainCrypto - reviewer.reviewer - INFO - Using legacy reviewer function with Reviewer class
+2025-05-15 11:13:17,051 - XplainCrypto - reviewer.run - INFO - Running reviewer for ONDO
+2025-05-15 11:13:17,051 - XplainCrypto - state_manager.update_progress - INFO - Progress: Reviewing draft report for ONDO...
+2025-05-15 11:13:17,051 - XplainCrypto - reviewer._extract_sections - INFO - Found 15 main sections (level 1 headers) to review
+2025-05-15 11:13:17,054 - XplainCrypto - reviewer._extract_sections - INFO - Extracted section 'Conclusion' with 603 words
+2025-05-15 11:13:17,054 - XplainCrypto - reviewer._extract_sections - INFO - Extracted section 'Developer Tools and User Experience in ONDO' with 534 words
+2025-05-15 11:13:17,054 - XplainCrypto - reviewer._extract_sections - INFO - Extracted section 'Ecosystem and Partnerships' with 416 words
+2025-05-15 11:13:17,054 - XplainCrypto - reviewer._extract_sections - INFO - Extracted section 'Executive Summary' with 317 words
+2025-05-15 11:13:17,054 - XplainCrypto - reviewer._extract_sections - INFO - Extracted section 'Governance and Community of ONDO' with 582 words
+2025-05-15 11:13:17,054 - XplainCrypto - reviewer._extract_sections - INFO - Extracted section 'Introduction' with 380 words
+2025-05-15 11:13:17,054 - XplainCrypto - reviewer._extract_sections - INFO - Extracted section 'Liquidity and Adoption Metrics of ONDO' with 507 words
+2025-05-15 11:13:17,055 - XplainCrypto - reviewer._extract_sections - INFO - Extracted section 'Market Analysis of ONDO' with 635 words
+2025-05-15 11:13:17,055 - XplainCrypto - reviewer._extract_sections - INFO - Extracted section 'ONDO Research Report' with 7 words
+2025-05-15 11:13:17,055 - XplainCrypto - reviewer._extract_sections - INFO - Extracted section 'ONDO Tokenomics and Distribution' with 432 words
+2025-05-15 11:13:17,055 - XplainCrypto - reviewer._extract_sections - INFO - Extracted section 'Risks and Opportunities' with 484 words
+2025-05-15 11:13:17,055 - XplainCrypto - reviewer._extract_sections - INFO - Extracted section 'Security Analysis of ONDO ' with 519 words
+2025-05-15 11:13:17,055 - XplainCrypto - reviewer._extract_sections - INFO - Extracted section 'Team and Development Activity of ONDO' with 416 words
+2025-05-15 11:13:17,055 - XplainCrypto - reviewer._extract_sections - INFO - Extracted section 'Technical Analysis ' with 491 words
+2025-05-15 11:13:17,055 - XplainCrypto - reviewer.run - INFO - Split draft into 14 sections for review
+2025-05-15 11:13:17,055 - XplainCrypto - reviewer.run - INFO - Reviewing section 1/14: 'Conclusion' (603 words)
+2025-05-15 11:13:28,562 - XplainCrypto - reviewer.run - INFO - Successfully reviewed section 'Conclusion': 581 words
+2025-05-15 11:13:28,563 - XplainCrypto - reviewer.run - INFO - Reviewing section 2/14: 'Developer Tools and User Experience in ONDO' (534 words)
+2025-05-15 11:13:38,275 - XplainCrypto - reviewer.run - INFO - Successfully reviewed section 'Developer Tools and User Experience in ONDO': 522 words
+2025-05-15 11:13:38,275 - XplainCrypto - reviewer.run - INFO - Reviewing section 3/14: 'Ecosystem and Partnerships' (416 words)
+2025-05-15 11:13:48,169 - XplainCrypto - reviewer.run - INFO - Successfully reviewed section 'Ecosystem and Partnerships': 454 words
+2025-05-15 11:13:48,169 - XplainCrypto - reviewer.run - INFO - Reviewing section 4/14: 'Executive Summary' (317 words)
+2025-05-15 11:13:54,239 - XplainCrypto - reviewer.run - INFO - Successfully reviewed section 'Executive Summary': 335 words
+2025-05-15 11:13:54,239 - XplainCrypto - reviewer.run - INFO - Reviewing section 5/14: 'Governance and Community of ONDO' (582 words)
+2025-05-15 11:14:07,176 - XplainCrypto - reviewer.run - INFO - Successfully reviewed section 'Governance and Community of ONDO': 542 words
+2025-05-15 11:14:07,176 - XplainCrypto - reviewer.run - INFO - Reviewing section 6/14: 'Introduction' (380 words)
+2025-05-15 11:14:16,946 - XplainCrypto - reviewer.run - INFO - Successfully reviewed section 'Introduction': 360 words
+2025-05-15 11:14:16,946 - XplainCrypto - reviewer.run - INFO - Reviewing section 7/14: 'Liquidity and Adoption Metrics of ONDO' (507 words)
+2025-05-15 11:14:26,074 - XplainCrypto - reviewer.run - INFO - Successfully reviewed section 'Liquidity and Adoption Metrics of ONDO': 510 words
+2025-05-15 11:14:26,075 - XplainCrypto - reviewer.run - INFO - Reviewing section 8/14: 'Market Analysis of ONDO' (635 words)
+2025-05-15 11:14:36,911 - XplainCrypto - reviewer.run - INFO - Successfully reviewed section 'Market Analysis of ONDO': 564 words
+2025-05-15 11:14:36,911 - XplainCrypto - reviewer.run - INFO - Reviewing section 9/14: 'ONDO Tokenomics and Distribution' (432 words)
+2025-05-15 11:14:47,089 - XplainCrypto - reviewer.run - INFO - Successfully reviewed section 'ONDO Tokenomics and Distribution': 430 words
+2025-05-15 11:14:47,089 - XplainCrypto - reviewer.run - INFO - Reviewing section 10/14: 'Risks and Opportunities' (484 words)
+2025-05-15 11:14:58,736 - XplainCrypto - reviewer.run - INFO - Successfully reviewed section 'Risks and Opportunities': 467 words
+2025-05-15 11:14:58,736 - XplainCrypto - reviewer.run - INFO - Reviewing section 11/14: 'Security Analysis of ONDO ' (519 words)
+2025-05-15 11:15:08,652 - XplainCrypto - reviewer.run - INFO - Successfully reviewed section 'Security Analysis of ONDO ': 499 words
+2025-05-15 11:15:08,652 - XplainCrypto - reviewer.run - INFO - Reviewing section 12/14: 'Team and Development Activity of ONDO' (416 words)
+2025-05-15 11:15:17,923 - XplainCrypto - reviewer.run - INFO - Successfully reviewed section 'Team and Development Activity of ONDO': 399 words
+2025-05-15 11:15:17,923 - XplainCrypto - reviewer.run - INFO - Reviewing section 13/14: 'Technical Analysis ' (491 words)
+2025-05-15 11:15:30,354 - XplainCrypto - reviewer.run - INFO - Successfully reviewed section 'Technical Analysis ': 499 words
+2025-05-15 11:15:30,356 - XplainCrypto - reviewer.run - INFO - Completed review: 6169 words from original 6323 words
+2025-05-15 11:15:30,356 - XplainCrypto - state_manager.update_progress - INFO - Progress: Final report polished for ONDO
+2025-05-15 11:15:30,356 - XplainCrypto - workflow_manager.execute_workflow - INFO - Reviewer completed
+2025-05-15 11:15:30,356 - XplainCrypto - workflow_manager.execute_workflow - INFO - Running Editor
+2025-05-15 11:15:30,356 - XplainCrypto - editor.editor - INFO - Editor agent starting
+2025-05-15 11:15:30,356 - XplainCrypto - editor.editor - INFO - Editor agent processing ONDO
+2025-05-15 11:15:30,356 - XplainCrypto - editor.editor - INFO - Performing comprehensive editing for ONDO
+2025-05-15 11:15:30,356 - XplainCrypto - state_manager.update_progress - INFO - Progress: Editing draft for ONDO...
+2025-05-15 11:15:30,374 - XplainCrypto - main.disconnect - INFO - Client disconnected: UPIenVuBtuMe3oVqAAAE
+2025-05-15 11:15:30,378 - XplainCrypto - main.connect - INFO - Client connected: HYFfF8gdguA358GmAAAH
+2025-05-15 11:20:01,804 - XplainCrypto - editor.editor - INFO - Processing 77 sections separately to avoid context limit issues
+2025-05-15 11:20:10,233 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Executive Summary': 421 words
+2025-05-15 11:20:19,157 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Introduction': 528 words
+2025-05-15 11:20:30,406 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Background and Founding': 551 words
+2025-05-15 11:20:42,030 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Mission': 564 words
+2025-05-15 11:20:53,502 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Role in the Cryptocurrency Market': 565 words
+2025-05-15 11:21:04,941 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Strategic Goals': 548 words
+2025-05-15 11:21:18,787 - XplainCrypto - editor.editor - INFO - Successfully edited section 'ONDO Tokenomics and Distribution': 563 words
+2025-05-15 11:21:28,261 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Tokenomics': 546 words
+2025-05-15 11:21:38,316 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Token Distribution': 600 words
+2025-05-15 11:21:47,228 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Conclusion': 382 words
+2025-05-15 11:22:00,462 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Market Analysis of ONDO': 621 words
+2025-05-15 11:22:11,235 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Trading Patterns': 616 words
+2025-05-15 11:22:23,449 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Liquidity Trends': 565 words
+2025-05-15 11:22:33,326 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Market Cap Growth': 554 words
+2025-05-15 11:22:45,713 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Competitor Comparison': 605 words
+2025-05-15 11:22:58,800 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Technical Analysis': 603 words
+2025-05-15 11:23:11,348 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Blockchain Technology': 589 words
+2025-05-15 11:23:24,813 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Consensus Mechanism': 531 words
+2025-05-15 11:23:38,425 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Scalability Solutions': 569 words
+2025-05-15 11:23:52,349 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Unique Features': 573 words
+2025-05-15 11:24:04,182 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Future Outlook': 581 words
+2025-05-15 11:24:17,096 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Developer Tools and User Experience in ONDO ': 624 words
+2025-05-15 11:24:27,510 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Developer Ecosystem': 568 words
+2025-05-15 11:24:36,927 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Documentation Quality': 521 words
+2025-05-15 11:24:47,010 - XplainCrypto - editor.editor - INFO - Successfully edited section 'User Engagement and Accessibility': 525 words
+2025-05-15 11:24:57,732 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Risk Factors': 580 words
+2025-05-15 11:25:09,328 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Security Analysis of ONDO ': 619 words
+2025-05-15 11:25:20,163 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Audit History': 581 words
+2025-05-15 11:25:30,522 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Identified Vulnerabilities': 578 words
+2025-05-15 11:25:50,205 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Risk Management Practices': 629 words
+2025-05-15 11:26:07,136 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Security Features': 563 words
+2025-05-15 11:26:21,568 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Implications for Investors': 557 words
+2025-05-15 11:26:31,853 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Liquidity and Adoption Metrics of ONDO': 579 words
+2025-05-15 11:26:42,844 - XplainCrypto - editor.editor - INFO - Successfully edited section 'User Growth': 590 words
+2025-05-15 11:26:54,126 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Market Integration': 544 words
+2025-05-15 11:27:04,012 - XplainCrypto - editor.editor - INFO - Successfully edited section 'DeFi Engagement and TVL Trends': 511 words
+2025-05-15 11:27:14,927 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Exchange Listings': 561 words
+2025-05-15 11:27:30,287 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Governance and Community of ONDO': 675 words
+2025-05-15 11:27:40,318 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Governance Structure': 585 words
+2025-05-15 11:27:49,271 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Voting Mechanism': 585 words
+2025-05-15 11:27:57,705 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Community Engagement and Growth': 524 words
+2025-05-15 11:28:07,990 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Proposal Activity': 550 words
+2025-05-15 11:28:20,143 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Ecosystem and Partnerships': 576 words
+2025-05-15 11:28:30,133 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Strategic Partnerships': 513 words
+2025-05-15 11:28:42,329 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Ecosystem Development': 526 words
+2025-05-15 11:28:55,177 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Risks and Opportunities': 610 words
+2025-05-15 11:29:07,388 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Regulatory Challenges': 584 words
+2025-05-15 11:29:18,299 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Market Risks': 559 words
+2025-05-15 11:29:30,378 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Technical Vulnerabilities': 626 words
+2025-05-15 11:29:41,511 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Growth Catalysts': 587 words
+2025-05-15 11:29:51,154 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Conclusion ': 413 words
+2025-05-15 11:30:03,246 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Team and Development Activity of ONDO': 611 words
+2025-05-15 11:30:14,388 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Team Evaluation': 528 words
+2025-05-15 11:30:25,692 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Development Activity': 622 words
+2025-05-15 11:30:37,928 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Roadmap Execution': 565 words
+2025-05-15 11:30:47,792 - XplainCrypto - editor.editor - INFO - Successfully edited section 'Disclaimer': 569 words
+2025-05-15 11:30:47,795 - XplainCrypto - editor.editor - INFO - Editing completed: 6323 words → 37798 words (+31475 words)
+2025-05-15 11:30:47,796 - XplainCrypto - editor.editor - INFO - Saved emergency backup of edited content to reports/ONDO/edited_content_20250515_113047.md
+2025-05-15 11:30:47,796 - XplainCrypto - state_manager.update_progress - INFO - Progress: Comprehensive editing completed.
+2025-05-15 11:30:47,797 - XplainCrypto - workflow_manager.execute_workflow - INFO - Editor completed
+2025-05-15 11:30:47,797 - XplainCrypto - workflow_manager.execute_workflow - INFO - Running Publisher
+2025-05-15 11:30:47,797 - XplainCrypto - publisher.publisher - INFO - Publisher agent starting
+2025-05-15 11:30:47,797 - XplainCrypto - publisher.publisher - INFO - Publisher agent processing report for project: 'ONDO'
+2025-05-15 11:30:47,797 - XplainCrypto - state_manager.update_progress - INFO - Progress: Publishing report for ONDO...
+2025-05-15 11:30:47,797 - XplainCrypto - publisher.publisher - ERROR - Error in publisher: 'StateManager' object has no attribute 'get_final_report'
+Traceback (most recent call last):
+  File "/Users/gkavanagh/Development/xplaincrypto/backend/agents/publisher.py", line 70, in publisher
+    draft = state_manager.get_final_report(state)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'StateManager' object has no attribute 'get_final_report'
+2025-05-15 11:30:47,799 - XplainCrypto - state_manager.update_progress - INFO - Progress: Error publishing report: 'StateManager' object has no attribute 'get_final_report'
+2025-05-15 11:30:47,799 - XplainCrypto - workflow_manager.execute_workflow - ERROR - Error executing workflow: object dict can't be used in 'await' expression
+2025-05-15 11:30:47,799 - XplainCrypto - error_reporter.report_error - CRITICAL - Error in workflow_manager: object dict can't be used in 'await' expression [ID: err_20250515113047_4584488864]
+Traceback (most recent call last):
+  File "/Users/gkavanagh/Development/xplaincrypto/backend/orchestration/workflow_manager.py", line 222, in execute_workflow
+    state = await publisher(state, llm=self.llm, logger=self.logger)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: object dict can't be used in 'await' expression
+2025-05-15 11:30:47,800 - XplainCrypto - main.message - ERROR - Workflow error: object dict can't be used in 'await' expression
+2025-05-15 13:40:00,479 - XplainCrypto - main.disconnect - INFO - Client disconnected: HYFfF8gdguA358GmAAAH
+2025-05-15 13:40:01,804 - XplainCrypto - main.connect - INFO - Client connected: 7x6SPBB8yh5IiPeEAAAJ
+2025-05-15 13:58:12,097 - XplainCrypto - main.disconnect - INFO - Client disconnected: 7x6SPBB8yh5IiPeEAAAJ
+2025-05-15 13:58:13,843 - XplainCrypto - main.connect - INFO - Client connected: SGm2CUS7uKmw5KsIAAAL
+2025-05-15 15:27:39,259 - XplainCrypto - main.disconnect - INFO - Client disconnected: SGm2CUS7uKmw5KsIAAAL
+2025-05-15 15:27:40,712 - XplainCrypto - main.connect - INFO - Client connected: hUBvfjfvRGSvuOarAAAN
+2025-05-15 16:11:32,523 - XplainCrypto - main.disconnect - INFO - Client disconnected: hUBvfjfvRGSvuOarAAAN
+2025-05-15 16:11:33,613 - XplainCrypto - main.connect - INFO - Client connected: _LDEbnQ_l-3JsAe8AAAP
+2025-05-15 16:25:49,007 - XplainCrypto - main.disconnect - INFO - Client disconnected: _LDEbnQ_l-3JsAe8AAAP
+2025-05-15 16:25:50,198 - XplainCrypto - main.connect - INFO - Client connected: VvtNDBCNCTn72MFdAAAR
+2025-05-15 16:40:08,690 - XplainCrypto - main.disconnect - INFO - Client disconnected: VvtNDBCNCTn72MFdAAAR
+2025-05-15 16:40:09,950 - XplainCrypto - main.connect - INFO - Client connected: bs3o9aMEg1WXgnCVAAAT
+2025-05-15 17:22:34,755 - XplainCrypto - main.disconnect - INFO - Client disconnected: bs3o9aMEg1WXgnCVAAAT
+2025-05-15 17:22:36,076 - XplainCrypto - main.connect - INFO - Client connected: PCnyvgFfVN5i0g4VAAAV
+2025-05-15 17:32:53,149 - XplainCrypto - main.disconnect - INFO - Client disconnected: PCnyvgFfVN5i0g4VAAAV
+2025-05-15 17:32:54,182 - XplainCrypto - main.connect - INFO - Client connected: OJGuoqSfACKFgiiBAAAX
+2025-05-15 17:50:02,719 - XplainCrypto - main.disconnect - INFO - Client disconnected: OJGuoqSfACKFgiiBAAAX
+2025-05-15 17:50:04,544 - XplainCrypto - main.connect - INFO - Client connected: Yl_TV5We9RPvxp6BAAAZ
+2025-05-15 18:23:00,731 - XplainCrypto - main.disconnect - INFO - Client disconnected: Yl_TV5We9RPvxp6BAAAZ
+2025-05-15 18:23:02,453 - XplainCrypto - main.connect - INFO - Client connected: grG3DwIyGdT6BuWUAAAb
+2025-05-15 18:54:07,152 - XplainCrypto - main.disconnect - INFO - Client disconnected: grG3DwIyGdT6BuWUAAAb

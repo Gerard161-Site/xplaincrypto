@@ -338,7 +338,7 @@ class PieChartVisualizer(BaseVisualizer):
         ax.set_title(title, fontsize=14, pad=20)
         
         # Save to file
-        output_path = f"docs/{self.project_name}/test_token_distribution.png"
+        output_path = f"reports/{self.project_name}/test_token_distribution.png"
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         plt.savefig(output_path, dpi=300, bbox_inches='tight')
         plt.close(fig)

@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 class CacheManager:
     """
     Manages caching of data with TTL (time-to-live) functionality.
-    All caches are stored in docs/{project_name}/cache/ directories.
+    All caches are stored in reports/{project_name}/cache/ directories.
     """
     
     # Define source-specific TTL values in hours
@@ -58,14 +58,14 @@ class CacheManager:
         self.logger = logger or logging.getLogger(__name__)
         
         # Set up cache directory
-        self.cache_dir = os.path.join("docs", self.project_name, "cache")
+        self.cache_dir = os.path.join("reports", self.project_name, "cache")
         self.logger.info(f"Cache directory set to: {self.cache_dir}")
         
         # Create cache directory if it doesn't exist
         os.makedirs(self.cache_dir, exist_ok=True)
         
         # Initialize cleanup manager
-        self.cleanup_manager = CacheCleanupManager(base_cache_dir="docs", logger=self.logger)
+        self.cleanup_manager = CacheCleanupManager(base_cache_dir="reports", logger=self.logger)
         
         # Maintenance counter to avoid running cleanup too frequently
         self._maintenance_counter = 0

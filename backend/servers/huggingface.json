@@ -1,0 +1,72 @@
+{
+    "server_name": "huggingface",
+    "display_name": "HuggingFace Inference API",
+    "description": "Provides access to HuggingFace models for inference and (simulated) model/dataset search.",
+    "command": "python huggingface_mcp.py",
+    "environment": {
+      "HUGGINGFACE_API_KEY": "{{ env.HUGGINGFACE_API_KEY }}"
+    },
+    "port": 8003,
+    "mount_path": "/mcp_huggingface",
+    "tools": [
+      {
+        "name": "query_hf_model",
+        "description": "Query a specified Hugging Face model with input text and optional parameters.",
+        "parameters": [
+          {"name": "model_id", "type": "string", "required": true, "description": "ID of the Hugging Face model (e.g., gpt2)"},
+          {"name": "input_text", "type": "string", "required": true, "description": "Text input for the model"},
+          {"name": "parameters", "type": "object", "required": false, "description": "Optional model-specific parameters (e.g., {\"max_length\": 50})"}
+        ]
+      },
+      {
+        "name": "search_hf_models",
+        "description": "(Simulated) Search for Hugging Face models.",
+        "parameters": [
+          {"name": "query", "type": "string", "required": true, "description": "Search query string"},
+          {"name": "task", "type": "string", "required": false, "description": "Optional task to filter by (e.g., text-generation)"},
+          {"name": "limit", "type": "integer", "required": false, "default": 5, "description": "Maximum number of results"}
+        ]
+      },
+      {
+        "name": "search_hf_datasets",
+        "description": "(Simulated) Search for Hugging Face datasets.",
+        "parameters": [
+          {"name": "query", "type": "string", "required": true, "description": "Search query string"},
+          {"name": "task", "type": "string", "required": false, "description": "Optional task to filter by"},
+          {"name": "limit", "type": "integer", "required": false, "default": 5, "description": "Maximum number of results"}
+        ]
+      },
+      {
+        "name": "get_hf_model_details",
+        "description": "(Simulated) Get detailed information about a specific HuggingFace model.",
+        "parameters": [
+          {"name": "model_id", "type": "string", "required": true, "description": "ID of the model"}
+        ]
+      }
+    ],
+    "resources": [
+      {
+        "path": "data://huggingface/model/{model_id}",
+        "description": "Fetch (simulated) model information for a given model ID.",
+        "parameters": [
+            {"name": "model_id", "type": "string", "required": true, "description": "HuggingFace model ID"}
+        ]
+      },
+      {
+        "path": "data://huggingface/query/{model_id}/{input_text}",
+        "description": "Query a HuggingFace model with input text.",
+        "parameters": [
+            {"name": "model_id", "type": "string", "required": true, "description": "HuggingFace model ID"},
+            {"name": "input_text", "type": "string", "required": true, "description": "URL-encoded input text for the model"}
+        ]
+      },
+      {
+        "path": "data://huggingface/research/{query}",
+        "description": "(Simulated) Perform comprehensive research on a query using HuggingFace models and datasets.",
+        "parameters": [
+            {"name": "query", "type": "string", "required": true, "description": "Research query"}
+        ]
+      }
+    ],
+    "cache_ttl": 86400 
+  } 

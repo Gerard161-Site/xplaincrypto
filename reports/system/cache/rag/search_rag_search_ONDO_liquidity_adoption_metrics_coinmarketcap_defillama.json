@@ -1,0 +1,1 @@
+{"data": ["data://coinmarketcap/overview/{coin}", "data://defillama/tvl/{coin}"], "metadata": {"source": "rag", "endpoint": "search", "query": "rag_search_ONDO liquidity adoption metrics_coinmarketcap_defillama", "cached_at": "2025-05-14T13:25:02.031087", "expires_at": "2025-05-15T13:25:02.031087", "last_accessed": "2025-05-14T16:57:02.942526", "ttl_hours": 24}}

@@ -1,0 +1,68 @@
+{
+    "server_name": "coinmarketcap",
+    "display_name": "CoinMarketCap API",
+    "description": "Provides cryptocurrency price, market cap, and OHLCV data",
+    "command": "python coinmarketcap_mcp.py",
+    "environment": {
+      "COINMARKETCAP_API_KEY": "{{ env.COINMARKETCAP_API_KEY }}"
+    },
+    "port": 8001,
+    "mount_path": "/mcp_coinmarketcap",
+    "tools": [
+      {
+        "name": "get_coin_price_data",
+        "description": "Fetch price and volume data for a cryptocurrency",
+        "data_type": "price",
+        "endpoint": "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest",
+        "parameters": [
+          {"name": "coin", "type": "string", "required": true}
+        ],
+        "method": "GET",
+        "headers": {"X-CMC_PRO_API_KEY": "{{ env.COINMARKETCAP_API_KEY }}"}
+      },
+      {
+        "name": "get_coin_market_data",
+        "description": "Fetch market cap and supply data for a cryptocurrency",
+        "data_type": "market_cap",
+        "endpoint": "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest",
+        "parameters": [
+          {"name": "coin", "type": "string", "required": true}
+        ],
+        "method": "GET",
+        "headers": {"X-CMC_PRO_API_KEY": "{{ env.COINMARKETCAP_API_KEY }}"}
+      },
+      {
+        "name": "get_coin_ohlcv_data",
+        "description": "Fetch OHLCV data for candlestick charts",
+        "data_type": "ohlcv",
+        "endpoint": "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/historical",
+        "parameters": [
+          {"name": "coin", "type": "string", "required": true},
+          {"name": "days", "type": "integer", "required": false, "default": 30}
+        ],
+        "method": "GET",
+        "headers": {"X-CMC_PRO_API_KEY": "{{ env.COINMARKETCAP_API_KEY }}"}
+      }
+    ],
+    "resources": [
+      {
+        "path": "data://coinmarketcap/price/{coin}",
+        "description": "CoinMarketCap API for price and volume data",
+        "data_type": "price",
+        "endpoint": "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest"
+      },
+      {
+        "path": "data://coinmarketcap/market/{coin}",
+        "description": "CoinMarketCap API for market cap and supply data",
+        "data_type": "market_cap",
+        "endpoint": "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest"
+      },
+      {
+        "path": "data://coinmarketcap/ohlcv/{coin}/{days}",
+        "description": "CoinMarketCap API for OHLCV data for candlestick charts",
+        "data_type": "ohlcv",
+        "endpoint": "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/historical"
+      }
+    ],
+    "cache_ttl": 3600
+  }

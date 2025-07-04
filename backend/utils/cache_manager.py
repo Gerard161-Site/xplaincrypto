@@ -14,7 +14,7 @@ class CacheCleanupManager:
     Implements a Least Recently Used (LRU) strategy for cache eviction.
     """
     
-    def __init__(self, base_cache_dir: str = "docs", logger=None):
+    def __init__(self, base_cache_dir: str = "reports", logger=None):
         self.base_cache_dir = base_cache_dir
         self.logger = logger or logging.getLogger(__name__)
         
@@ -79,7 +79,7 @@ class CacheCleanupManager:
                     parts = path.parts
                     project_name = "unknown"
                     for i, part in enumerate(parts):
-                        if part == "docs" and i+1 < len(parts):
+                        if part == "reports" and i+1 < len(parts):
                             project_name = parts[i+1]
                             break
                     

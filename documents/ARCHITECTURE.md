@@ -54,7 +54,7 @@ XplainCrypto/
 │   ├── state.py                   # State definitions
 │   └── main.py                    # Simplified entry point
 ├── frontend/                      # Frontend web application
-├── docs/                          # Generated reports and visualizations
+├── reports/                          # Generated reports and visualizations
 │   ├── cache/                     # Cached research results
 │   └── project_name/              # Project-specific reports and visualizations
 └── requirements.txt               # Python dependencies
@@ -210,7 +210,7 @@ Configuration files:
        ┌───────────────────────────────────────┐              
        │                                       │              
        │          Output Directory             │              
-       │     (docs/project_name/*.png)         │              
+       │     (reports/project_name/*.png)         │              
        │                                       │              
        └───────────────┬───────────────────────┘              
                        │                                      

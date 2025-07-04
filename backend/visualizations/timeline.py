@@ -56,7 +56,7 @@ class TimelineVisualizer(BaseVisualizer):
             
             # Save the timeline
             chart_name = f"{viz_id.lower().replace(' ', '_')}.png"
-            chart_path = os.path.join("docs", self.project_name, chart_name)
+            chart_path = os.path.join("reports", self.project_name, chart_name)
             os.makedirs(os.path.dirname(chart_path), exist_ok=True)
             
             fig.write_image(chart_path, scale=2)

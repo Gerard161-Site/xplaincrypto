@@ -2,7 +2,7 @@
   "app_name": "XplainCrypto",
   "app_description": "Advanced Cryptocurrency Research Platform",
   "app_version": "1.0.0",
-  "static_dir": "docs",
+  "static_dir": "reports",
   "report_config_file": "backend/config/report_config.json",
   "error_categories_file": "backend/config/error_categories.json",
   

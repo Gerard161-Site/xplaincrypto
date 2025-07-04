@@ -30,19 +30,19 @@ def get_project_root() -> str:
     return str(Path(__file__).parent.parent.parent)
 
 
-def get_docs_dir(project_name: str) -> str:
-    """Get the docs directory for a project.
+def get_reports_dir(project_name: str) -> str:
+    """Get the reports directory for a project.
     
     Args:
         project_name: Name of the project
         
     Returns:
-        Path to the docs directory for the project
+        Path to the reports directory for the project
     """
     normalized_name = project_name.lower().replace(" ", "_")
-    docs_dir = os.path.join(get_project_root(), "docs", normalized_name)
-    ensure_dir_exists(docs_dir)
-    return docs_dir
+    reports_dir = os.path.join(get_project_root(), "reports", normalized_name)
+    ensure_dir_exists(reports_dir)
+    return reports_dir
 
 
 def get_cache_dir(project_name: str) -> str:
@@ -54,8 +54,8 @@ def get_cache_dir(project_name: str) -> str:
     Returns:
         Path to the cache directory for the project
     """
-    docs_dir = get_docs_dir(project_name)
-    cache_dir = os.path.join(docs_dir, "cache")
+    reports_dir = get_reports_dir(project_name)
+    cache_dir = os.path.join(reports_dir, "cache")
     ensure_dir_exists(cache_dir)
     return cache_dir
 

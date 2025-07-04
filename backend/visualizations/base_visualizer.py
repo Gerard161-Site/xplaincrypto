@@ -37,7 +37,7 @@ class BaseVisualizer:
         
         # Default theme (light or dark)
         self.theme = "light"
-        self.output_dir = os.path.join("docs", self.project_name.lower().replace(" ", "_"))
+        self.output_dir = os.path.join("reports", self.project_name.lower().replace(" ", "_"))
         os.makedirs(self.output_dir, exist_ok=True)
         
         # Ensure kaleido is configured for high-quality exports

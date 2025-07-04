@@ -63,7 +63,7 @@ Logic:
 Query vector store (backend.orchestration.rag.vector_store) with ResearchState.query and section_requirements.
 Vector store contains endpoint metadata (e.g., { "endpoint": "cmc", "capabilities": ["price_history", "market_cap"] }).
 RAG outputs data_needs (e.g., ["price_history", "tvl", "token_distribution"]) and selected_endpoints (e.g., {"price_history": ["cmc"], "tvl": ["defillama"]}).
-Check cache (docs/{project_name}/cache) for existing data, updating cache_status.
+Check cache (reports/{project_name}/cache) for existing data, updating cache_status.
 
 
 Output: ResearchState with data_needs and selected_endpoints.
@@ -117,13 +117,13 @@ cache_node:
 
 Purpose: Store data in a structured cache for reuse.
 Logic:
-Save to docs/{project_name}/cache:
-Raw: docs/{project_name}/cache{source}/{project_name}_{data_type}_{timestamp}.json.
-Sections: docs/{project_name}/cachesections/{project_name}/{section_name}_{timestamp}.json.
+Save to reports/{project_name}/cache:
+Raw: reports/{project_name}/cache{source}/{project_name}_{data_type}_{timestamp}.json.
+Sections: reports/{project_name}/cachesections/{project_name}/{section_name}_{timestamp}.json.
 
 
 Format: { "data": value, "source": "cmc|defillama|tavily|huggingface", "timestamp": "2025-04-16T00:00:00Z" }.
-Update docs/{project_name}/cacheindex.json with latest paths.
+Update reports/{project_name}/cacheindex.json with latest paths.
 Save to PostgreSQL (data table: project_id, data_type, value, source, timestamp).
 
 
@@ -137,7 +137,7 @@ Logic:
 Query vector store with ResearchState.data and query to enrich sections.
 Example: For “Market Sentiment,” combine X sentiment with Tavily news.
 Store in ResearchState.data[section_name][rag_context].
-Cache in docs/{project_name}/cacherag/{project_name}/{section_name}_rag.json.
+Cache in reports/{project_name}/cacherag/{project_name}/{section_name}_rag.json.
 
 
 Output: Enriched ResearchState.
@@ -194,14 +194,14 @@ RAG: Matches query to capabilities, prioritizing low-cost/free endpoints (e.g., 
 Output: selected_endpoints (e.g., {"price_history": ["cmc"], "tvl": ["defillama"]}).
 
 
-Learning: Update vector store with new endpoints (e.g., X sentiment) via manual entries or automated scraping of API docs.
+Learning: Update vector store with new endpoints (e.g., X sentiment) via manual entries or automated scraping of API reports.
 
 Caching and State Management
 
 Cache Structure:
-docs/{project_name}/cache{source}/{project_name}_{data_type}_{timestamp}.json: Raw API outputs.
-docs/{project_name}/cachesections/{project_name}/{section_name}_{timestamp}.json: Section-specific data.
-docs/{project_name}/cacherag/{project_name}/{section_name}_rag.json: Enriched context.
+reports/{project_name}/cache{source}/{project_name}_{data_type}_{timestamp}.json: Raw API outputs.
+reports/{project_name}/cachesections/{project_name}/{section_name}_{timestamp}.json: Section-specific data.
+reports/{project_name}/cacherag/{project_name}/{section_name}_rag.json: Enriched context.
 TTL: 3 hours (real-time), 24 hours (historical), 7 days (whitepapers).
 
 
@@ -213,7 +213,7 @@ Archive to AWS S3 (>30 days).
 
 ResearchState:
 Tracks data, cache_status, errors across nodes.
-Persists to docs/{project_name}/cachestate/{project_name}_{workflow_id}.json for recovery.
+Persists to reports/{project_name}/cachestate/{project_name}_{workflow_id}.json for recovery.
 
 
 
@@ -244,7 +244,7 @@ Example: POST /query {"project": "Bitcoin", "prompt": "TVL trend"}.
 
 Visualizer/Chatbot:
 
-Access ResearchState.data or docs/{project_name}/cachesections/ for charts (Plotly, per April 16, 2025 discussion).
+Access ResearchState.data or reports/{project_name}/cachesections/ for charts (Plotly, per April 16, 2025 discussion).
 Chatbot queries MCP server for real-time results.
 
 
@@ -333,7 +333,7 @@ Add fetch_dynamic method for endpoint routing.
 
 
 Cache System:
-Structure docs/{project_name}/cache and PostgreSQL tables.
+Structure reports/{project_name}/cache and PostgreSQL tables.
 Script S3 archival.
 
 

@@ -16,7 +16,7 @@ def register_routes(
     fastapi_app: FastAPI,
     socket_service: SocketService,
     workflow_manager: WorkflowManager,
-    static_dir: str = "docs"
+    static_dir: str = "reports"
 ):
     """
     Register routes and handlers for the FastAPI application.
@@ -31,7 +31,7 @@ def register_routes(
     
     # Mount static files
     if os.path.exists(static_dir):
-        fastapi_app.mount("/docs", StaticFiles(directory=static_dir), name="docs")
+        fastapi_app.mount("/reports", StaticFiles(directory=static_dir), name="reports")
         logger.info(f"Mounted static files from {static_dir}")
     else:
         logger.warning(f"Static directory {static_dir} does not exist")

@@ -1,0 +1,50 @@
+{
+    "server_name": "tavily",
+    "display_name": "Tavily Search API",
+    "description": "Provides web search and research capabilities using the Tavily API.",
+    "command": "python tavily_mcp.py",
+    "environment": {
+      "TAVILY_API_KEY": "{{ env.TAVILY_API_KEY }}"
+    },
+    "port": 8003,
+    "mount_path": "/mcp_tavily",
+    "tools": [
+      {
+        "name": "search",
+        "description": "Perform a web search using Tavily API.",
+        "parameters": [
+          {"name": "query", "type": "string", "required": true, "description": "The search query string."},
+          {"name": "search_depth", "type": "string", "enum": ["basic", "advanced"], "required": false, "default": "basic", "description": "Search depth: basic or advanced."},
+          {"name": "max_results", "type": "integer", "required": false, "default": 5, "description": "Number of search results to return."},
+          {"name": "include_answer", "type": "boolean", "required": false, "default": false, "description": "Include a direct answer if available."},
+          {"name": "topic", "type": "string", "required": false, "default": "general", "description": "Topic focus (e.g., finance, news)."},
+          {"name": "days_back", "type": "integer", "required": false, "description": "Restrict to results from the last N days."},
+          {"name": "include_raw_content", "type": "boolean", "required": false, "default": false, "description": "Include raw content of search results."}
+        ]
+      },
+      {
+        "name": "research",
+        "description": "Perform an in-depth research search on a topic using Tavily.",
+        "parameters": [
+          {"name": "query", "type": "string", "required": true, "description": "The research query string."}
+        ]
+      }
+    ],
+    "resources": [
+      {
+        "path": "data://tavily/search/{query}",
+        "description": "Perform a basic web search using Tavily.",
+        "parameters": [
+            {"name": "query", "type": "string", "required": true, "description": "Search query"}
+        ]
+      },
+      {
+        "path": "data://tavily/research/{query}",
+        "description": "Perform an advanced/research-oriented web search using Tavily.",
+        "parameters": [
+            {"name": "query", "type": "string", "required": true, "description": "Research query"}
+        ]
+      }
+    ],
+    "cache_ttl": 3600 
+  } 

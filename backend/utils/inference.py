@@ -1,39 +1,66 @@
-import json
-from typing import Dict, List
-from backend.retriever.huggingface_search import HuggingFaceSearch
-import openai
-from tenacity import retry, wait_exponential, stop_after_attempt, retry_if_exception_type
+import logging
+import asyncio
+from typing import Dict, Any, List
+from backend.orchestration.mcp.client_manager import MCPClientManager
 
-# Retry decorator for OpenAI API calls
-def openai_retry_decorator(func):
-    """Add exponential backoff retry logic to functions that make OpenAI API calls."""
-    @retry(
-        wait=wait_exponential(multiplier=1, min=4, max=60),  # Wait between 4-60 seconds with exponential backoff
-        stop=stop_after_attempt(5),                          # Give up after 5 attempts
-        retry=retry_if_exception_type((                      # Retry on specific error types
-            openai.RateLimitError,                           # 429 errors
-            openai.APITimeoutError,                          # Timeout
-            openai.APIConnectionError                        # Connection issues
-        ))
-    )
-    def wrapper(*args, **kwargs):
-        return func(*args, **kwargs)
-    return wrapper
+logger = logging.getLogger(__name__)
 
-def infer_missing_data(hf_search: HuggingFaceSearch, available_data: Dict, missing_fields: List[str], project_name: str, logger, model="distilbert-base-uncased-distilled-squad") -> Dict:
-    inferred = {}
-    logger.info(f"Inferring {len(missing_fields)} missing fields: {missing_fields}")
-    context = json.dumps(available_data)
-    for field in missing_fields:
-        question = f"What is the {field} for {project_name}?"
-        payload = {"question": question, "context": context}
-        try:
-            result = hf_search.query(model, payload)  # Pass dict instead of string
-            inferred_value = result[0].get("answer", f"Unable to infer {field}").strip()
-            inferred[field] = inferred_value
-            logger.info(f"Inferred {field}: {inferred_value}")
-        except Exception as e:
-            logger.error(f"Failed to infer {field}: {str(e)}")
-            inferred[field] = f"Unable to infer {field}"
-    return inferred
+class InferenceManager:
+    def __init__(self):
+        self.mcp_client = MCPClientManager()
+        self.logger = logger
 
+    async def infer_missing_data(self, data: Dict[str, Any], missing_keys: List[str]) -> Dict[str, Any]:
+        """
+        Infer missing data in the provided dictionary using the huggingface MCP server.
+        
+        Args:
+            data: The input data dictionary
+            missing_keys: List of keys that are missing and need to be inferred
+            
+        Returns:
+            Updated data dictionary with inferred values
+        """
+        self.logger.info(f"Inferring missing data for keys: {missing_keys}")
+        updated_data = data.copy()
+        
+        for key in missing_keys:
+            try:
+                # Construct a query to fetch missing data using the huggingface MCP server
+                query = f"Information about {key} for project {updated_data.get('project_name', 'unknown')}"
+                self.logger.info(f"Fetching missing data for key '{key}' with query: {query}")
+                
+                # Use MCPClientManager to call the huggingface server's research tool
+                result = await self.mcp_client.execute_tool(
+                    server_name="huggingface",
+                    tool_name="research",
+                    params={"query": query, "project_name": updated_data.get("project_name", "unknown")}
+                )
+                
+                if result and "error" not in result:
+                    updated_data[key] = result.get("data", result.get("results", "Inferred data not available"))
+                    self.logger.info(f"Successfully inferred data for key '{key}': {updated_data[key]}")
+                else:
+                    updated_data[key] = "Inferred data not available"
+                    self.logger.warning(f"Failed to infer data for key '{key}': {result.get('error', 'Unknown error')}")
+            except Exception as e:
+                self.logger.error(f"Error inferring data for key '{key}': {str(e)}")
+                updated_data[key] = "Inferred data not available"
+        
+        return updated_data
+
+# Singleton instance for synchronous access
+_inference_manager = InferenceManager()
+
+def infer_missing_data(data: Dict[str, Any], missing_keys: List[str]) -> Dict[str, Any]:
+    """
+    Synchronous wrapper for infer_missing_data.
+    
+    Args:
+        data: The input data dictionary
+        missing_keys: List of keys that are missing and need to be inferred
+        
+    Returns:
+        Updated data dictionary with inferred values
+    """
+    return asyncio.run(_inference_manager.infer_missing_data(data, missing_keys))

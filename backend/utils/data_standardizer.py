@@ -17,9 +17,21 @@ class DataStandardizer:
     4. Pre-processing for visualization requirements
     """
     
-    def __init__(self, logger: Optional[logging.Logger] = None):
-        """Initialize the DataStandardizer with optional logger."""
+    def __init__(self, logger: Optional[logging.Logger] = None, state_manager: Optional[Any] = None):
+        """Initialize the DataStandardizer with optional logger and state_manager."""
         self.logger = logger or logging.getLogger(__name__)
+        self.state_manager = state_manager
+        if not self.state_manager:
+            # Try to import and instantiate a default StateManager if not provided
+            try:
+                from backend.utils.state_manager import StateManager
+                self.state_manager = StateManager(logger=self.logger)
+                self.logger.info("DataStandardizer initialized with a new default StateManager instance.")
+            except ImportError:
+                self.logger.error("StateManager could not be imported for DataStandardizer, and none was provided. State access will fail.")
+                # This will likely lead to AttributeErrors later if state_manager methods are called.
+        else:
+            self.logger.info("DataStandardizer initialized with a provided StateManager instance.")
         
         # Default visualization mappings in case visualization_mapping.json is missing
         self.default_viz_mapping = {
@@ -207,7 +219,7 @@ class DataStandardizer:
                     
                 # Prepare visualization data
                 self.logger.debug(f"Preparing data for viz_id: {viz_id}, type: {viz_type}, source: {data_source}, field: {data_field}")
-                viz_data = self._prepare_visualization_data(state, viz_config, section_title, data_sources)
+                viz_data = self._prepare_visualization_data(state, viz_config, viz_id, section_title, data_sources)
                 
                 # Store standardized data in state.visualization_data
                 if viz_data:
@@ -251,7 +263,8 @@ class DataStandardizer:
         return section_title.lower().replace(" ", "_")
     
     def _prepare_visualization_data(self, state: Union[ResearchState, Dict], 
-                                   viz_config: Dict, 
+                                   viz_config: Dict,
+                                   viz_id: str,
                                    section_title: str,
                                    section_data_sources: List[str]) -> Dict:
         """
@@ -260,6 +273,7 @@ class DataStandardizer:
         Args:
             state: Research state
             viz_config: Visualization configuration
+            viz_id: The unique identifier for the visualization (e.g., "key_metrics_table")
             section_title: Section title
             section_data_sources: List of data sources available for this section (from report_config)
             
@@ -267,10 +281,6 @@ class DataStandardizer:
             Standardized data for the visualization
         """
         viz_type = viz_config.get("type", "")
-        viz_id = viz_config.get("id", "")
-        if not viz_id and "title" in viz_config:
-            viz_id = viz_config.get("title", "unknown_viz").lower().replace(" ", "_")
-
         data_field = viz_config.get("data_field", "")
         specific_source_for_viz = viz_config.get("data_source")
         normalized_section = self._normalize_section_name(section_title)
@@ -296,7 +306,7 @@ class DataStandardizer:
         self.logger.debug(f"Effective sources to check for viz '{viz_id}': {effective_data_sources_to_check} for data_field '{data_field}'")
         
         # Get data from state based on data sources
-        raw_data = self._extract_data_from_state(state, normalized_section, effective_data_sources_to_check, data_field)
+        raw_data = self._extract_data_from_state(state, effective_data_sources_to_check, data_field, normalized_section)
         
         # If no data found, return empty dict
         if not raw_data:
@@ -318,94 +328,127 @@ class DataStandardizer:
             # For unknown types, return raw data with minimal processing
             return self._standardize_generic_data(raw_data, viz_config)
     
-    def _extract_data_from_state(self, state: Union[ResearchState, Dict], 
-                               normalized_section_name: str,
-                               sources_to_check: List[str],
-                               data_field: str) -> Dict:
-        """
-        Extract specific data field from multiple sources within the state,
-        considering the specific section.
-        If data_field is empty, it extracts all data for the specified sources within that section.
+    def _extract_data_from_state(self, state: ResearchState,
+                                 sources_to_check: List[str],
+                                 data_field: str,
+                                 normalized_section_name: str) -> Any:
+        self.logger.debug(f"Attempting to extract '{data_field}' from sources {sources_to_check} in section '{normalized_section_name}'")
         
-        Args:
-            state: Research state object or dictionary
-            normalized_section_name: The normalized name of the current section being processed.
-            sources_to_check: List of data source names (e.g., ["coinmarketcap", "defillama"])
-                              These are the sources that _should_ be checked for this viz.
-            data_field: Specific data field to extract (e.g., "price_history", "tvl")
-                        If empty, all data from the source is taken.
+        top_level_data_dict = None
+        if hasattr(state, "data") and isinstance(state.data, dict):
+            top_level_data_dict = state.data
+        elif isinstance(state, dict) and "data" in state and isinstance(state["data"], dict):
+            top_level_data_dict = state["data"]
+        else:
+            self.logger.warning(f"state.data is not a dictionary or not found. Cannot extract batch_data effectively.")
+            return None
+
+        batch_data_sources = top_level_data_dict.get("batch_data")
+        if not isinstance(batch_data_sources, dict):
+            self.logger.debug("state.data.batch_data is not a dictionary or not found.")
+            batch_data_sources = {}
+
+        section_specific_data_root = None
+        if hasattr(state, "sections") and isinstance(state.sections, dict):
+            section_specific_data_root = state.sections.get(normalized_section_name)
+        elif isinstance(state, dict) and "sections" in state and isinstance(state.get("sections"), dict):
+            section_specific_data_root = state.get("sections", {}).get(normalized_section_name)
+        
+        if not isinstance(section_specific_data_root, dict):
+            self.logger.debug(f"No section-specific data found or not a dict for section '{normalized_section_name}'.")
+            section_specific_data_root = {}
+
+        for current_source_name in sources_to_check:
+            self.logger.debug(f"Checking source: '{current_source_name}' for data_field: '{data_field}'")
+            source_data_to_inspect = None
+            data_location_message = ""
+
+            # Attempt 1: Check batch_data for the current_source_name
+            if current_source_name in batch_data_sources:
+                source_data_to_inspect = batch_data_sources.get(current_source_name)
+                data_location_message = f"from 'state.data.batch_data.{current_source_name}'"
+                self.logger.debug(f"Found source '{current_source_name}' in batch_data. Type: {type(source_data_to_inspect)}")
             
-        Returns:
-            Dictionary with extracted data, keyed by source name.
-        """
-        result = {}
-        
-        # Get the main 'data' attribute from state object or dict
-        is_state_dict = isinstance(state, dict)
-        state_data = state.get("data") if is_state_dict else getattr(state, "data", {})
-        
-        if not state_data:
-            self.logger.warning("State object or dict has no 'data' attribute or key, or it is empty.")
-            return result
+            # Attempt 2: If not in batch_data, check section-specific data for the current_source_name
+            if source_data_to_inspect is None and current_source_name in section_specific_data_root:
+                source_data_to_inspect = section_specific_data_root.get(current_source_name)
+                data_location_message = f"from section '{normalized_section_name}' specific data for source '{current_source_name}'"
+                self.logger.debug(f"Found source '{current_source_name}' in section-specific data for '{normalized_section_name}'. Type: {type(source_data_to_inspect)}")
 
-        # Get the data specific to the current section
-        section_actual_data = state_data.get(normalized_section_name, {})
-        if not section_actual_data:
-            self.logger.warning(f"No data found in state.data for section '{normalized_section_name}'.")
-            return result
+            if source_data_to_inspect is None:
+                self.logger.debug(f"Source '{current_source_name}' not found in batch_data or section '{normalized_section_name}'. Trying next source.")
+                continue # Try the next source in the list
 
-        for source in sources_to_check:
-            source_data = section_actual_data.get(source, {}) # Look for the source within the section's data
-            if not source_data: # Skip if source itself is not in section_actual_data or is empty
-                self.logger.debug(f"No data found for source '{source}' in section '{normalized_section_name}'.")
-                continue
+            # Ensure source_data_to_inspect is a dictionary for consistent field extraction,
+            # unless it's a special case like a direct string URL for tokenomics.
+            if not isinstance(source_data_to_inspect, dict):
+                if current_source_name == "tokenomics" and data_field in ["documentation_url", "whitepaper_url"] and isinstance(source_data_to_inspect, str):
+                    self.logger.info(f"Treating raw string data from tokenomics {data_location_message} as value for '{data_field}'. Returning for source '{current_source_name}'.")
+                    return source_data_to_inspect
+                self.logger.warning(f"Data for source '{current_source_name}' {data_location_message} is not a dictionary (type: {type(source_data_to_inspect)}). Cannot extract specific fields.")
+                if not data_field:
+                    self.logger.info(f"Data_field is empty, returning the non-dict data found for '{current_source_name}' {data_location_message}.")
+                    return source_data_to_inspect
+                continue # Try next source if this one isn't a dict and data_field is expected
+            
+            self.logger.debug(f"Inspecting data for source '{current_source_name}' {data_location_message}. Keys: {list(source_data_to_inspect.keys())}")
 
-            extracted_value = None # To store the data we find
-
-            if data_field:
-                # Attempt 1: Direct lookup from source_data
-                if isinstance(source_data, dict):
-                    extracted_value = source_data.get(data_field)
-                
-                # Attempt 2: Nested lookup for specific cases
-                if extracted_value is None and isinstance(source_data, dict):
-                    if source == "tokenomics":
-                        tokenomics_outer_data = source_data.get("data")
-                        if data_field == "whitepaper_url" or data_field == "documentation_url":
-                            if isinstance(tokenomics_outer_data, str):
-                                extracted_value = tokenomics_outer_data
-                                self.logger.info(f"Found '{data_field}' for '{source}' as direct string in source_data['data'].")
-                            elif isinstance(tokenomics_outer_data, dict):
-                                extracted_value = tokenomics_outer_data.get(data_field)
-                                if extracted_value is not None:
-                                    self.logger.info(f"Found '{data_field}' for '{source}' in source_data['data']['{data_field}'].")
-                        elif isinstance(tokenomics_outer_data, dict):
-                            tokenomics_inner_payload = tokenomics_outer_data.get("data")
-                            if isinstance(tokenomics_inner_payload, dict):
-                                extracted_value = tokenomics_inner_payload.get(data_field)
-                                if extracted_value is not None:
-                                    self.logger.info(f"Found '{data_field}' for '{source}' in source_data['data']['data']['{data_field}'].")
-                    elif source == "coinmarketcap" and data_field in ["price_history", "volume_history"]:
-                        # Handle cases where historical data from CoinMarketCap might be nested under a 'data' key
-                        data_dict = source_data.get('data')
-                        if isinstance(data_dict, dict):
-                            extracted_value = data_dict.get(data_field)
-                            if extracted_value is not None:
-                                self.logger.info(f"Found '{data_field}' for '{source}' in source_data['data']['{data_field}'].")
-                
-                if extracted_value is not None:
-                    result[source] = extracted_value
-                else:
-                    # Enhanced logging for missing field
-                    available_keys_msg = f"Available top-level keys in '{source}': {list(source_data.keys()) if isinstance(source_data, dict) else 'Not a dict or empty'}"
-                    if source == "tokenomics" and isinstance(source_data, dict) and isinstance(source_data.get("data"), dict):
-                        available_keys_msg += f", Available keys in '{source}[\"]': {list(source_data['data'].keys())}"
-                    self.logger.warning(f"Could not find data field '{data_field}' in source '{source}'. {available_keys_msg}")
+            extracted_value = None
+            if not data_field:  # For key_metrics_table etc., where the whole source_data is needed
+                extracted_value = source_data_to_inspect
+                self.logger.info(f"Using entire source_data from '{current_source_name}' {data_location_message} as data_field is empty.")
             else:
-                # If no specific data_field, take all data for this source
-                result[source] = source_data
-        
-        return result
+                extracted_value = source_data_to_inspect.get(data_field)
+                if extracted_value is not None:
+                    self.logger.info(f"Directly extracted '{data_field}' from source '{current_source_name}' {data_location_message}.")
+                else:
+                    if current_source_name == "tokenomics":
+                        tokenomics_payload_to_check = source_data_to_inspect.get("data", source_data_to_inspect)
+                        if isinstance(tokenomics_payload_to_check, dict):
+                            if data_field == "data":
+                                extracted_value = tokenomics_payload_to_check
+                                self.logger.info(f"Extracted entire 'data' object for 'tokenomics' from '{current_source_name}' {data_location_message}.")
+                            else:
+                                extracted_value = tokenomics_payload_to_check.get(data_field)
+                                if extracted_value is not None:
+                                    self.logger.info(f"Extracted '{data_field}' for 'tokenomics' from its payload from '{current_source_name}' {data_location_message}.")
+                                elif "data" in tokenomics_payload_to_check and isinstance(tokenomics_payload_to_check["data"], dict):
+                                    extracted_value = tokenomics_payload_to_check["data"].get(data_field)
+                                    if extracted_value is not None:
+                                        self.logger.info(f"Extracted '{data_field}' for 'tokenomics' from its nested 'data.data' payload from '{current_source_name}' {data_location_message}.")
+                        elif isinstance(tokenomics_payload_to_check, str) and data_field in ["documentation_url", "whitepaper_url"]:
+                            extracted_value = tokenomics_payload_to_check
+                            self.logger.info(f"Extracted '{data_field}' (string URL) directly for 'tokenomics' from '{current_source_name}' {data_location_message}.")
+
+                    elif current_source_name == "coinmarketcap" and data_field in ["price_history", "volume_history"]:
+                        self.logger.info(f"Attempting CoinMarketCap specific lookup for '{data_field}' from '{current_source_name}' {data_location_message}.")
+                        cmc_actual_payload = source_data_to_inspect.get("data", source_data_to_inspect)
+                        if isinstance(cmc_actual_payload, dict):
+                            lookup_key_for_cmc = "ohlcv" if data_field == "price_history" else data_field
+                            extracted_value = cmc_actual_payload.get(lookup_key_for_cmc)
+                            if extracted_value is not None:
+                                self.logger.info(f"Extracted CoinMarketCap '{lookup_key_for_cmc}' (for requested '{data_field}') from '{current_source_name}' {data_location_message}. Type: {type(extracted_value)}")
+                            else:
+                                self.logger.warning(f"Could not find '{lookup_key_for_cmc}' in CoinMarketCap payload from '{current_source_name}' {data_location_message}. Keys: {list(cmc_actual_payload.keys())}")
+                        else:
+                            self.logger.warning(f"CoinMarketCap data payload for '{data_field}' from '{current_source_name}' {data_location_message} is not a dict. Type: {type(cmc_actual_payload)}")
+
+                    if extracted_value is None: # Generic fallback if not found by specific handlers for this source
+                        data_payload_generic = source_data_to_inspect.get("data")
+                        if isinstance(data_payload_generic, dict):
+                            extracted_value = data_payload_generic.get(data_field)
+                            if extracted_value is not None:
+                                self.logger.info(f"Extracted '{data_field}' from nested 'data' key for source '{current_source_name}' {data_location_message}.")
+            
+            if extracted_value is not None:
+                self.logger.info(f"Successfully extracted '{data_field if data_field else 'entire blob'}' from source '{current_source_name}'. Returning this value.")
+                return extracted_value # Return as soon as data is found from one of the sources
+            else:
+                self.logger.debug(f"Data field '{data_field}' not found in source '{current_source_name}' {data_location_message}. Trying next source.")
+
+        # If loop completes without returning, data_field was not found in any of the sources_to_check
+        self.logger.warning(f"Could not find data field '{data_field}' in any of the specified sources: {sources_to_check} for section '{normalized_section_name}'.")
+        return None
     
     def _standardize_line_chart_data(self, raw_data: Dict, viz_config: Dict) -> Dict:
         """Standardize data for line charts."""

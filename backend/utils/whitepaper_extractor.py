@@ -25,7 +25,7 @@ class WhitepaperExtractor:
         self.project_name = project_name
         
         # Create project-specific cache directory
-        self.cache_dir = os.path.join("docs", project_name, "cache")
+        self.cache_dir = os.path.join("reports", project_name, "cache")
         os.makedirs(self.cache_dir, exist_ok=True)
         
         self.logger.info(f"WhitepaperExtractor initialized with project-specific cache: {self.cache_dir}")
@@ -182,7 +182,7 @@ class WhitepaperExtractor:
             result["data"]["vesting_details"][category] = vesting
             
         # Check for specific information in Ondo documentation
-        if "docs.ondo.foundation/ondo-token" in result["documentation_url"]:
+        if "reports.ondo.foundation/ondo-token" in result["documentation_url"]:
             # Only include data we can directly extract from the document
             if "💡 SUMMARY" in text_content and "The initial token supply of `ONDO` is 10 billion" in text_content:
                 result["data"]["total_supply"] = 10_000_000_000

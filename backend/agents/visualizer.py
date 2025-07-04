@@ -60,7 +60,7 @@ class Visualizer:
             project_name = project_name['project_name']
             
         self.project_name = project_name
-        self.output_dir = os.path.join("docs", project_name.lower().replace(" ", "_"))
+        self.output_dir = os.path.join("reports", project_name.lower().replace(" ", "_"))
         os.makedirs(self.output_dir, exist_ok=True)
         
         # Initialize supporting managers
@@ -105,7 +105,7 @@ class Visualizer:
                 "data_source": "defillama",
                 "research_state_key": "data.defillama.tvl_history",
                 "expected_structure": "List of [timestamp, tvl] or [{'date': timestamp, 'tvl': value}]",
-                "fallback_cache_path": f"docs/{self.project_name.lower()}/cache/defillama/tvl_{self.project_name.lower()}.json",
+                "fallback_cache_path": f"reports/{self.project_name.lower()}/cache/defillama/tvl_{self.project_name.lower()}.json",
                 "max_data_age": 24
             },
             "price_chart": {
@@ -113,7 +113,7 @@ class Visualizer:
                 "data_source": "coinmarketcap",
                 "research_state_key": "data.coinmarketcap.ohlcv",
                 "expected_structure": "List of [{'date': timestamp, 'open': float, 'high': float, 'low': float, 'close': float, 'volume': float}]",
-                "fallback_cache_path": f"docs/{self.project_name.lower()}/cache/coinmarketcap/ohlcv_{self.project_name.lower()}_30.json",
+                "fallback_cache_path": f"reports/{self.project_name.lower()}/cache/coinmarketcap/ohlcv_{self.project_name.lower()}_30.json",
                 "max_data_age": 1
             },
             "volume_chart": {
@@ -121,7 +121,7 @@ class Visualizer:
                 "data_source": "coinmarketcap",
                 "research_state_key": "data.coinmarketcap.volume_history",
                 "expected_structure": "List of [{'date': timestamp, 'volume': float}]",
-                "fallback_cache_path": f"docs/{self.project_name.lower()}/cache/coinmarketcap/historical_{self.project_name.lower()}_days_30.json",
+                "fallback_cache_path": f"reports/{self.project_name.lower()}/cache/coinmarketcap/historical_{self.project_name.lower()}_days_30.json",
                 "max_data_age": 4
             },
             "tokenomics_chart": {
@@ -129,7 +129,7 @@ class Visualizer:
                 "data_source": "tokenomics",
                 "research_state_key": "data.tokenomics.token_distribution",
                 "expected_structure": "Nested object with token_allocation field containing Dict of {category: percentage}",
-                "fallback_cache_path": f"docs/{self.project_name.lower()}/cache/tokenomics/distribution_{self.project_name.lower()}.json",
+                "fallback_cache_path": f"reports/{self.project_name.lower()}/cache/tokenomics/distribution_{self.project_name.lower()}.json",
                 "max_data_age": 168
             },
             "chain_distribution_chart": {
@@ -137,7 +137,7 @@ class Visualizer:
                 "data_source": "defillama",
                 "research_state_key": "data.defillama.currentChainTvls",
                 "expected_structure": "Dict of {chain: tvl} or [{\"chain\": str, \"tvl\": float}]",
-                "fallback_cache_path": f"docs/{self.project_name.lower()}/cache/defillama/protocol_protocol_{self.project_name.lower()}.json",
+                "fallback_cache_path": f"reports/{self.project_name.lower()}/cache/defillama/protocol_protocol_{self.project_name.lower()}.json",
                 "max_data_age": 24
             },
             "comparison_chart": {

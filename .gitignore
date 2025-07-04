@@ -22,24 +22,24 @@ node_modules/
 .cursor/  
 
 # Project specific
-docs/*.md
-docs/*.pdf 
-docs/*.png
-docs/*.jpg
-docs/*.jpeg
-docs/*.gif
-docs/*.bmp
-docs/*.tiff
-docs/*.ico
-docs/*/*.png
-docs/*.txt
-docs/*/*.txt
-docs/*/*.md
-docs/*/*.pdf
-docs/*/*.png
-docs/*/*.jpg
-docs/*/*.jpeg
-docs/*/*.gif
-docs/cache/*.json
+reports/*.md
+reports/*.pdf 
+reports/*.png
+reports/*.jpg
+reports/*.jpeg
+reports/*.gif
+reports/*.bmp
+reports/*.tiff
+reports/*.ico
+reports/*/*.png
+reports/*.txt
+reports/*/*.txt
+reports/*/*.md
+reports/*/*.pdf
+reports/*/*.png
+reports/*/*.jpg
+reports/*/*.jpeg
+reports/*/*.gif
+reports/cache/*.json
 
 cache/*.json

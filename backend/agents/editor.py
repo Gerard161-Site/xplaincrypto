@@ -3,10 +3,30 @@ from langchain_openai import ChatOpenAI
 import logging
 import re
 from backend.state import ResearchState
-from backend.utils.inference import openai_retry_decorator
 from backend.utils.state_manager import StateManager
 from typing import Dict
 from datetime import datetime
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+
+logger = logging.getLogger(__name__)
+
+# Define openai_retry_decorator directly in editor.py
+def openai_retry_decorator(func):
+    """
+    Decorator to retry OpenAI API calls with exponential backoff.
+    Retries up to 3 times with a wait time of 1-5 seconds between attempts.
+    """
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=5),
+        retry=retry_if_exception_type(Exception),
+        before_sleep=lambda retry_state: logger.warning(
+            f"Retrying {func.__name__} (attempt {retry_state.attempt_number}/3) due to {retry_state.outcome.exception()}"
+        )
+    )
+    async def wrapper(*args, **kwargs):
+        return await func(*args, **kwargs)
+    return wrapper
 
 @openai_retry_decorator
 async def editor(state: Dict, llm: ChatOpenAI, logger: logging.Logger, config=None) -> Dict:
@@ -251,8 +271,8 @@ Focus on:
         
         # Save emergency backup of edited content
         import os
-        os.makedirs(f"docs/{project_name}", exist_ok=True)
-        backup_path = f"docs/{project_name}/edited_content_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
+        os.makedirs(f"reports/{project_name}", exist_ok=True)
+        backup_path = f"reports/{project_name}/edited_content_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
         try:
             with open(backup_path, "w") as f:
                 f.write(final_draft)

@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ONDO Price Trend (30 Days)</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <canvas id="ondoChart" width="1200" height="600"></canvas>
+
+<script>
+const jsonData = {
+    timestamps: ["2025-04-15T00:00:00.000Z", "2025-04-16T00:00:00.000Z", "2025-04-17T00:00:00.000Z", "2025-04-18T00:00:00.000Z", "2025-04-19T00:00:00.000Z", "2025-04-20T00:00:00.000Z", "2025-04-21T00:00:00.000Z", "2025-04-22T00:00:00.000Z", "2025-04-23T00:00:00.000Z", "2025-04-24T00:00:00.000Z", "2025-04-25T00:00:00.000Z", "2025-04-26T00:00:00.000Z", "2025-04-27T00:00:00.000Z", "2025-04-28T00:00:00.000Z", "2025-04-29T00:00:00.000Z", "2025-04-30T00:00:00.000Z", "2025-05-01T00:00:00.000Z", "2025-05-02T00:00:00.000Z", "2025-05-03T00:00:00.000Z", "2025-05-04T00:00:00.000Z", "2025-05-05T00:00:00.000Z", "2025-05-06T00:00:00.000Z", "2025-05-07T00:00:00.000Z", "2025-05-08T00:00:00.000Z", "2025-05-09T00:00:00.000Z", "2025-05-10T00:00:00.000Z", "2025-05-11T00:00:00.000Z", "2025-05-12T00:00:00.000Z", "2025-05-13T00:00:00.000Z", "2025-05-14T00:00:00.000Z"],
+    prices: [0.8751752765173386, 0.8319414519764998, 0.82007288866094, 0.8277458526481855, 0.8300301496966787, 0.8553503760316804, 0.8365515741098131, 0.8518917529130976, 0.9169838836577331, 0.9158311988481957, 0.9781576516551554, 0.9916660155018335, 0.9955468522786948, 0.9453445302248001, 0.9724847335827989, 0.9320545504879655, 0.908087436177739, 0.9137505267501692, 0.9219422184891475, 0.8762269348267737, 0.8589627603580648, 0.8673311280024161, 0.8661775453405262, 0.8718745545750897, 0.9746700760938899, 1.0051618232063924, 1.1021354583335305, 1.0377294875070089, 1.0297853666523316, 1.0449546717872027]
+};
+
+const ctx = document.getElementById('ondoChart').getContext('2d');
+new Chart(ctx, {
+    type: 'line',
+    data: {
+        labels: jsonData.timestamps.map(date => new Date(date).toLocaleDateString()),
+        datasets: [{
+            label: 'Price (USD)',
+            data: jsonData.prices,
+            borderColor: 'rgb(54, 162, 235)',
+            backgroundColor: 'rgba(54, 162, 235, 0.2)',
+            tension: 0.4,
+            fill: true
+        }]
+    },
+    options: {
+        responsive: false,
+        plugins: {
+            title: {
+                display: true,
+                text: 'ONDO Price Trend (30 Days)',
+                font: { size: 18 }
+            }
+        },
+        scales: {
+            x: {
+                type: 'time',
+                time: {
+                    unit: 'day',
+                    displayFormats: { day: 'MMM d' }
+                },
+                ticks: {
+                    maxRotation: 45,
+                    minRotation: 45,
+                    autoSkip: true,
+                    maxTicksLimit: 10
+                },
+                title: {
+                    display: true,
+                    text: 'Date'
+                }
+            },
+            y: {
+                title: {
+                    display: true,
+                    text: 'Price (USD)'
+                },
+                ticks: {
+                    callback: value => '$' + value.toFixed(3)
+                },
+                suggestedMin: 0.82,
+                suggestedMax: 1.10
+            }
+        }
+    }
+});
+</script>
+
+</body>
+</html>

@@ -1,0 +1,22 @@
+[
+  {
+    "server_name": "coinmarketcap",
+    "command": "python backend/servers/coinmarketcap_mcp.py",
+    "metadata_file": "backend/servers/coinmarketcap.json"
+  },
+  {
+    "server_name": "defillama",
+    "command": "python backend/servers/defillama_mcp.py",
+    "metadata_file": "backend/servers/defillama.json"
+  },
+  {
+    "server_name": "tavily",
+    "command": "python backend/servers/tavily_mcp.py",
+    "metadata_file": "backend/servers/tavily.json"
+  },
+  {
+    "server_name": "huggingface",
+    "command": "python backend/servers/huggingface_mcp.py",
+    "metadata_file": "backend/servers/huggingface.json"
+  }
+]

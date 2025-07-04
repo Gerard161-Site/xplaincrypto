@@ -51,6 +51,41 @@ class Researcher:
         self.state_manager = StateManager(logger=self.logger)
         
         self.logger.info("Researcher constructor started")
+
+        # Define core data queries for RAG-driven fetching of project-wide data
+        self.CORE_DATA_QUERIES = [
+            {
+                "concept": "overview",
+                "query_template": "{project_name} market overview, including current price, market cap, 24h volume, circulating supply, total supply, max supply, and a brief description.",
+                "target_sources": ["coinmarketcap", "coingecko"], # Primary sources for general overview
+                "description_for_report": "Fetches general market overview, current price, market cap, 24h volume, etc."
+            },
+            {
+                "concept": "price_history", 
+                "query_template": "{project_name} cryptocurrency 30-day price history OHLCV", 
+                "target_sources": ["coinmarketcap", "coingecko"],
+                "description": "Fetches 30-day historical price data (Open, High, Low, Close, Volume)."
+            },
+            {
+                "concept": "volume_history", 
+                "query_template": "{project_name} cryptocurrency 30-day trading volume history", 
+                "target_sources": ["coinmarketcap", "coingecko"],
+                "description": "Fetches 30-day historical trading volume."
+            },
+            {
+                "concept": "protocol_data_tvl", 
+                "query_template": "{project_name} DeFi protocol data including Total Value Locked (TVL) and historical TVL", 
+                "target_sources": ["defillama"],
+                "description": "Fetches comprehensive DeFi protocol data, including current and historical TVL."
+            },
+            {
+                "concept": "token_distribution", 
+                "query_template": "{project_name} cryptocurrency tokenomics, supply, and distribution details", 
+                "target_sources": ["tokenomics", "huggingface"], # Added huggingface as a fallback for tokenomics
+                "description": "Fetches details about token supply, allocation, and distribution."
+            }
+            # Add more core data concepts as needed
+        ]
         self.logger.info("Researcher constructor completed")
     
     async def initialize(self):
@@ -91,28 +126,15 @@ class Researcher:
                 self.logger.info('No global client manager found, creating a new one')
                 self.mcp_client = MCPClientManager()
             
-            if not hasattr(self.mcp_client, 'servers_started') or not self.mcp_client.servers_started:
-                self.logger.info('Starting MCP servers')
-                server_names = ['coingecko', 'coinmarketcap', 'defillama', 'tavily', 'tokenomics']
-                for server_name in server_names:
-                    self.logger.info(f'Starting MCP server: {server_name}')
-                    try:
-                        await asyncio.wait_for(self.mcp_client.start_server(server_name), timeout=10.0)
-                        self.logger.info(f'Server {server_name} started')
-                    except asyncio.TimeoutError:
-                        self.logger.error(f"Timeout starting MCP server: {server_name}")
-                    except Exception as e:
-                        self.logger.error(f"Error starting MCP server {server_name}: {str(e)}")
-                self.mcp_client.servers_started = True
-            else:
-                self.logger.info('All MCP servers already running')
+            # Servers are started by MCPClientManager during WorkflowManager initialization
+            self.logger.info('MCP servers should already be running via WorkflowManager')
             
             self.logger.info('RAG and MCP components initialized successfully')
         except Exception as e:
             self.logger.error(f'Error initializing RAG and MCP components: {str(e)}', exc_info=True)
             raise
         self.logger.info("Completed Researcher.initialize")
-    
+
     async def run(self, state: Union[ResearchState, Dict]) -> Union[ResearchState, Dict]:
         """Run the researcher to collect data for the given project."""
         self.logger.info("Entering Researcher.run")
@@ -121,7 +143,7 @@ class Researcher:
             self.project_name = self.state_manager.get_project_name(state)
             self.logger.info(f"Running researcher for {self.project_name}")
             
-            self.cache_dir = os.path.join("docs", self.project_name.lower(), "cache")
+            self.cache_dir = os.path.join("reports", self.project_name.lower(), "cache")
             os.makedirs(self.cache_dir, exist_ok=True)
             self.logger.info(f"Cache directory set to: {self.cache_dir}")
             
@@ -163,7 +185,7 @@ class Researcher:
         
         try:
             self.processed_endpoints = set()
-            await self._batch_process_project_data(report_config, project_name)
+            await self._fetch_core_project_data_via_rag(project_name)
             
             if "batch_data" in self.data and "tavily" in self.data["batch_data"]:
                 section_research_results = self.data["batch_data"]["tavily"]
@@ -184,105 +206,99 @@ class Researcher:
                 if not section_title:
                     continue
                     
-                required_sources = [source for source in section.get("data_sources", [])
-                                    if source != "web_research"]
+                # Normalize data_sources: ensure it's a list, handle "web_research" consistently
+                # All sources, including 'web_research', will go through the RAG process.
+                data_sources = section.get("data_sources", [])
+                if isinstance(data_sources, str):
+                    data_sources = [data_sources]
                 
-                if not required_sources:
-                    self.logger.info(f"Section '{section_title}' only requires web_research, which was already processed")
-                    continue
+                # Map "web_research" to "tavily" for RAG consistency if needed,
+                # though RAGRetriever also has logic for this.
+                # For clarity here, we ensure 'tavily' is used if 'web_research' is specified.
+                required_sources_for_section = []
+                for src in data_sources:
+                    if src.lower() == "web_research":
+                        if "tavily" not in required_sources_for_section: # Avoid duplicates
+                            required_sources_for_section.append("tavily")
+                    elif src.lower() not in required_sources_for_section: # Avoid duplicates
+                        required_sources_for_section.append(src.lower())
+
+                self.logger.info(f"Processing section: '{section_title}' | Required sources: {required_sources_for_section}")
                 
-                self.logger.info(f"Processing section: '{section_title}' | Required sources: {required_sources}")
-                
-                query_template = section.get("query_template", "{project_name}")
-                section_query = query_template.format(project_name=project_name)
-                self.logger.info(f"Section '{section_title}': Running RAG with query: '{section_query}'")
-                
-                endpoints_for_section = []
-                try:
-                    if self.rag_retriever:
-                        endpoints_for_section = await asyncio.wait_for(
-                            self.rag_retriever.get_endpoints_for_project(section_query, required_sources=required_sources), 
-                            timeout=5.0
-                        )
-                        endpoints_for_section = [
-                            endpoint for endpoint in endpoints_for_section
-                            if "research" not in endpoint.lower() and "tavily" not in endpoint.lower()
-                        ]
-                        self.logger.info(f"RAG retrieved {len(endpoints_for_section)} endpoints for section query: {endpoints_for_section}")
+                # Attempt to use pre-fetched core data if concepts are listed for the section
+                section_data_found_in_core = False
+                if section.get("data_concepts_needed"):
+                    for concept in section.get("data_concepts_needed"):
+                        if concept in self.data["batch_data"] and self.data["batch_data"][concept] and not self.data["batch_data"][concept].get("error"):
+                            section_data_found_in_core = True
+                            self.logger.info(f"All data for section '{section_title}' found in pre-fetched core data. Skipping RAG/tool invocation.")
+                            continue
+
+                # If not all data was found in core, or no core concepts needed, proceed with RAG for the section
+                if not section_data_found_in_core:
+                    section_query_template = section.get("query_template")
+                    if section_query_template:
+                        query = section_query_template.format(project_name=self.project_name)
+                        self.logger.info(f"Section '{section_title}': Running RAG with query: '{query}' and sources: {required_sources_for_section}")
+                        
+                        try:
+                            # Pass the required_sources_for_section to RAG
+                            endpoints = await self.rag_retriever.get_endpoints_for_project(
+                                query,
+                                required_sources=required_sources_for_section if required_sources_for_section else None,
+                                top_k=5 # Fetch a few relevant endpoints for sections
+                            )
+                            self.logger.info(f"RAG retrieved {len(endpoints)} endpoints for section query: {endpoints}")
+
+                            if endpoints:
+                                for endpoint in endpoints:
+                                    if endpoint in self.processed_endpoints:
+                                        self.logger.info(f"Endpoint {endpoint} already processed. Skipping.")
+                                        continue
+                                    
+                                    try:
+                                        self.logger.info(f"Section '{section_title}': Invoking tool for endpoint: {endpoint}")
+                                        result = await self._invoke_tool_for_endpoint(endpoint, project_name, query=query, cache_key=section_title)
+                                        self.processed_endpoints.add(endpoint)
+                                        
+                                        if result:
+                                            source = endpoint.split("://")[1].split("/")[0] if "://" in endpoint else "unknown"
+                                            current_section_data = self.state_manager.get_section_data(state, section_title) or {}
+                                            current_section_data[source] = result
+                                            state = self.state_manager.update_section_data(state, section_title, current_section_data)
+                                    except Exception as e:
+                                        self.logger.error(f"Error processing endpoint {endpoint} for section '{section_title}': {str(e)}")
+                                        problem_sections = self.state_manager.get_problem_sections(state) or []
+                                        if not any(ps.get("title") == section_title for ps in problem_sections):
+                                            problem_sections.append({"title": section_title, "missing_fields": [source]})
+                                            state = self.state_manager.update_problem_sections(state, problem_sections)
+                            else:
+                                self.logger.warning(f"RAGRetriever returned no suitable endpoints for section '{section_title}'. Skipping RAG.")
+                        except Exception as e:
+                            self.logger.error(f"Error during RAG processing for section '{section_title}': {e}", exc_info=True)
+                    elif required_sources_for_section:
+                        # This case might indicate a config error: sources specified but no query template.
+                        # Or, it might rely purely on source-based core data already fetched.
+                        # For now, we log if it seems like RAG should have run but didn't due to no query.
+                        self.logger.warning(f"Section '{section_title}' has required sources {required_sources_for_section} but no query_template. RAG was not performed. Ensure this is intended or core data covers needs.")
                     else:
-                        self.logger.warning("RAG retriever not available, skipping additional endpoint retrieval")
-                        endpoints_for_section = []
-                except Exception as e:
-                    self.logger.error(f"Error in RAG retrieval for section '{section_title}': {str(e)}")
-                    endpoints_for_section = []
-                
-                for endpoint in endpoints_for_section:
-                    if endpoint in self.processed_endpoints:
-                        self.logger.info(f"Endpoint {endpoint} already processed. Skipping.")
-                        continue
-                        
-                    try:
-                        self.logger.info(f"Section '{section_title}': Invoking tool for endpoint: {endpoint}")
-                        result = await self._invoke_tool_for_endpoint(endpoint, project_name, query=section_query, cache_key=section_title)
-                        self.processed_endpoints.add(endpoint)
-                        
-                        if result:
-                            source = endpoint.split("://")[1].split("/")[0] if "://" in endpoint else "unknown"
-                            current_section_data = self.state_manager.get_section_data(state, section_title) or {}
-                            current_section_data[source] = result
-                            state = self.state_manager.update_section_data(state, section_title, current_section_data)
-                    except Exception as e:
-                        self.logger.error(f"Error processing endpoint {endpoint} for section '{section_title}': {str(e)}")
-                        problem_sections = self.state_manager.get_problem_sections(state) or []
-                        if not any(ps.get("title") == section_title for ps in problem_sections):
-                            problem_sections.append({"title": section_title, "missing_fields": [source]})
-                            state = self.state_manager.update_problem_sections(state, problem_sections)
+                        self.logger.info(f"Section '{section_title}' has no query_template and no specific required_sources for RAG. Skipping RAG.")
+            
+            # Consolidate all fetched data into state
+            self.logger.info("Consolidating additional fetched data into state...")
+            for key, value in self.data.items():
+                if key != "batch_data":
+                    for field_key, field_data in value.items():
+                        state = self.state_manager.update_data_field(state, key, field_key, field_data)
             
             # Report problem sections
             problem_sections = self.state_manager.get_problem_sections(state) or []
             self.logger.info(f"Problem sections reported: {len(problem_sections)}")
             
-            # NEW: Consolidate batch-processed API data into the top level of state.data
-            self.logger.info("Consolidating batch-processed API data into state.data...")
-            if hasattr(self, 'data') and "batch_data" in self.data:
-                for source_name, source_data_payload in self.data["batch_data"].items():
-                    if source_name == "tavily": # Skip Tavily as it's handled section-specifically
-                        self.logger.info(f"Skipping Tavily data consolidation at this top level for source: {source_name}")
-                        continue
-
-                    if source_data_payload and not (isinstance(source_data_payload, dict) and source_data_payload.get("error")):
-                        self.logger.info(f"Consolidating data for source: {source_name} into state.data.{source_name}")
-                        
-                        # Access state.data (which is a dict)
-                        if isinstance(state, dict): # If state itself is a dict
-                            if "data" not in state or not isinstance(state["data"], dict):
-                                state["data"] = {} # Should be initialized by ensure_state_structure
-                            state["data"][source_name] = source_data_payload
-                        elif hasattr(state, "data") and isinstance(state.data, dict): # If state is ResearchState object
-                            state.data[source_name] = source_data_payload
-                        else:
-                            self.logger.error(f"Cannot consolidate batch data for {source_name}: state.data is not accessible as a dict.")
-                        
-                        # Log sample of consolidated data
-                        if isinstance(source_data_payload, dict):
-                            sample_keys = list(source_data_payload.keys())[:5]
-                            self.logger.debug(f"Consolidated {source_name} data. Sample keys: {sample_keys}")
-                        elif isinstance(source_data_payload, list):
-                            self.logger.debug(f"Consolidated {source_name} data. Sample length: {len(source_data_payload)}")
-                            if source_data_payload:
-                                self.logger.debug(f"First item sample: {str(source_data_payload[0])[:100]}")
-                                
-                    elif isinstance(source_data_payload, dict) and source_data_payload.get("error"):
-                        self.logger.warning(f"Skipping consolidation for source {source_name} due to error in fetched data: {source_data_payload.get('error')}")
-                    else:
-                        self.logger.warning(f"No data or invalid data structure for source {source_name} in batch_data. Skipping consolidation.")
-            else:
-                self.logger.warning("No 'batch_data' found in self.data to consolidate.")
-            
             # Standardize data for visualizations
             self.logger.info("Standardizing data for visualizations")
             try:
-                data_standardizer = DataStandardizer(logger=self.logger)
+                data_standardizer = DataStandardizer(logger=self.logger, state_manager=self.state_manager)
                 state = data_standardizer.standardize_state_data(state, report_config)
                 self.logger.info("Data standardization complete")
             except Exception as e:
@@ -295,6 +311,85 @@ class Researcher:
         except Exception as e:
             self.logger.error(f"Error in execute_workflow: {str(e)}", exc_info=True)
             return self.state_manager.add_error(state, "researcher", f"Error in execute_workflow: {str(e)}")
+
+    async def _fetch_core_project_data_via_rag(self, project_name: str) -> None:
+        """
+        Fetches core, project-wide data points using RAG to determine the best endpoint for each predefined concept.
+        Results are stored in self.data['batch_data'][<concept_name>].
+        """
+        self.logger.info(f"Starting RAG-driven fetching of core project data for: {project_name}")
+
+        if not self.rag_retriever:
+            self.logger.error("RAG retriever is not initialized. Cannot fetch core project data.")
+            return
+
+        if "batch_data" not in self.data: # Ensure batch_data dict exists
+            self.data["batch_data"] = {}
+
+        # Ensure a set to track successfully processed core concepts to avoid redundant calls if a concept maps to multiple RAG queries later
+        # This is distinct from self.already_processed_endpoints which is for section-level generic endpoint tracking
+        successfully_fetched_core_concepts = set()
+
+        for item in self.CORE_DATA_QUERIES:
+            concept = item["concept"]
+            query = item["query_template"].format(project_name=project_name)
+            target_sources = item["target_sources"]
+            description = item.get("description", "core data point")
+
+            self.logger.info(f"Processing core concept: '{concept}' ({item.get('description_for_report', query)})")
+            
+            # Check if data for this concept already exists from a previous step (e.g. resume from interruption)
+            if concept in self.data["batch_data"] and self.data["batch_data"][concept] and not self.data["batch_data"][concept].get("error"):
+                self.logger.info(f"Core concept '{concept}' already present in self.data['batch_data']. Skipping RAG fetch.")
+                continue
+
+            try:
+                endpoints = await self.rag_retriever.get_endpoints_for_project(
+                    query,
+                    required_sources=target_sources,
+                    top_k=1 # We want the single best endpoint for each core concept
+                )
+
+                if endpoints and isinstance(endpoints, list) and len(endpoints) > 0:
+                    endpoint_to_call = endpoints[0] # Take the top_k=1 result
+                    self.logger.info(f"RAG selected endpoint '{endpoint_to_call}' for core concept '{concept}' with query '{query}'")
+                    
+                    # Use a more specific cache key for core data to avoid collision with section-specific calls to same endpoint
+                    core_data_cache_key_suffix = f"core_concept_{concept}"
+
+                    # Invoke the tool for the selected endpoint
+                    # Pass the original concept query for potential use in _invoke_tool_for_endpoint if needed for specific tools
+                    fetched_data = await self._invoke_tool_for_endpoint(
+                        endpoint_pattern=endpoint_to_call, 
+                        project_name=project_name, 
+                        query_for_formatting=query, # Pass the concept-specific query
+                        section_key_for_cache=core_data_cache_key_suffix # Use concept for specific caching
+                    )
+                    
+                    if fetched_data is not None:
+                        # Store data under the concept key, and also identify the source if possible from the endpoint
+                        source_name = endpoint_to_call.split('://')[1].split('/')[0] if '://' in endpoint_to_call else 'unknown_source'
+                        self.data['batch_data'][concept] = {
+                            "source_endpoint": endpoint_to_call,
+                            "source_name": source_name,
+                            "data": fetched_data
+                        }
+                        successfully_fetched_core_concepts.add(concept)
+                        self.logger.info(f"Successfully fetched and stored data for core concept '{concept}' from '{endpoint_to_call}'")
+                    else:
+                        self.logger.warning(f"No data returned from endpoint '{endpoint_to_call}' for core concept '{concept}'. Storing as None.")
+                        self.data['batch_data'][concept] = None # Explicitly store None if fetch fails
+
+                else:
+                    self.logger.warning(f"RAGRetriever returned no suitable endpoints for core concept '{concept}' with query: {query}. Storing as None.")
+                    self.data['batch_data'][concept] = None # Explicitly store None if no endpoint found
+
+            except Exception as e:
+                self.logger.error(f"Exception during RAG-driven fetch for core concept '{concept}': {e}", exc_info=True)
+                self.data['batch_data'][concept] = None # Store None on exception
+        
+        self.logger.info(f"Completed RAG-driven fetching of core project data. self.data['batch_data'] keys: {list(self.data['batch_data'].keys())}")
+        self.logger.info(f"Successfully fetched core concepts: {successfully_fetched_core_concepts}")
 
     async def _invoke_tool_for_endpoint(self, endpoint_pattern: str, project_name: str, query: Optional[str] = None, cache_key: Optional[str] = None) -> Dict[str, Any]:
         """Formats endpoint pattern INCLUDING identifiers in the path and calls fetch_data."""
@@ -466,7 +561,8 @@ class Researcher:
                 "results": result,
                 "endpoint": endpoint,
                 "query": project_param,
-                "count": len(result)
+                "count": len(result),
+                "source": endpoint.split("://")[1].split("/")[0] if "://" in endpoint else "unknown_list_source" # Added source
             }
         else:
             return {
@@ -775,198 +871,123 @@ class Researcher:
             return {"error": str(e)}
     
     async def _batch_process_coinmarketcap(self, project_name: str) -> Dict[str, Any]:
-        """Batch process all CoinMarketCap API calls for a project, including volume_history and ohlcv."""
-        self.logger.info(f"Batch processing CoinMarketCap data for {project_name}")
+        """Batch process CoinMarketCap API calls for a project by invoking standard endpoints for overview, price history, and volume history."""
+        self.logger.info(f"Batch processing CoinMarketCap data for {project_name} by invoking standard endpoints via _invoke_tool_for_endpoint.")
         
-        try:
-            cache_manager = CacheManager(project_name=project_name)
-            cached_data = cache_manager.load("coinmarketcap", "data", project_name.lower())
-            
-            if cached_data:
-                self.logger.info(f"Using cached CoinMarketCap data for {project_name}")
-                if isinstance(cached_data, str):
-                    try:
-                        cached_data = json.loads(cached_data)
-                        self.logger.debug(f"Parsed cached CMC data keys: {list(cached_data.keys())}")
-                    except json.JSONDecodeError:
-                        self.logger.error(f"Failed to parse cached CMC data as JSON for {project_name}")
-                        cached_data = {"error": "Invalid cached data format"}
-                if isinstance(cached_data, dict) and "error" not in cached_data:
-                    self.logger.debug(f"Cached CMC data keys: {list(cached_data.keys())}")
-                    if "volume_history" in cached_data and isinstance(cached_data["volume_history"], list) and len(cached_data["volume_history"]) > 0:
-                        self.logger.debug(f"Cached volume_history sample: {cached_data['volume_history'][:5]}")
-                    if "ohlcv" in cached_data and isinstance(cached_data["ohlcv"], list) and len(cached_data["ohlcv"]) > 0:
-                        self.logger.debug(f"Cached ohlcv sample: {cached_data['ohlcv'][:5]}")
-                    self.data["batch_data"]["coinmarketcap"] = cached_data
-                    return cached_data
+        cmc_consolidated_data = {
+            "overview": None,
+            "price_history": None, 
+            "volume_history": None,
+            "error_in_batch": False # Flag to indicate if any part of the batch failed
+        }
+
+        endpoint_patterns_to_fetch = {
+            "overview": "data://coinmarketcap/overview/{coin}",
+            "price_history": "data://coinmarketcap/price_history/{coin}", # Expects 30-day OHLCV or similar
+            "volume_history": "data://coinmarketcap/volume_history/{coin}"  # Expects 30-day volume
+        }
+
+        for data_key, pattern in endpoint_patterns_to_fetch.items():
+            self.logger.info(f"Attempting to fetch '{data_key}' for CMC batch using pattern: {pattern}")
+            try:
+                # Using project_name as query, and a specific cache_key for batch context
+                # _invoke_tool_for_endpoint handles its own caching logic.
+                # Parameters like 'days=30' should be part of the MCP server's tool definition or passed if _invoke_tool_for_endpoint is enhanced.
+                # For now, assuming the server tools default to 30 days or the patterns are specific enough.
+                # If specific params like 'days' are needed and not part of the pattern, this approach needs refinement or _invoke_tool_for_endpoint needs enhancement.
+                # For this iteration, we'll assume the endpoint pattern or server-side tool handles 'days=30' implicitly.
+                
+                # Let's construct a more unique cache key for batch items to avoid collision with section-specific calls
+                # for the same endpoint, if the underlying data isn't identical (though for project-wide data it should be).
+                batch_cache_key = f"batch_cmc_{data_key}"
+
+                result = await self._invoke_tool_for_endpoint(
+                    endpoint_pattern=pattern, 
+                    project_name=project_name, 
+                    query=project_name, # Generic query for project-level data
+                    cache_key=batch_cache_key
+                )
+                
+                if result and not result.get("error") and not result.get("data_unavailable"):
+                    cmc_consolidated_data[data_key] = result
+                    self.logger.info(f"Successfully fetched and stored '{data_key}' for CMC batch.")
                 else:
-                    self.logger.warning(f"Cached CMC data is invalid, fetching fresh data")
+                    error_detail = result.get("error", "Data unavailable") if isinstance(result, dict) else "Unknown error"
+                    self.logger.warning(f"Failed to fetch '{data_key}' for CMC batch. Error: {error_detail}")
+                    cmc_consolidated_data[data_key] = {"error": f"Failed to fetch {data_key}: {error_detail}", "data_unavailable": True}
+                    cmc_consolidated_data["error_in_batch"] = True
+            except Exception as e:
+                self.logger.error(f"Exception fetching '{data_key}' for CMC batch: {e!s}", exc_info=True)
+                cmc_consolidated_data[data_key] = {"error": f"Exception fetching {data_key}: {e!s}", "data_unavailable": True}
+                cmc_consolidated_data["error_in_batch"] = True
+        
+        if not self.data.get("batch_data"):
+            self.data["batch_data"] = {}
+        self.data["batch_data"]["coinmarketcap"] = cmc_consolidated_data
+        
+        if cmc_consolidated_data["error_in_batch"]:
+            self.logger.error(f"CoinMarketCap batch processing for {project_name} encountered errors in one or more components.")
+        else:
+            self.logger.info(f"Successfully completed CoinMarketCap batch processing for {project_name}.")
             
-            self.logger.info(f"Calling CoinMarketCap tools for {project_name}")
-            cmc_data = {}
-            
-            # Fetch overview data (current_price, price_change_percentage_24h, etc.)
-            overview_data = await self.mcp_client.call_tool(
-                "coinmarketcap", "get_batch_data", coin=project_name, project_name=project_name
-            )
-            if isinstance(overview_data, str):
-                try:
-                    overview_data = json.loads(overview_data)
-                    self.logger.debug(f"Parsed CMC overview response keys: {list(overview_data.keys())}")
-                except json.JSONDecodeError:
-                    self.logger.error(f"Failed to parse CMC overview response as JSON for {project_name}")
-                    overview_data = {"error": "Invalid overview response format"}
-            
-            if overview_data and isinstance(overview_data, dict) and "error" not in overview_data:
-                cmc_data.update(overview_data)
-                self.logger.info(f"Successfully retrieved CoinMarketCap overview data for {project_name}")
-            else:
-                self.logger.warning(f"Failed to retrieve CoinMarketCap overview data for {project_name}")
-                cmc_data["error"] = overview_data.get('error', 'Failed to retrieve overview data') if isinstance(overview_data, dict) else "Failed to retrieve overview data"
-            
-            # Fetch volume_history
-            volume_data = await self.mcp_client.call_tool(
-                "coinmarketcap", "get_volume_history", coin=project_name, project_name=project_name
-            )
-            if isinstance(volume_data, str):
-                try:
-                    volume_data = json.loads(volume_data)
-                    self.logger.debug(f"Parsed CMC volume_history response keys: {list(volume_data.keys())}")
-                except json.JSONDecodeError:
-                    self.logger.error(f"Failed to parse CMC volume_history response as JSON for {project_name}")
-                    volume_data = {"error": "Invalid volume_history response format"}
-            
-            if volume_data and isinstance(volume_data, dict) and "error" not in volume_data:
-                volume_history = volume_data.get("volume_history", [])
-                if isinstance(volume_history, list) and len(volume_history) > 0:
-                    cmc_data["volume_history"] = volume_history
-                    self.logger.info(f"Successfully retrieved CoinMarketCap volume_history for {project_name}")
-                    self.logger.debug(f"Volume history sample: {volume_history[:5]}")
-                else:
-                    self.logger.warning(f"CoinMarketCap volume_history is empty or invalid for {project_name}")
-                    cmc_data["volume_history"] = []
-            else:
-                self.logger.warning(f"Failed to retrieve CoinMarketCap volume_history for {project_name}")
-                cmc_data["volume_history"] = []
-            
-            # Fetch ohlcv data
-            ohlcv_data = await self.mcp_client.call_tool(
-                "coinmarketcap", "get_ohlcv", coin=project_name, project_name=project_name
-            )
-            if isinstance(ohlcv_data, str):
-                try:
-                    ohlcv_data = json.loads(ohlcv_data)
-                    self.logger.debug(f"Parsed CMC ohlcv response keys: {list(ohlcv_data.keys())}")
-                except json.JSONDecodeError:
-                    self.logger.error(f"Failed to parse CMC ohlcv response as JSON for {project_name}")
-                    ohlcv_data = {"error": "Invalid ohlcv response format"}
-            
-            if ohlcv_data and isinstance(ohlcv_data, dict) and "error" not in ohlcv_data:
-                ohlcv = ohlcv_data.get("ohlcv", [])
-                if isinstance(ohlcv, list) and len(ohlcv) > 0:
-                    cmc_data["ohlcv"] = ohlcv
-                    self.logger.info(f"Successfully retrieved CoinMarketCap ohlcv for {project_name}")
-                    self.logger.debug(f"OHLCV sample: {ohlcv[:5]}")
-                else:
-                    self.logger.warning(f"CoinMarketCap ohlcv is empty or invalid for {project_name}")
-                    cmc_data["ohlcv"] = []
-            else:
-                self.logger.warning(f"Failed to retrieve CoinMarketCap ohlcv for {project_name}")
-                cmc_data["ohlcv"] = []
-            
-            if cmc_data and ("error" not in cmc_data or len(cmc_data) > 1):
-                self.logger.info(f"Successfully retrieved CoinMarketCap data for {project_name}, keys: {list(cmc_data.keys())}")
-                cache_manager.save(cmc_data, "coinmarketcap", "data", project_name.lower())
-                self.data["batch_data"]["coinmarketcap"] = cmc_data
-                return cmc_data
-            else:
-                self.logger.warning(f"Failed to retrieve any valid CoinMarketCap data for {project_name}")
-                return {"error": "Failed to retrieve CoinMarketCap data"}
-        except Exception as e:
-            self.logger.error(f"Error in batch processing CoinMarketCap data for {project_name}: {str(e)}", exc_info=True)
-            return {"error": str(e)}
+        return cmc_consolidated_data
     
     async def _batch_process_defillama(self, project_name: str) -> Dict[str, Any]:
         """Batch process all DeFiLlama API calls for a project."""
         self.logger.info(f"Batch processing DeFiLlama data for {project_name}")
+        defillama_final_data = None
         
         try:
             cache_manager = CacheManager(project_name=project_name)
-            cached_data = cache_manager.load("defillama", "tvl", project_name.lower())
+            cached_data = cache_manager.load("defillama", "batch_consolidated_data", project_name.lower())
             
-            if cached_data:
-                self.logger.info(f"Using cached DeFiLlama data for {project_name}")
-                if isinstance(cached_data, str):
-                    try:
-                        cached_data = json.loads(cached_data)
-                        self.logger.debug(f"Parsed cached DeFiLlama data keys: {list(cached_data.keys())}")
-                    except json.JSONDecodeError:
-                        self.logger.error(f"Failed to parse cached DeFiLlama data as JSON for {project_name}")
-                        cached_data = {"error": "Invalid cached data format"}
-                if isinstance(cached_data, dict) and "error" not in cached_data:
-                    self.logger.debug(f"Cached DeFiLlama data keys: {list(cached_data.keys())}")
-                    tvl_history = cached_data.get("tvl_history", [])
-                    if isinstance(tvl_history, list) and len(tvl_history) > 0:
-                        self.logger.debug(f"Cached tvl_history sample: {tvl_history[:5]}")
-                        # Validate format
-                        valid_format = True
-                        for item in tvl_history[:5]:
-                            if isinstance(item, (list, tuple)) and len(item) >= 2:
-                                try:
-                                    _, value = item[:2]
-                                    float(value)
-                                except (ValueError, TypeError):
-                                    valid_format = False
-                                    break
-                            elif isinstance(item, dict) and any(key in item for key in ["tvl", "value"]) and any(key in item for key in ["date", "timestamp"]):
-                                try:
-                                    value = item.get("tvl", item.get("value"))
-                                    float(value)
-                                except (ValueError, TypeError):
-                                    valid_format = False
-                                    break
-                            else:
-                                valid_format = False
-                                break
-                        if valid_format:
-                            self.data["batch_data"]["defillama"] = cached_data
-                            return cached_data
-                        else:
-                            self.logger.warning(f"Cached DeFiLlama tvl_history has invalid format, fetching fresh data")
-                    else:
-                        self.logger.warning(f"Cached DeFiLlama tvl_history is empty or invalid, fetching fresh data")
-                else:
-                    self.logger.warning(f"Cached DeFiLlama data is invalid, fetching fresh data")
+            if cached_data and isinstance(cached_data, dict) and not cached_data.get("error_in_batch"):
+                self.logger.info(f"Using cached consolidated DeFiLlama data for {project_name}")
+                self.data["batch_data"]["defillama"] = cached_data
+                return cached_data
             
-            self.logger.info(f"Calling DeFiLlama tool directly for {project_name}")
-            defillama_data = await self.mcp_client.call_tool("defillama", "get_protocol_data", protocol=project_name, project_name=project_name)
+            self.logger.info(f"No valid consolidated cache for DeFiLlama data for {project_name}, fetching fresh.")
+            self.logger.info(f"Calling DeFiLlama tool 'get_protocol_data' for {project_name}")
+            defillama_response_raw = await self.mcp_client.call_tool("defillama", "get_protocol_data", protocol=project_name, project_name=project_name)
             
-            if isinstance(defillama_data, str):
-                try:
-                    defillama_data = json.loads(defillama_data)
-                    self.logger.debug(f"Parsed DeFiLlama response keys: {list(defillama_data.keys())}")
-                except json.JSONDecodeError:
-                    self.logger.error(f"Failed to parse DeFiLlama response as JSON for {project_name}")
-                    return {"error": "Invalid DeFiLlama response format"}
-            
-            if defillama_data and isinstance(defillama_data, dict) and "error" not in defillama_data:
-                self.logger.info(f"Successfully retrieved DeFiLlama data for {project_name}, keys: {list(defillama_data.keys())}")
-                tvl_history = defillama_data.get("tvl_history", [])
-                if isinstance(tvl_history, list) and len(tvl_history) > 0:
-                    self.logger.debug(f"Fresh tvl_history sample: {tvl_history[:5]}")
-                    cache_manager.save(defillama_data, "defillama", "tvl", project_name.lower())
-                    self.data["batch_data"]["defillama"] = defillama_data
-                    return defillama_data
-                else:
-                    self.logger.warning(f"DeFiLlama tvl_history is empty or invalid for {project_name}")
-                    return {"error": "DeFiLlama tvl_history is empty or invalid"}
+            defillama_data_processed = self._safe_handle_response(defillama_response_raw, "defillama.get_protocol_data", project_name)
+
+            if "error" in defillama_data_processed:
+                self.logger.warning(f"Failed to retrieve or parse base DeFiLlama data for {project_name}: {defillama_data_processed.get('error')}")
+                defillama_final_data = {**defillama_data_processed, "error_in_batch": True, "data_unavailable": True}
             else:
-                self.logger.warning(f"Failed to retrieve DeFiLlama data for {project_name}")
-                error_msg = defillama_data.get('error', 'Failed to retrieve DeFiLlama data') if isinstance(defillama_data, dict) else "Failed to retrieve DeFiLlama data"
-                return {"error": error_msg}
+                self.logger.info(f"Successfully retrieved and parsed base DeFiLlama data for {project_name}, keys: {list(defillama_data_processed.keys())}")
+                
+                # Ensure 'tvl_history' is present and is a list, even if empty
+                tvl_history = defillama_data_processed.get("tvl_history")
+                if tvl_history is None: # Key might be missing
+                    self.logger.warning(f"DeFiLlama 'tvl_history' key missing for {project_name}. Setting to empty list.")
+                    defillama_data_processed["tvl_history"] = []
+                elif not isinstance(tvl_history, list):
+                    self.logger.warning(f"DeFiLlama 'tvl_history' is not a list for {project_name} (type: {type(tvl_history)}). Setting to empty list.")
+                    defillama_data_processed["tvl_history"] = []
+                elif not tvl_history: # Empty list
+                    self.logger.info(f"DeFiLlama 'tvl_history' is an empty list for {project_name}.")
+                else: # Non-empty list
+                    self.logger.info(f"DeFiLlama 'tvl_history' for {project_name} has {len(tvl_history)} entries.")
+                    # Optional: Add validation for items within tvl_history if needed
+                
+                defillama_final_data = defillama_data_processed
+
+            if not defillama_final_data.get("error_in_batch"):
+                self.logger.info(f"Successfully processed DeFiLlama data for {project_name}. Saving to cache. Keys: {list(defillama_final_data.keys())}")
+                cache_manager.save(defillama_final_data, "defillama", "batch_consolidated_data", project_name.lower())
+            else:
+                 self.logger.warning(f"Not caching DeFiLlama batch data for {project_name} due to 'error_in_batch' flag.")
+
+            self.data["batch_data"]["defillama"] = defillama_final_data
+            return defillama_final_data
+                
         except Exception as e:
             self.logger.error(f"Error in batch processing DeFiLlama data for {project_name}: {str(e)}", exc_info=True)
-            return {"error": str(e)}
+            error_payload = {"error": str(e), "error_in_batch": True, "data_unavailable": True}
+            self.data["batch_data"]["defillama"] = error_payload
+            return error_payload
     
     async def _batch_process_tokenomics(self, project_name: str) -> Dict[str, Any]:
         """Batch process all Tokenomics API calls for a project."""
@@ -1170,7 +1191,7 @@ class Researcher:
             self.data["batch_data"]["tavily"] = all_section_results
             
             for key_check in sections_to_process:
-                cache_file_path = os.path.join("docs", project_name.lower(), "cache", "tavily", f"research_{key_check}.json")
+                cache_file_path = os.path.join("reports", project_name.lower(), "cache", "tavily", f"research_{key_check}.json")
                 if os.path.exists(cache_file_path):
                     self.logger.info(f"✅ Verified Tavily cache for '{key_check}' exists: {cache_file_path}")
                 else:
@@ -1180,9 +1201,11 @@ class Researcher:
                 
         except Exception as e:
             self.logger.error(f"General error in _batch_process_tavily for {project_name}: {str(e)}", exc_info=True)
-            error_payload = {"error": str(e), "data_unavailable": True}
-            if hasattr(self, 'data') and "batch_data" in self.data and "tavily" in self.data["batch_data"]:
-                self.data["batch_data"]["tavily"]["_overall_error"] = error_payload 
+            error_payload = {"error": str(e), "data_unavailable": True, "source": "tavily_exception"}
+            if hasattr(self, 'data') and "batch_data" in self.data:
+                if "tavily_section_research" not in self.data["batch_data"]:
+                    self.data["batch_data"]["tavily_section_research"] = {}
+                self.data["batch_data"]["tavily_section_research"]["_overall_error"] = error_payload 
             return error_payload
 
 async def researcher(state, llm=None, logger=None, config=None):

@@ -71,10 +71,11 @@ Reports can be customized through the report_structure.json file:
    - `OPENAI_API_KEY` - Required for LLM operations
    - `TAVILY_API_KEY` - Required for web search
    - `COINMARKETCAP_API_KEY` - Optional for additional market data
-4. Customize report_structure.json (optional)
-5. Run the server: `python -m uvicorn main:app --reload`
+4. Customize `backend/config/report_structure.json` (optional)
+5. Run the server: `uvicorn backend.api.main:app --host 0.0.0.0 --port 8000 --reload`
 
 ## 📊 Using the System
+
 
 The platform can be accessed through:
 
@@ -106,56 +107,72 @@ The system employs a hierarchical approach similar to GPT-Researcher, but with s
 xplaincrypto/
 ├── backend/              # FastAPI server
 │   ├── agents/           # AI agents for different tasks
-│   │   ├── researcher.py # Main research agent
-│   │   ├── visualization_agent.py # Data visualization agent
-│   │   ├── writer.py     # Report writing agent
-│   │   ├── editor.py     # Report editing agent
-│   │   ├── reviewer.py   # Report review agent
-│   │   └── publisher.py  # Report publishing agent
+│   │   ├── researcher.py
+│   │   ├── visualizer.py
+│   │   ├── writer.py
+│   │   ├── editor.py
+│   │   ├── reviewer.py
+│   │   └── publisher.py
+│   ├── api/              # FastAPI endpoints
+│   │   └── mcp_api.py
+│   ├── cli/              # Command-line interface tools
+│   │   └── manage_mcp.py
 │   ├── config/           # Configuration files
-│   │   ├── app_config.json # Main application configuration
-│   │   ├── report_structure.json # Report customization settings
-│   │   ├── style_config.json # Visual styling configuration
-│   │   └── error_categories.json # Error handling configuration
+│   │   ├── app_config.json
+│   │   ├── report_config.json
+│   │   ├── style_config.json
+│   │   ├── error_categories.json
+│   │   ├── mcp_servers.json
+│   │   └── visualization_mapping.json
 │   ├── core/             # Core application components
-│   │   ├── app_factory.py # Application initialization
-│   │   ├── config_loader.py # Configuration management
-│   │   └── server.py     # Server setup and routes
+│   │   ├── app_factory.py
+│   │   ├── config_loader.py
+│   │   └── server.py
 │   ├── orchestration/    # Workflow coordination
-│   │   └── workflow_manager.py # Manages workflow execution
-│   ├── research/         # Research system components
-│   │   ├── core.py       # Core research components
-│   │   ├── agents.py     # Specialized research agents
-│   │   └── orchestrator.py # Orchestrates research process
-│   ├── retriever/        # Web & API retrieval components
-│   │   ├── tavily_search.py # Web search integration
-│   │   ├── huggingface_search.py # HuggingFace integration
-│   │   ├── coingecko_api.py # CoinGecko API retriever
-│   │   ├── coinmarketcap_api.py # CoinMarketCap API retriever
-│   │   ├── defillama_api.py # DeFi Llama API retriever 
-│   │   └── data_gatherer.py # Manages multiple data sources
+│   │   ├── workflow_manager.py
+│   │   ├── mcp/            # MCP specific orchestration (client-side)
+│   │   │   ├── client_manager.py
+│   │   │   ├── router.py
+│   │   │   └── endpoint_selector.py
+│   │   │   └── initialize_endpoints.py
+│   │   └── rag/            # RAG specific orchestration
+│   │       ├── retriever.py
+│   │       └── vector_store.py
 │   ├── services/         # Shared services
-│   │   ├── communication/ # Communication services
-│   │   │   └── socket_service.py # Socket.IO handling
-│   │   └── reporting/    # Reporting services
-│   │       ├── progress_tracker.py # Progress tracking
-│   │       ├── error_reporter.py # Error reporting
-│   │       └── logging_config.py # Centralized logging config
+│   │   ├── communication/
+│   │   │   └── socket_service.py
+│   │   └── reporting/
+│   │       ├── progress_tracker.py
+│   │       ├── error_reporter.py
+│   │       └── logging_config.py
 │   ├── utils/            # Utility functions
-│   │   └── style_utils.py # Styling utilities for visualizations
+│   │   └── style_utils.py
 │   ├── visualizations/   # Modular visualization components
-│   │   ├── base.py       # Base visualizer class
-│   │   ├── line_chart.py # Line chart visualizer
-│   │   ├── bar_chart.py  # Bar chart visualizer
-│   │   ├── pie_chart.py  # Pie chart visualizer
-│   │   ├── table.py      # Table visualizer
-│   │   └── timeline.py   # Timeline visualizer
+│   │   ├── base_visualizer.py 
+│   │   ├── bar_chart.py
+│   │   ├── candlestick_chart.py
+│   │   ├── comparison_chart.py
+│   │   ├── error_chart.py
+│   │   ├── line_chart.py
+│   │   ├── pie_chart.py
+│   │   ├── table.py
+│   │   ├── timeline.py
+│   │   └── visualization_factory.py
+├   |── servers/          # Standalone MCP Server Implementations
 │   ├── state.py          # State definitions
 │   └── main.py           # Server entry point
 ├── frontend/             # Next.js frontend
-│   ├── pages/            # React components and pages
+│   ├── app/              # Main application components (Next.js 13+ app router)
+│   ├── components/       # Reusable UI components
+│   ├── pages/            # Next.js pages (if using pages router)
+│   ├── public/           # Static assets
 │   └── styles/           # CSS and styling
-└── docs/                 # Generated reports and visualizations
+├── .env                  # Environment variables (TEMPLATE - DO NOT COMMIT ACTUAL KEYS)
+├── .gitignore
+├── docker-compose.yml
+├── install_deps.sh
+├── README.md             # This file
+└── requirements.txt      # Main Python dependencies for backend
 ```
 
 ## Key Features
@@ -281,4 +298,4 @@ Run the example script to generate all visualizations:
 python examples/generate_visualizations.py
 ```
 
-This will create all 11 visualization types in the `docs/ONDO/` directory.
+This will create all 11 visualization types in the `reports/ONDO/` directory.

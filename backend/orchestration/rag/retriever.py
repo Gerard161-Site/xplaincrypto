@@ -252,13 +252,14 @@ class RAGRetriever:
             self.logger.error(f"Error in LLM endpoint refinement: {str(e)}")
             return endpoints
             
-    async def get_endpoints_for_project(self, query: str, required_sources: Optional[List[str]] = None) -> List[str]:
+    async def get_endpoints_for_project(self, query: str, required_sources: Optional[List[str]] = None, top_k: Optional[int] = 5) -> List[str]:
         """
         Get appropriate MCP endpoints for a project query using semantic search.
         
         Args:
             query: The query to search for
             required_sources: List of required data sources (e.g., ["web_research", "coinmarketcap"])
+            top_k: The number of top results to retrieve from the vector store. Defaults to 5.
             
         Returns:
             List of endpoint strings (e.g., ["data://coingecko/price/{coin}"])
@@ -309,8 +310,9 @@ class RAGRetriever:
             # use semantic search with Pinecone
             if self.vector_store:
                 # Run semantic search against our endpoint descriptions
-                top_k = int(os.getenv("RAG_TOP_K", "10"))
-                results = await self.vector_store.search(query, top_k=top_k)
+                # Use the provided top_k, defaulting if None
+                search_top_k = top_k if top_k is not None else int(os.getenv("RAG_TOP_K", "5"))
+                results = await self.vector_store.search(query, top_k=search_top_k)
                 
                 # Extract endpoint patterns from results
                 endpoint_patterns = [result["metadata"]["pattern"] for result in results 

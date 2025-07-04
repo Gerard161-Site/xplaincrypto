@@ -1,0 +1,70 @@
+{
+    "server_name": "defillama",
+    "display_name": "DeFiLlama API",
+    "description": "Provides DeFi protocol data, including TVL, historical data, and yield opportunities.",
+    "command": "python defillama_mcp.py",
+    "environment": {},
+    "port": 8002,
+    "mount_path": "/mcp_defillama",
+    "tools": [
+      {
+        "name": "get_protocol_info",
+        "description": "Fetch detailed information about a specific DeFi protocol (TVL, category, chains, description, etc.).",
+        "parameters": [
+          {"name": "protocol_identifier", "type": "string", "required": true, "description": "Name, symbol, or slug of the protocol (e.g., uniswap, makerdao)"}
+        ]
+      },
+      {
+        "name": "get_tvl",
+        "description": "Fetch TVL (Total Value Locked) data for a specific DeFi protocol.",
+        "parameters": [
+          {"name": "protocol_identifier", "type": "string", "required": true, "description": "Name, symbol, or slug of the protocol"}
+        ]
+      },
+      {
+        "name": "find_protocols",
+        "description": "Search for DeFi protocols based on a search term.",
+        "parameters": [
+          {"name": "search_term", "type": "string", "required": true, "description": "Term to search for (e.g., lending, aave)"}
+        ]
+      },
+      {
+        "name": "get_yield_opportunities",
+        "description": "Fetch yield farming opportunities (pools, APYs) for a specific DeFi protocol.",
+        "parameters": [
+          {"name": "protocol_identifier", "type": "string", "required": true, "description": "Name, symbol, or slug of the protocol"}
+        ]
+      }
+    ],
+    "resources": [
+      {
+        "path": "data://defillama/protocol/{protocol_query}",
+        "description": "Get detailed data for a specific DeFi protocol.",
+        "parameters": [
+            {"name": "protocol_query", "type": "string", "required": true, "description": "Protocol name, symbol, or slug"}
+        ]
+      },
+      {
+        "path": "data://defillama/tvl/{protocol_query}",
+        "description": "Get TVL (Total Value Locked) data for a DeFi protocol.",
+        "parameters": [
+            {"name": "protocol_query", "type": "string", "required": true, "description": "Protocol name, symbol, or slug"}
+        ]
+      },
+      {
+        "path": "data://defillama/search/{query}",
+        "description": "Search for DeFi protocols by name or symbol.",
+        "parameters": [
+            {"name": "query", "type": "string", "required": true, "description": "Search query for protocols"}
+        ]
+      },
+      {
+        "path": "data://defillama/yields/{protocol_query}",
+        "description": "Get current yield/APY data for pools on a DeFi protocol.",
+        "parameters": [
+            {"name": "protocol_query", "type": "string", "required": true, "description": "Protocol name, symbol, or slug"}
+        ]
+      }
+    ],
+    "cache_ttl": 3600 
+  } 

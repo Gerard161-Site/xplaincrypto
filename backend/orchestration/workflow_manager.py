@@ -7,19 +7,23 @@ from typing import Dict, Any, Optional, List, TypedDict
 from copy import deepcopy
 from pathlib import Path
 
-# Import StateManager
+# Import BaseTool for type hint
+from langchain_core.tools import BaseTool
+
+# Import agent functions from backend/agents/
+from backend.agents.researcher import researcher
+from backend.agents.writer import writer
+from backend.agents.visualizer import visualizer_async
+from backend.agents.reviewer import reviewer
+from backend.agents.editor import editor
+from backend.agents.publisher import publisher
+
 from backend.utils.state_manager import StateManager
 from backend.services.reporting.error_reporter import ErrorReporter
 from backend.services.reporting.progress_tracker import ProgressTracker
 from backend.utils.cache_utils import CacheManager
-
-# Import agent functions
-from backend.agents.researcher import researcher
-from backend.agents.writer import writer
-from backend.agents.editor import editor
-from backend.agents.reviewer import reviewer
-from backend.agents.publisher import publisher
-from backend.agents.visualizer import visualizer_async
+from backend.orchestration.mcp.client_manager import MCPClientManager
+from backend.orchestration.rag.vector_store import get_vector_store
 
 class WorkflowState(TypedDict):
     project_name: str
@@ -52,6 +56,8 @@ class WorkflowManager:
         self.progress_tracker = progress_tracker
         self.error_reporter = error_reporter
         self.state_manager = StateManager(logger=logger)
+        self.mcp_client = MCPClientManager()
+        self.vector_store = get_vector_store()
         if progress_tracker:
             self.logger.info("ProgressTracker initialized in WorkflowManager")
         if error_reporter:
@@ -103,14 +109,12 @@ class WorkflowManager:
                 success = self.initialize_llm()
                 if not success:
                     self.logger.error("Failed to initialize LLM in WorkflowManager")
-                    if self.error_reporter:
-                        self.error_reporter.report_error(
-                            Exception("LLM initialization failed"),
-                            category="system_error",
-                            component="workflow_manager",
-                            context={"feature": "llm_initialization"}
-                        )
                     return False
+            
+            # Initialize MCPClientManager to start all servers
+            self.logger.info("Initializing MCPClientManager")
+            await self.mcp_client.initialize()
+            
             self.logger.info("WorkflowManager initialized successfully")
             return True
         except Exception as e:
@@ -135,13 +139,9 @@ class WorkflowManager:
         """
         self.logger.info(f"Executing research workflow for query: {query}")
         
-        # Set default context if none provided
         context = context or {}
-        
-        # Create a project name from the query
         project_name = context.get("project_name") or query.lower().replace(" ", "_")
         
-        # Execute the workflow with necessary parameters
         result = await self.execute_workflow(
             project_name=project_name,
             fast_mode=context.get("fast_mode", False),
@@ -149,20 +149,53 @@ class WorkflowManager:
             visualization_request=context.get("visualization_request")
         )
         
-        # Add query information to result
         result["query"] = query
         result["context"] = context
         
         return result
 
-    async def execute_workflow(self, project_name: str, fast_mode: bool = False, mode: str = "report", visualization_request: Optional[Dict] = None) -> Dict[str, Any]:
-        from backend.agents.researcher import researcher
-        from backend.agents.writer import writer
-        from backend.agents.visualizer import visualizer_async
-        from backend.agents.reviewer import reviewer
-        from backend.agents.editor import editor
-        from backend.agents.publisher import publisher
+    async def execute_chat_workflow(self, query: str, project_name: str) -> Dict[str, Any]:
+        """
+        Execute a chatbot query workflow.
+        
+        Args:
+            query: The user query
+            project_name: The project name
+            
+        Returns:
+            The result of the chat query
+        """
+        self.logger.info(f"Executing chat workflow for query: {query}, project: {project_name}")
+        
+        state = {
+            "project_name": project_name,
+            "report_config": deepcopy(self.report_config),
+            "fast_mode": True,
+            "mode": "query",
+            "visualization_request": [],
+            "errors": {},
+            "review_status": {},
+            "writer_output": {},
+            "visualizer_output": {},
+            "merged_output": {},
+            "final_report": "",
+            "report_path": "",
+            "visualization_list": []
+        }
+        
+        try:
+            state = await researcher(state, llm=self.llm, logger=self.logger)
+            state = await writer(state, llm=self.llm, logger=self.logger)
+            return {
+                "project_name": project_name,
+                "result": state.get("writer_output", {}).get("draft", ""),
+                "errors": state.get("errors", {})
+            }
+        except Exception as e:
+            self.logger.error(f"Error executing chat workflow: {str(e)}")
+            return {"error": str(e), "project_name": project_name}
 
+    async def execute_workflow(self, project_name: str, fast_mode: bool = False, mode: str = "report", visualization_request: Optional[Dict] = None) -> Dict[str, Any]:
         self.logger.info(f"Starting asynchronous workflow execution for {project_name}")
         start_time = time.time()
 
@@ -188,12 +221,10 @@ class WorkflowManager:
         }
         
         try:
-            # Run each agent asynchronously with longer timeout for researcher
             self.logger.info("Running Researcher")
-            # Give researcher more time to complete all sections
             state = await asyncio.wait_for(
                 researcher(state, llm=self.llm, logger=self.logger),
-                timeout=600  # 10 minutes timeout for researcher
+                timeout=600
             )
             self.logger.info("Researcher completed")
             
@@ -234,17 +265,12 @@ class WorkflowManager:
             }
         except Exception as e:
             self.logger.error(f"Error executing workflow: {str(e)}")
-            if self.error_reporter:
-                self.error_reporter.report_error(
-                    e, category="system_error", component="workflow_manager",
-                    context={"project_name": project_name, "mode": mode}
-                )
             return {
                 "error": str(e),
                 "project_name": project_name,
                 "mode": mode
             }
-        
+    
     def _merge_results(self, state: WorkflowState) -> Dict[str, Any]:
         self.logger.info(f"Merging results for project: {state.get('project_name', 'Unknown Project')}")
         writer_output = state.get('writer_output', {})
@@ -264,6 +290,21 @@ class WorkflowManager:
         updated_state['merged_output'] = merged_output
         self.logger.info(f"Merged state keys: {list(updated_state.keys())}")
         return updated_state
+
+    async def get_available_tools(self, server_names: Optional[List[str]] = None) -> List[BaseTool]:
+        """Get available tools from MCP servers."""
+        return await self.mcp_client.get_tools(server_names)
+    
+    async def execute_tool(self, tool_name: str, **kwargs) -> Any:
+        """Execute a specific MCP tool."""
+        server_name = None
+        for name in ["coinmarketcap", "defillama", "tavily", "huggingface"]:
+            if name in tool_name.lower():
+                server_name = name
+                break
+        if not server_name:
+            raise ValueError(f"Could not determine server for tool: {tool_name}")
+        return await self.mcp_client.execute_tool(server_name, tool_name, kwargs)
 
     def _report_error(self, state: Dict[str, Any], stage: str, error: str) -> Dict[str, Any]:
         """Report an error using the error reporter and StateManager."""

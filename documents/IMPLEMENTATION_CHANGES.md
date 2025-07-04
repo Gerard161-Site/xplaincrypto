@@ -37,8 +37,8 @@ The `Visualizer` class has been enhanced to:
 
 File path handling has been improved throughout the codebase:
 
-- Ensuring the `docs/{project}` directory exists before saving files
+- Ensuring the `reports/{project}` directory exists before saving files
 - Creating directories as needed when saving visualizations
 - Verifying file system write access before attempting to generate visualizations
 
-These changes ensure that reports and images are properly saved to the `docs/{project}` directory as required.
+These changes ensure that reports and images are properly saved to the `reports/{project}` directory as required.

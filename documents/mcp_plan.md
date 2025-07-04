@@ -65,7 +65,7 @@ XplainCrypto/
 │   ├── state.py                   # Existing state definitions (unchanged)
 │   └── main.py                    # Existing entry point (unchanged)
 ├── frontend/
-├── docs/
+├── reports/
 └── requirements.txt
 ```
 

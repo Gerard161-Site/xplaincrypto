@@ -4,7 +4,7 @@ echo "Installing dependencies for XplainCrypto..."
 
 # Create necessary directories if they don't exist
 mkdir -p backend/research
-mkdir -p docs
+mkdir -p reports
 
 # Install Python dependencies
 pip install -r requirements.txt
